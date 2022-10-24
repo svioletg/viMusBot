@@ -3,3 +3,4 @@ __pycache__/
 token.txt
 spotify.txt
 *.log
+basic_voice.py
