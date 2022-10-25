@@ -3,10 +3,29 @@ import discord
 import yt_dlp
 import spoofy
 import sys
+import os
 from discord.ext import commands
+
+### TODO
+# - Queue system
+# - Add stop command
+# - Add skip command
+# - Add support for forcing a youtube search by user
+
+version='1.1.0'
 
 # Start logging
 discord.utils.setup_logging()
+
+# Personal debug logging
+debug=True
+def logln():
+	cf = currentframe()
+	if debug: print('@ LINE ', cf.f_back.f_lineno)
+
+def log(msg):
+	if debug:
+		print('[ bot.py ] '+str(msg))
 
 # Used for bot owner-specific commands
 myID = '141354677752037377'
@@ -34,6 +53,25 @@ ffmpeg_options = {
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
+
+# For easier emoji usage
+emoji={
+	'cancel':'❌',
+	'confirm':'✅',
+	'num':[
+	'0️⃣',
+	'1️⃣',
+	'2️⃣',
+	'3️⃣',
+	'4️⃣',
+	'5️⃣',
+	'6️⃣',
+	'7️⃣',
+	'8️⃣',
+	'9️⃣',
+	'🔟'
+	],
+}
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
@@ -83,12 +121,89 @@ class Music(commands.Cog):
 
 		await channel.connect()
 
-	@commands.command()
-	async def play(self, ctx, *, url):
-		"""Streams from a url (same as yt, but doesn't predownload)"""
+	@commands.command(aliases=['p'])
+	async def play(self, ctx, *, url: str):
+		"""Main music playing command."""
+		mid = ctx.message.id
+		# Remove old downloaded videos
+		if os.path.exists('*.webm'):
+			os.remove('*.webm')
+
+		if 'https://' not in ctx.message.content:
+			embed=discord.Embed(title='Query must be a link.')
+			await ctx.send(embed=embed)
+			return
 
 		async with ctx.typing():
-			player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+			if 'open.spotify.com' in ctx.message.content:
+				# Locate YT equivalent if spotify link given
+				log('Spotify URL was received from play command.')
+				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',color=0xFFFF00)
+				await ctx.send(embed=embed)
+				spyt=spoofy.spyt(url)
+				log('Checking if unsure...')
+				if type(spyt)==tuple and spyt[0]=='unsure':
+					# This indicates no match was found
+					log('spyt returned unsure.')
+					# Remove the warning, no longer needed
+					spyt=spyt[1]
+					# Shorten to {limit} results
+					limit=5
+					spyt=dict(list(spyt.items())[:limit])
+					# Prompt the user with choice
+					log('Generating embed message...')
+					embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+					for i in spyt:
+						title=spyt[i]['title']
+						url=spyt[i]['url']
+						embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
+
+					log('Embed created.')
+					prompt = await ctx.send(embed=embed)
+					# Get reaction menu ready
+					log('Adding reactions.')
+					for i in spyt:
+						await prompt.add_reaction(emoji['num'][i+1])
+
+					await prompt.add_reaction(emoji['cancel'])
+
+					def check(reaction, user):
+						log('Reaction check is being called.')
+						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
+
+					log('Checking for reaction...')
+					try:
+						reaction, user = await bot.wait_for('reaction_add', timeout=15.0, check=check)
+					except asyncio.TimeoutError as e:
+						log('Timeout reached.')
+						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
+						await ctx.send(embed=embed)
+						return
+					except Exception as e:
+						log('An error occurred.')
+						print(e)
+						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
+						await ctx.send(embed=embed)
+						return
+					else:
+						# If a valid reaction was received.
+						log('Received a valid reaction.')
+						if str(reaction)==emoji['cancel']:
+							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+							await ctx.send(embed=embed)
+							return
+						else:
+							print(str(reaction))
+							choice=emoji['num'].index(str(reaction))
+							print(choice)
+							spyt=spyt[choice-1]
+							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
+							await ctx.send(embed=embed)
+
+				url=spyt['url']
+			
+			player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=False)
+			log('Starting player.')
 			ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
 
 		embed=discord.Embed(title=f'Now playing: {player.title}',color=0xFFFF00)
@@ -139,9 +254,12 @@ class Music(commands.Cog):
 
 # Establish bot user
 intents = discord.Intents.default()
+intents.messages = True
 intents.message_content = True
 intents.voice_states = True
 intents.reactions = True
+intents.guilds = True
+intents.members = True
 
 bot = commands.Bot(
 	command_prefix=commands.when_mentioned_or('$'),

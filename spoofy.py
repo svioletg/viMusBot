@@ -1,23 +1,29 @@
+import json
 import spotipy
 from spotipy import SpotifyClientCredentials
 from discord import Embed
 from datetime import datetime
 from inspect import currentframe, getframeinfo
+from ytmusicapi import YTMusic
 
-debug=False
+### TODO
+# - Add support for finding album equivalents
+
+debug=True
 def logln():
 	cf = currentframe()
 	if debug: print('@ LINE ', cf.f_back.f_lineno)
 
 def log(msg):
 	if debug:
-		print(msg)
+		print('[ spoofy.py ] '+msg)
 
-# Set up spotify
-creds = open('spotify.txt').read().split('\n')
-spotid = creds[0]
-spotsecret = creds[1]
-client_credentials_manager = SpotifyClientCredentials(client_id=spotid,client_secret=spotsecret)
+# Connect to youtube music API
+ytmusic = YTMusic()
+
+# Connect to spotify API
+scred = json.loads(open('config.json').read())['spotify']
+client_credentials_manager = SpotifyClientCredentials(client_id=scred['client_id'], client_secret=scred['client_secret'])
 sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
 keytable = {
@@ -35,8 +41,74 @@ keytable = {
 	11: 'B major or G#/Ab minor',
 }
 
+# Youtube
+def searchYT(**kwargs):
+	query=''
+	limit=5
+	unsure=False
+
+	if 'title' not in kwargs:
+		print('spoofy.searchYT: "title" was not passed, aborting.')
+		return False
+
+	# Process kwargs
+	title=kwargs['title']
+	query+=title
+	artist=kwargs['artist']
+	query+=' '+artist
+	if 'limit' in kwargs:
+		limit=kwargs['limit']
+
+	# Start search
+	log(f'searchYT: Trying query \"{query}\" with a limit of {limit}')
+	search_out=ytmusic.search(query=query,limit=limit,filter='songs')
+	log('Checking for exact match...')
+	# SET TO FALSE BEFORE GENERAL USE!
+	force_no_match=False
+	# Try user-uploaded videos if no song found
+	if title not in search_out[0]['title'] or force_no_match:
+		log('Not found; checking for close match...')
+		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
+		# If no close match is found, pass to the user
+		if title not in search_out[0]['title'] or force_no_match:
+			log('Not found; marking for unsure.')
+			unsure=True
+		else:
+			log('Close match check passed.')
+	# Make new dicts with more relevant information
+	results={}
+	log('Creating results dictionary...')
+	for result in search_out:
+		results[search_out.index(result)] = {
+		'title': result['title'],
+		'artist': result['artists'][0]['name'],
+		'url': 'https://www.youtube.com/watch?v='+result['videoId'],
+		'duration': result['duration'],
+		}
+
+	# Ask for confirmation if no exact match found
+	if unsure:
+		log('searchYT is returning as unsure.')
+		return 'unsure', results
+
+	# Return top result if not specified otherwise
+	if 'all' in kwargs:
+		if kwargs['all']:
+			return results
+	else:
+		return results[0]
+
+# Spotify
 def getURI(url):
 	return url.split("/")[-1].split("?")[0]
+
+def trackinfo(url):
+	uri=getURI(url)
+	info=sp.track(uri)
+	title=info['name']
+	# Only retrieves the first artist name
+	artist=info['artists'][0]['name']
+	return title, artist
 
 def analyzetrack(url):
 	uri=getURI(url)
@@ -46,6 +118,7 @@ def analyzetrack(url):
 
 	embed=Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=0x00FF00)
 
+	# Nicer formatting
 	data['tempo']=str(int(data['tempo']))+'bpm'
 	data['key']=keytable[data['key']]
 	data['time_signature']=str(data['time_signature'])+'/4'
@@ -71,12 +144,9 @@ def analyzetrack(url):
 
 	# Assemble embed object
 	# Put key, time sig, and tempo at the top
-	embed.add_field(name='Key',value=data['key'])
-	data.pop('key')
-	embed.add_field(name='Tempo',value=data['tempo'])
-	data.pop('tempo')
-	embed.add_field(name='Time Signature',value=data['time_signature'])
-	data.pop('time_signature')
+	embed.add_field(name='Key',value=data['key']); data.pop('key')
+	embed.add_field(name='Tempo',value=data['tempo']); data.pop('tempo')
+	embed.add_field(name='Time Signature',value=data['time_signature']); data.pop('time_signature')
 
 	# Add the rest
 	for i in data:
@@ -91,9 +161,18 @@ def analyzetrack(url):
 				value=str(round(data[i]*100,2))+'%'
 
 		value=str(value)
-		log(i)
-		log(data[i])
-		log(value)
 		embed.add_field(name=i.title(),value=value)
 
 	return embed
+
+def spyt(url, **kwargs):
+	track=trackinfo(url)
+	limit=5
+	if 'limit' in kwargs:
+		limit=kwargs['limit']
+
+	result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
+	if type(result)==tuple and result[0]=='unsure':
+		log('spyt is returning as unsure.')
+		return result
+	return result
