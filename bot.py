@@ -1,10 +1,11 @@
+import os
+import sys
+import glob
+import yt_dlp
 import asyncio
 import discord
-import yt_dlp
-import spoofy
-import sys
-import os
 from discord.ext import commands
+import spoofy
 
 ### TODO
 # - Queue system
@@ -12,7 +13,7 @@ from discord.ext import commands
 # - Add skip command
 # - Add support for forcing a youtube search by user
 
-version='1.1.0'
+version='1.1.1'
 
 # Start logging
 discord.utils.setup_logging()
@@ -126,8 +127,8 @@ class Music(commands.Cog):
 		"""Main music playing command."""
 		mid = ctx.message.id
 		# Remove old downloaded videos
-		if os.path.exists('*.webm'):
-			os.remove('*.webm')
+		for i in glob.glob('*.webm'):
+			os.remove(i)
 
 		if 'https://' not in ctx.message.content:
 			embed=discord.Embed(title='Query must be a link.')
