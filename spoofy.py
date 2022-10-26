@@ -67,8 +67,7 @@ def searchYT(**kwargs):
 	# SET TO FALSE BEFORE GENERAL USE!
 	force_no_match=False
 
-	matching = artist==top['artists'][0]['name'] and (title in top['title'] or title.split(' - ')[0])
-
+	matching = artist.lower()==top['artists'][0]['name'].lower() and (title.lower() in top['title'].lower() or (title.split(' - ')[0].lower() in top['title'].lower() and title.split(' - ')[1].lower() in top['title'].lower()))
 	# Try user-uploaded videos if no song found
 	if not matching or force_no_match:
 		log('Not found; checking for close match...')

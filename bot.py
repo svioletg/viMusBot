@@ -9,13 +9,11 @@ import spoofy
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.1.2'
+version = '1.2.0'
 
 ### TODO
-# - Queue system
-# - Add skip command
 # - Remove the menu of top YT results after a result is selected
-
+# - Remove old webm files
 
 # Start logging
 discord.utils.setup_logging()
@@ -61,6 +59,10 @@ ffmpeg_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
+def urltitle(url):
+	info_dict = ytdl.extract_info(url, download=False)
+	return info_dict.get('title', None)
+
 # For easier emoji usage
 emoji={
 	'cancel':'❌',
@@ -79,8 +81,6 @@ emoji={
 	'🔟'
 	],
 }
-
-ytqueue = []
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
@@ -130,8 +130,14 @@ class Music(commands.Cog):
 
 		await channel.connect()
 
+	@commands.command(aliases=['s'])
+	async def skip(self, ctx):
+		await ctx.send(embed=embedq('Skipping...'))
+		await serverqueue(ctx, skip=True)
+
 	@commands.command()
 	async def stop(self, ctx):
+		ytqueue=[]
 		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
 			ctx.voice_client.stop()
 			await ctx.send(embed=embedq('Player has been stopped.'))
@@ -148,21 +154,45 @@ class Music(commands.Cog):
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
 
+	@commands.command()
+	async def clear(self, ctx):
+		ytqueue=[]
+		await ctx.send(embed=embedq('Queue cleared.'))
+
+	@commands.command(aliases=['q'])
+	async def queue(self, ctx):
+		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
+		n=1
+		for i in ytqueue:
+			if n<=10: embed.add_field(name=f'#{n}. {urltitle(i)}',value=i)
+			n+=1
+
+		await ctx.send(embed=embed)
+
+	@commands.command(aliases=['np'])
+	async def nowplaying(self, ctx):
+		# broken, fix later
+		embed=discord.Embed(title=f'Now playing: {nowplaying} {nowplaying.title()} {str(nowplaying.title)}')
+		await ctx.send(embed=embed)
+
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
+		log('play command')
 		"""Main music playing command."""
 		# Will resume if paused
 		# This is handled in on_command_error()
 
 		# Remove old downloaded videos
-		for i in glob.glob('*.webm'):
-			os.remove(i)
+
+		# for i in glob.glob('*.webm'):
+		# 	os.remove(i)
 
 		if 'https://' not in ctx.message.content:
 			embed=discord.Embed(title='Query must be a link.')
 			await ctx.send(embed=embed)
 			return
 
+		log('Starting play routine')
 		async with ctx.typing():
 			if 'open.spotify.com' in ctx.message.content:
 				# Locate YT equivalent if spotify link given
@@ -235,16 +265,21 @@ class Music(commands.Cog):
 							await ctx.send(embed=embed)
 
 				url=spyt['url']
+			
 			# Start the player.
-			player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=False)
-			log('Starting player.')
-			ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
-
-		embed=discord.Embed(title=f'Now playing: {player.title}',color=0xFFFF00)
-		if 'open.spotify.com' in ctx.message.content:
-			await message.edit(embed=embed)
-		else:
-			await ctx.send(embed=embed)
+			try:
+				log('Trying to start playing or queueing.')
+				if not ctx.voice_client.is_playing():
+					log('Voice client is not playing')
+					await playnext(url, ctx)
+				else:
+					log('URL appended to queue.')
+					ytqueue.append(url)
+					title=urltitle(url)
+					await ctx.send(embed=embedq(f'Added {title} to the queue at spot #{len(ytqueue)}'))
+			except Exception as e:
+				print(e)
+				raise e
 
 	@commands.command()
 	async def localfile(self, ctx, *, query):
@@ -266,7 +301,7 @@ class Music(commands.Cog):
 	@commands.command()
 	async def leave(self, ctx):
 		"""Stops and disconnects the bot from voice"""
-
+		ytqueue=[]
 		await ctx.voice_client.disconnect()
 
 	# Extra
@@ -286,9 +321,6 @@ class Music(commands.Cog):
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 				raise commands.CommandError("Author not connected to a voice channel.")
-		elif ctx.voice_client.is_playing():
-			ctx.voice_client.stop()
-
 
 
 # Establish bot user
@@ -317,6 +349,33 @@ except FileNotFoundError:
 async def on_ready():
 	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
 	print('------')
+
+# Queueing system
+ytqueue = []
+global nowplaying
+nowplaying=''
+
+async def playnext(url, ctx):
+	player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
+	nowplaying = player
+	ctx.voice_client.stop()
+	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(serverqueue(ctx), bot.loop))
+	embed=discord.Embed(title=f'Now playing: {player.title}',color=0xFFFF00)
+	if 'open.spotify.com' in ctx.message.content:
+		await ctx.message.edit(embed=embed)
+	else:
+		await ctx.send(embed=embed)
+
+async def serverqueue(ctx, **kwargs):
+	skip=False
+	if 'skip' in kwargs:
+		if kwargs['skip']==True: skip=True
+	if skip or (ytqueue != [] and not ctx.voice_client.is_playing()):
+		if ytqueue==[]:
+			ctx.voice_client.stop()
+		else:
+			await playnext(ytqueue.pop(0), ctx)
+		print('ytqueue - '+str(ytqueue))
 
 @bot.event
 async def on_command_error(ctx, error):
