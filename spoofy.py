@@ -62,15 +62,20 @@ def searchYT(**kwargs):
 	# Start search
 	log(f'searchYT: Trying query \"{query}\" with a limit of {limit}')
 	search_out=ytmusic.search(query=query,limit=limit,filter='songs')
+	top=search_out[0]
 	log('Checking for exact match...')
 	# SET TO FALSE BEFORE GENERAL USE!
 	force_no_match=False
+
+	matching = artist==top['artists'][0]['name'] and (title in top['title'] or title.split(' - ')[0])
+
 	# Try user-uploaded videos if no song found
-	if title not in search_out[0]['title'] or force_no_match:
+	if not matching or force_no_match:
 		log('Not found; checking for close match...')
 		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
+
 		# If no close match is found, pass to the user
-		if title not in search_out[0]['title'] or force_no_match:
+		if not matching or force_no_match:
 			log('Not found; marking for unsure.')
 			unsure=True
 		else:

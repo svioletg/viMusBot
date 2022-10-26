@@ -7,13 +7,15 @@ import discord
 from discord.ext import commands
 import spoofy
 
+# For personal reference
+# Represents the version of the overall project, not just this file
+version = '1.1.2'
+
 ### TODO
 # - Queue system
-# - Add stop command
 # - Add skip command
-# - Add support for forcing a youtube search by user
+# - Remove the menu of top YT results after a result is selected
 
-version='1.1.1'
 
 # Start logging
 discord.utils.setup_logging()
@@ -27,6 +29,10 @@ def logln():
 def log(msg):
 	if debug:
 		print('[ bot.py ] '+str(msg))
+
+# Shortcut for title-only embeds; "embed quick"
+def embedq(msg):
+	return discord.Embed(title=msg,color=0xFFFF00)
 
 # Used for bot owner-specific commands
 myID = '141354677752037377'
@@ -73,6 +79,8 @@ emoji={
 	'🔟'
 	],
 }
+
+ytqueue = []
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
@@ -122,10 +130,30 @@ class Music(commands.Cog):
 
 		await channel.connect()
 
+	@commands.command()
+	async def stop(self, ctx):
+		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+			ctx.voice_client.stop()
+			await ctx.send(embed=embedq('Player has been stopped.'))
+		else:
+			await ctx.send(embed=embedq('Nothing is playing.'))
+
+	@commands.command()
+	async def pause(self, ctx):
+		if ctx.voice_client.is_playing():
+			ctx.voice_client.pause()
+			await ctx.send(embed=embedq('Player has been paused.'))
+		elif ctx.voice_client.is_paused():
+			await ctx.send(embed=embedq('Player is already paused.'))
+		else:
+			await ctx.send(embed=embedq('Nothing to pause.'))
+
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
 		"""Main music playing command."""
-		mid = ctx.message.id
+		# Will resume if paused
+		# This is handled in on_command_error()
+
 		# Remove old downloaded videos
 		for i in glob.glob('*.webm'):
 			os.remove(i)
@@ -140,9 +168,10 @@ class Music(commands.Cog):
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
 				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',color=0xFFFF00)
-				await ctx.send(embed=embed)
+				message=await ctx.send(embed=embed)
 				spyt=spoofy.spyt(url)
 				log('Checking if unsure...')
+
 				if type(spyt)==tuple and spyt[0]=='unsure':
 					# This indicates no match was found
 					log('spyt returned unsure.')
@@ -154,6 +183,7 @@ class Music(commands.Cog):
 					# Prompt the user with choice
 					log('Generating embed message...')
 					embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+
 					for i in spyt:
 						title=spyt[i]['title']
 						url=spyt[i]['url']
@@ -163,6 +193,7 @@ class Music(commands.Cog):
 					prompt = await ctx.send(embed=embed)
 					# Get reaction menu ready
 					log('Adding reactions.')
+
 					for i in spyt:
 						await prompt.add_reaction(emoji['num'][i+1])
 
@@ -173,6 +204,7 @@ class Music(commands.Cog):
 						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
 
 					log('Checking for reaction...')
+
 					try:
 						reaction, user = await bot.wait_for('reaction_add', timeout=15.0, check=check)
 					except asyncio.TimeoutError as e:
@@ -189,6 +221,7 @@ class Music(commands.Cog):
 					else:
 						# If a valid reaction was received.
 						log('Received a valid reaction.')
+
 						if str(reaction)==emoji['cancel']:
 							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
 							await ctx.send(embed=embed)
@@ -202,13 +235,16 @@ class Music(commands.Cog):
 							await ctx.send(embed=embed)
 
 				url=spyt['url']
-			
+			# Start the player.
 			player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=False)
 			log('Starting player.')
 			ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
 
 		embed=discord.Embed(title=f'Now playing: {player.title}',color=0xFFFF00)
-		await ctx.send(embed=embed)
+		if 'open.spotify.com' in ctx.message.content:
+			await message.edit(embed=embed)
+		else:
+			await ctx.send(embed=embed)
 
 	@commands.command()
 	async def localfile(self, ctx, *, query):
@@ -241,12 +277,14 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@play.before_invoke
+	@pause.before_invoke
+	@stop.before_invoke
 	async def ensure_voice(self, ctx):
 		if ctx.voice_client is None:
 			if ctx.author.voice:
 				await ctx.author.voice.channel.connect()
 			else:
-				await ctx.send("You are not connected to a voice channel.")
+				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 				raise commands.CommandError("Author not connected to a voice channel.")
 		elif ctx.voice_client.is_playing():
 			ctx.voice_client.stop()
@@ -284,13 +322,15 @@ async def on_ready():
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
 		if ctx.command.name == 'play':
-			await ctx.send('No URL given.')
+			if ctx.voice_client.is_paused():
+				ctx.voice_client.resume()
+				await ctx.send(embed=embedq('Player is resuming.'))
+			else:
+				await ctx.send(embed=embedq('No URL given.'))
 		if ctx.command.name == 'volume':
-			await ctx.send('An integer between 0 and 100 must be given for volume.')
+			await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
 		if ctx.command.name == 'analyze':
-			await ctx.send('A spotify track URL is required.')
-		else:
-			await ctx.send('Command is missing required arguments.')
+			await ctx.send(embed=embedq('A spotify track URL is required.'))
 
 async def main():
 	async with bot:
