@@ -25,4 +25,6 @@ urllib3==1.26.12
 websockets==10.3
 wrapt==1.14.1
 yarl==1.8.1
+youtube-python==1.0.13
 yt-dlp==2022.10.4
+ytmusicapi==0.24.0

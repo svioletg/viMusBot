@@ -7,7 +7,6 @@ from inspect import currentframe, getframeinfo
 from ytmusicapi import YTMusic
 
 ### TODO
-# - Add support for finding album equivalents
 
 debug=True
 def logln():
@@ -67,18 +66,31 @@ def searchYT(**kwargs):
 	# SET TO FALSE BEFORE GENERAL USE!
 	force_no_match=False
 
-	matching = artist.lower()==top['artists'][0]['name'].lower() and (title.lower() in top['title'].lower() or (title.split(' - ')[0].lower() in top['title'].lower() and title.split(' - ')[1].lower() in top['title'].lower()))
+	def is_matching(item):
+		matchingArtist = artist.lower() in item['artists'][0]['name'].lower()
+		matchingTitle = title.lower() in item['title'].lower() or (title.split(' - ')[0].lower() in item['title'].lower() and title.split(' - ')[1].lower() in item['title'].lower())
+		desired = 'remix' in title.lower()
+		found = 'remix' in item['title'].lower()
+		remixcheck = False
+		if (desired and found) or (not desired and not found):
+			remixcheck=True
+		else:
+			remixcheck=False
+		return (matchingArtist) and (matchingTitle) and (remixcheck)
+
 	# Try user-uploaded videos if no song found
-	if not matching or force_no_match:
+	if not is_matching(top) or force_no_match:
 		log('Not found; checking for close match...')
 		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
+		top=search_out[0]
 
 		# If no close match is found, pass to the user
-		if not matching or force_no_match:
+		if not is_matching(top) or force_no_match:
 			log('Not found; marking for unsure.')
 			unsure=True
 		else:
 			log('Close match check passed.')
+
 	# Make new dicts with more relevant information
 	results={}
 	log('Creating results dictionary...')

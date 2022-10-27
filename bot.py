@@ -9,11 +9,18 @@ import spoofy
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.2.0'
+version = '1.2.1'
 
 ### TODO
+# - Fix editing previous messages from spoofy.py without context
 # - Remove the menu of top YT results after a result is selected
-# - Remove old webm files
+# - Add playlist & album support
+# - Add help command
+# - Add move command
+# - Consider keeping more information in ytqueue
+#   to reduce time spent on extracting info from URLs
+# - Find faster way to check URLs for errors
+# - Add command to trigger search menu
 
 # Start logging
 discord.utils.setup_logging()
@@ -35,8 +42,27 @@ def embedq(msg):
 # Used for bot owner-specific commands
 myID = '141354677752037377'
 
-# Largely borrowed from:
+# Based on and adapted from:
 # https://github.com/Rapptz/discord.py/blob/v2.0.1/examples/basic_voice.py
+
+# For easier emoji usage
+emoji={
+	'cancel':'❌',
+	'confirm':'✅',
+	'num':[
+	'0️⃣',
+	'1️⃣',
+	'2️⃣',
+	'3️⃣',
+	'4️⃣',
+	'5️⃣',
+	'6️⃣',
+	'7️⃣',
+	'8️⃣',
+	'9️⃣',
+	'🔟'
+	],
+}
 
 # Configure youtube dl
 ytdl_format_options = {
@@ -63,25 +89,6 @@ def urltitle(url):
 	info_dict = ytdl.extract_info(url, download=False)
 	return info_dict.get('title', None)
 
-# For easier emoji usage
-emoji={
-	'cancel':'❌',
-	'confirm':'✅',
-	'num':[
-	'0️⃣',
-	'1️⃣',
-	'2️⃣',
-	'3️⃣',
-	'4️⃣',
-	'5️⃣',
-	'6️⃣',
-	'7️⃣',
-	'8️⃣',
-	'9️⃣',
-	'🔟'
-	],
-}
-
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
 		super().__init__(source,volume)
@@ -103,7 +110,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
 		filename = data['url'] if stream else ytdl.prepare_filename(data)
 		return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
-
+# Start bot-related events
 
 # Commands here
 class Music(commands.Cog):
@@ -164,28 +171,28 @@ class Music(commands.Cog):
 		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
 		n=1
 		for i in ytqueue:
-			if n<=10: embed.add_field(name=f'#{n}. {urltitle(i)}',value=i)
+			if n<=10: embed.add_field(name=f'#{n}. {urltitle(i)}',value=i,inline=False)
 			n+=1
 
 		await ctx.send(embed=embed)
 
+	@commands.command()
+	async def remove(self, ctx, spot):
+		await ctx.send(embed=embedq(f'Removed {ytqueue.pop(spot+1)} from the queue.'))
+		ytqueue.pop(spot+1)
+
 	@commands.command(aliases=['np'])
 	async def nowplaying(self, ctx):
-		# broken, fix later
-		embed=discord.Embed(title=f'Now playing: {nowplaying} {nowplaying.title()} {str(nowplaying.title)}')
+		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
 		log('play command')
+		await ctx.send(embed=embedq('Trying to queue...'))
 		"""Main music playing command."""
 		# Will resume if paused
 		# This is handled in on_command_error()
-
-		# Remove old downloaded videos
-
-		# for i in glob.glob('*.webm'):
-		# 	os.remove(i)
 
 		if 'https://' not in ctx.message.content:
 			embed=discord.Embed(title='Query must be a link.')
@@ -197,11 +204,11 @@ class Music(commands.Cog):
 			if 'open.spotify.com' in ctx.message.content:
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
-				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',color=0xFFFF00)
+				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
 				message=await ctx.send(embed=embed)
 				spyt=spoofy.spyt(url)
-				log('Checking if unsure...')
 
+				log('Checking if unsure...')
 				if type(spyt)==tuple and spyt[0]=='unsure':
 					# This indicates no match was found
 					log('spyt returned unsure.')
@@ -217,6 +224,14 @@ class Music(commands.Cog):
 					for i in spyt:
 						title=spyt[i]['title']
 						url=spyt[i]['url']
+						# Make sure the video exists.
+						try:
+							ytdl.extract_info(url,download=False)
+						except yt_dlp.utils.DownloadError as e:
+							# Skip unavailable videos
+							continue
+						except Exception as e:
+							print(e)
 						embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
 
 					log('Embed created.')
@@ -266,6 +281,18 @@ class Music(commands.Cog):
 
 				url=spyt['url']
 			
+			# Make sure the video exists.
+			try:
+				ytdl.extract_info(url,download=False)
+			except yt_dlp.utils.DownloadError as e:
+				print(e)
+				await ctx.send(embed=embedq('That video is not available.'))
+				return
+			except Exception as e:
+				print(e)
+				await ctx.send(embed=embedq('An unexpected error occurred.'))
+				return
+
 			# Start the player.
 			try:
 				log('Trying to start playing or queueing.')
@@ -311,6 +338,12 @@ class Music(commands.Cog):
 		embed=spoofy.analyzetrack(spotifyurl)
 		await ctx.send(embed=embed)
 
+	@commands.command(aliases=['repo', 'github', 'gh'])
+	async def repository(self, ctx):
+		embed=discord.Embed(title='If you have a GitHub account, you can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
+		embed.add_field(name='A GitHub account is required because the repository is private.',value='Let me know your GitHub account username to allow access.',inline=False)
+		await ctx.send(embed=embed)
+
 	@play.before_invoke
 	@pause.before_invoke
 	@stop.before_invoke
@@ -333,7 +366,7 @@ intents.guilds = True
 intents.members = True
 
 bot = commands.Bot(
-	command_prefix=commands.when_mentioned_or('$'),
+	command_prefix=commands.when_mentioned_or('-'),
 	description='',
 	intents=intents,
 )
@@ -345,26 +378,34 @@ except FileNotFoundError:
 	print('token.txt does not exist; exiting.')
 	exit()
 
-@bot.event
-async def on_ready():
-	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-	print('------')
-
 # Queueing system
-ytqueue = []
-global nowplaying
+ytqueue=[]
 nowplaying=''
+npurl=''
+npid=''
+lastplayed=''
+lasturl=''
+lastid=''
 
 async def playnext(url, ctx):
+	global nowplaying, npurl, npid
+	global lastplayed, lasturl, lastid
+	lastplayed=nowplaying
+	lasturl=npurl
+	lastid=npid
+
 	player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
 	nowplaying = player
+	npurl = url
+	npid = npurl.split('watch?v=')[-1]
 	ctx.voice_client.stop()
 	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(serverqueue(ctx), bot.loop))
-	embed=discord.Embed(title=f'Now playing: {player.title}',color=0xFFFF00)
-	if 'open.spotify.com' in ctx.message.content:
-		await ctx.message.edit(embed=embed)
-	else:
-		await ctx.send(embed=embed)
+	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
+	# There's a way to do this, but it's low on the priority list
+	# if 'open.spotify.com' in ctx.message.content:
+	# 	await ctx.message.edit(embed=embed)
+	# else:
+	await ctx.send(embed=embed)
 
 async def serverqueue(ctx, **kwargs):
 	skip=False
@@ -375,7 +416,10 @@ async def serverqueue(ctx, **kwargs):
 			ctx.voice_client.stop()
 		else:
 			await playnext(ytqueue.pop(0), ctx)
-		print('ytqueue - '+str(ytqueue))
+			for i in glob.glob(f'*{lastid}*.webm'):
+				# Delete last played file
+				os.remove(i)
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -390,6 +434,11 @@ async def on_command_error(ctx, error):
 			await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
 		if ctx.command.name == 'analyze':
 			await ctx.send(embed=embedq('A spotify track URL is required.'))
+
+@bot.event
+async def on_ready():
+	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
+	print('------')
 
 async def main():
 	async with bot:
