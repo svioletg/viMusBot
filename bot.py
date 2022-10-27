@@ -9,18 +9,13 @@ import spoofy
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.2.1'
+version = '1.2.2'
 
 ### TODO
-# - Fix editing previous messages from spoofy.py without context
-# - Remove the menu of top YT results after a result is selected
-# - Add playlist & album support
-# - Add help command
-# - Add move command
-# - Consider keeping more information in ytqueue
-#   to reduce time spent on extracting info from URLs
-# - Find faster way to check URLs for errors
-# - Add command to trigger search menu
+TODO = {
+	'Add playlist & album support':'FEATURE',
+	'Find faster way to check URLs for errors':'QOL',
+}
 
 # Start logging
 discord.utils.setup_logging()
@@ -113,20 +108,48 @@ class YTDLSource(discord.PCMVolumeTransformer):
 # Start bot-related events
 
 # Commands here
+class General(commands.Cog):
+	def __init__(self, bot):
+		self.bot = bot
+
+	@commands.command(aliases=['bugs'])
+	async def todo(self, ctx):
+		"""| -todo (alias: -bugs) | Returns a list of planned features or bugs to be fixed."""
+		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.',color=0xFFFF00)
+		for i in TODO:
+			embed.add_field(name=i,value=TODO[i])
+
+		await ctx.send(embed=embed)
+
+	@commands.command(aliases=['repo', 'github', 'gh'])
+	async def repository(self, ctx):
+		"""| -repository (aliases: -repo, -github, -gh) | Returns the link to the viMusBot GitHub repository."""
+		embed=discord.Embed(title='If you have a GitHub account, you can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
+		embed.add_field(name='A GitHub account is required because the repository is private.',value='Let me know your GitHub account username to allow access.',inline=False)
+		await ctx.send(embed=embed)
+
 class Music(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
 
-	@commands.command()
-	async def ping(self, ctx):
-		await ctx.send('Pong!')
-		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
+	# Playing music / Voice-related
+
+	@commands.command(aliases=['analyse'])
+	async def analyze(self, ctx, spotifyurl: str):
+		"""| -analyze <spotify_url> | Returns spotify API information regarding a track."""
+		embed=spoofy.analyzetrack(spotifyurl)
 		await ctx.send(embed=embed)
 
-	# Playing music / Voice-related
+	@commands.command()
+	async def clear(self, ctx):
+		"""| -clear | Clears the entire queue."""
+		global ytqueue
+		ytqueue=[]
+		await ctx.send(embed=embedq('Queue cleared.'))
+
 	@commands.command()
 	async def join(self, ctx):
-		"""Joins a voice channel"""
+		"""| -join | Joins the voice channel of the user."""
 		if ctx.author.voice == None:
 			await ctx.send('You are not connected to a voice channel.')
 		else:
@@ -137,22 +160,37 @@ class Music(commands.Cog):
 
 		await channel.connect()
 
-	@commands.command(aliases=['s'])
-	async def skip(self, ctx):
-		await ctx.send(embed=embedq('Skipping...'))
-		await serverqueue(ctx, skip=True)
+	@commands.command()
+	async def leave(self, ctx):
+		"""| -leave | Disconnects the bot from voice."""
+		ytqueue=[]
+		await ctx.voice_client.disconnect()
 
 	@commands.command()
-	async def stop(self, ctx):
-		ytqueue=[]
-		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
-			ctx.voice_client.stop()
-			await ctx.send(embed=embedq('Player has been stopped.'))
-		else:
-			await ctx.send(embed=embedq('Nothing is playing.'))
+	async def move(self, ctx, old: int, new: int):
+		"""| -move <current> <new> | Moves a queue item from <current> to <new>."""
+		log('move command')
+		try:
+			ytqueue.insert(new-1, ytqueue.pop(old-1))
+			await ctx.send(embed=embedq(f'Moved {ytqueue[new].title} to #{new}.'))
+		except IndexError as e:
+			await ctx.send(embed=embedq('The selected number is out of range.'))
+			print(e)
+			raise e
+		except Exception as e:
+			await ctx.send(embed=embedq('An unexpected error occurred.'))
+			print(e)
+			raise e
+
+	@commands.command(aliases=['np'])
+	async def nowplaying(self, ctx):
+		"""| -nowplaying (alias: -np) | Displays the currently playing video."""
+		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
+		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def pause(self, ctx):
+		"""| -pause | Pauses the player."""
 		if ctx.voice_client.is_playing():
 			ctx.voice_client.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
@@ -160,43 +198,29 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
-
+		
 	@commands.command()
-	async def clear(self, ctx):
-		ytqueue=[]
-		await ctx.send(embed=embedq('Queue cleared.'))
-
-	@commands.command(aliases=['q'])
-	async def queue(self, ctx):
-		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
-		n=1
-		for i in ytqueue:
-			if n<=10: embed.add_field(name=f'#{n}. {urltitle(i)}',value=i,inline=False)
-			n+=1
-
-		await ctx.send(embed=embed)
-
-	@commands.command()
-	async def remove(self, ctx, spot):
-		await ctx.send(embed=embedq(f'Removed {ytqueue.pop(spot+1)} from the queue.'))
-		ytqueue.pop(spot+1)
-
-	@commands.command(aliases=['np'])
-	async def nowplaying(self, ctx):
-		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
+	async def ping(self, ctx):
+		"""| -ping | Test command."""
+		await ctx.send('Pong!')
+		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
+		"""| -play <url> (alias: -p) | Adds a link to the queue. Plays immediately if the queue is empty."""
 		log('play command')
-		await ctx.send(embed=embedq('Trying to queue...'))
-		"""Main music playing command."""
+		global playctx
+		playctx = ctx
+		global qmessage
+		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
+
 		# Will resume if paused
 		# This is handled in on_command_error()
 
 		if 'https://' not in ctx.message.content:
 			embed=discord.Embed(title='Query must be a link.')
-			await ctx.send(embed=embed)
+			await qmessage.edit(embed=embed)
 			return
 
 		log('Starting play routine')
@@ -205,7 +229,7 @@ class Music(commands.Cog):
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
 				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
-				message=await ctx.send(embed=embed)
+				await qmessage.edit(embed=embed)
 				spyt=spoofy.spyt(url)
 
 				log('Checking if unsure...')
@@ -224,7 +248,6 @@ class Music(commands.Cog):
 					for i in spyt:
 						title=spyt[i]['title']
 						url=spyt[i]['url']
-						# Make sure the video exists.
 						try:
 							ytdl.extract_info(url,download=False)
 						except yt_dlp.utils.DownloadError as e:
@@ -255,13 +278,13 @@ class Music(commands.Cog):
 					except asyncio.TimeoutError as e:
 						log('Timeout reached.')
 						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-						await ctx.send(embed=embed)
+						await qmessage.edit(embed=embed)
 						return
 					except Exception as e:
 						log('An error occurred.')
 						print(e)
 						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-						await ctx.send(embed=embed)
+						await qmessage.edit(embed=embed)
 						return
 					else:
 						# If a valid reaction was received.
@@ -269,7 +292,7 @@ class Music(commands.Cog):
 
 						if str(reaction)==emoji['cancel']:
 							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-							await ctx.send(embed=embed)
+							await qmessage.edit(embed=embed)
 							return
 						else:
 							print(str(reaction))
@@ -277,7 +300,9 @@ class Music(commands.Cog):
 							print(choice)
 							spyt=spyt[choice-1]
 							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-							await ctx.send(embed=embed)
+							await qmessage.edit(embed=embed)
+
+					await prompt.delete()
 
 				url=spyt['url']
 			
@@ -286,11 +311,11 @@ class Music(commands.Cog):
 				ytdl.extract_info(url,download=False)
 			except yt_dlp.utils.DownloadError as e:
 				print(e)
-				await ctx.send(embed=embedq('That video is not available.'))
+				await qmessage.edit(embed=embedq('That video is not available.'))
 				return
 			except Exception as e:
 				print(e)
-				await ctx.send(embed=embedq('An unexpected error occurred.'))
+				await qmessage.edit(embed=embedq('An unexpected error occurred.'))
 				return
 
 			# Start the player.
@@ -301,48 +326,46 @@ class Music(commands.Cog):
 					await playnext(url, ctx)
 				else:
 					log('URL appended to queue.')
-					ytqueue.append(url)
-					title=urltitle(url)
-					await ctx.send(embed=embedq(f'Added {title} to the queue at spot #{len(ytqueue)}'))
+					ytqueue.append(QueueItem(url))
+					title=ytqueue[-1].title
+					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(ytqueue)}'))
 			except Exception as e:
 				print(e)
 				raise e
 
-	@commands.command()
-	async def localfile(self, ctx, *, query):
-		source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(query))
-		ctx.voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
+	@commands.command(aliases=['q'])
+	async def queue(self, ctx):
+		"""| -queue (alias: -q) | Displays the current queue, up to #10."""
+		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
+		n=1
+		for i in ytqueue:
+			if n<=10: embed.add_field(name=f'#{n}. {i.title}',value=i,inline=False)
+			n+=1
 
-		await ctx.send(f'Now playing: {query}')
-
-	@commands.command()
-	async def volume(self, ctx, volume: int):
-		"""Changes the player's volume"""
-
-		if ctx.voice_client is None:
-			return await ctx.send("Not connected to a voice channel.")
-
-		ctx.voice_client.source.volume = volume / 100
-		await ctx.send(f"Changed volume to {volume}%")
+		await ctx.send(embed=embed)
 
 	@commands.command()
-	async def leave(self, ctx):
-		"""Stops and disconnects the bot from voice"""
+	async def remove(self, ctx, spot):
+		"""| -remove <number> | Removes an item from the queue. Use -q to get its number."""
+		await ctx.send(embed=embedq(f'Removed {ytqueue.pop(spot+1)} from the queue.'))
+		ytqueue.pop(spot+1)
+
+	@commands.command(aliases=['s'])
+	async def skip(self, ctx):
+		"""| -skip (alias: -s)| Skips the currently playing video."""
+		await ctx.send(embed=embedq('Skipping...'))
+		await serverqueue(ctx, skip=True)
+
+	@commands.command()
+	async def stop(self, ctx):
+		"""| -stop | Stops the player and clears the queue."""
+		global ytqueue
 		ytqueue=[]
-		await ctx.voice_client.disconnect()
-
-	# Extra
-	@commands.command(aliases=['analyse'])
-	async def analyze(self, ctx, spotifyurl: str):
-		"""Returns spotify API information regarding a track"""
-		embed=spoofy.analyzetrack(spotifyurl)
-		await ctx.send(embed=embed)
-
-	@commands.command(aliases=['repo', 'github', 'gh'])
-	async def repository(self, ctx):
-		embed=discord.Embed(title='If you have a GitHub account, you can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
-		embed.add_field(name='A GitHub account is required because the repository is private.',value='Let me know your GitHub account username to allow access.',inline=False)
-		await ctx.send(embed=embed)
+		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
+			ctx.voice_client.stop()
+			await ctx.send(embed=embedq('Player has been stopped.'))
+		else:
+			await ctx.send(embed=embedq('Nothing is playing.'))
 
 	@play.before_invoke
 	@pause.before_invoke
@@ -380,6 +403,12 @@ except FileNotFoundError:
 
 # Queueing system
 ytqueue=[]
+
+class QueueItem(object):
+	def __init__(self, url):
+		self.url = url
+		self.title = urltitle(url)
+
 nowplaying=''
 npurl=''
 npid=''
@@ -401,21 +430,21 @@ async def playnext(url, ctx):
 	ctx.voice_client.stop()
 	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(serverqueue(ctx), bot.loop))
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
-	# There's a way to do this, but it's low on the priority list
-	# if 'open.spotify.com' in ctx.message.content:
-	# 	await ctx.message.edit(embed=embed)
-	# else:
-	await ctx.send(embed=embed)
+	if 'open.spotify.com' in ctx.message.content:
+		await qmessage.edit(embed=embed)
+	else:
+		await ctx.send(embed=embed)
 
 async def serverqueue(ctx, **kwargs):
 	skip=False
 	if 'skip' in kwargs:
 		if kwargs['skip']==True: skip=True
 	if skip or (ytqueue != [] and not ctx.voice_client.is_playing()):
+		print(ytqueue)
 		if ytqueue==[]:
 			ctx.voice_client.stop()
 		else:
-			await playnext(ytqueue.pop(0), ctx)
+			await playnext(ytqueue.pop(0).url, ctx)
 			for i in glob.glob(f'*{lastid}*.webm'):
 				# Delete last played file
 				os.remove(i)
@@ -442,6 +471,7 @@ async def on_ready():
 
 async def main():
 	async with bot:
+		await bot.add_cog(General(bot))
 		await bot.add_cog(Music(bot))
 		await bot.start(token)
 
