@@ -6,16 +6,16 @@ import asyncio
 import discord
 from discord.ext import commands
 import spoofy
+import thread
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.1'
+version = '1.3.2'
 
 ### TODO
 TODO = {
 	'Find faster way to check URLs for errors (maybe threading?)':'QOL',
-	'Queueing playlists & albums takes too long':'ISSUE',
-	'Add Bandcamp & SoundCloud playlist/album support':'FEATURE',
+	'Queueing playlists & albums takes too long\n--flat-playlist may help with this':'ISSUE',
 }
 
 # Start logging
@@ -110,7 +110,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
 	@classmethod
 	async def from_url(cls, url, *, loop=None, stream=False):
-		global filename
 		loop = loop or asyncio.get_event_loop()
 		data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
@@ -129,6 +128,10 @@ class YTDLSource(discord.PCMVolumeTransformer):
 class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
+
+	@commands.command()
+	async def thread(self, ctx):
+		thread.starttest()
 
 	@commands.command(aliases=['bugs'])
 	async def todo(self, ctx):
@@ -244,9 +247,8 @@ class Music(commands.Cog):
 			return
 
 		url = url.split('&list=')[0]
-
 		log('Starting play routine')
-		async with ctx.typing():
+		try:
 			if 'open.spotify.com' in url:
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
@@ -341,12 +343,16 @@ class Music(commands.Cog):
 
 				url=spyt['url']
 			
-			if 'playlist?list=' in url:
+			# Detecting YouTube or SoundCloud playlists
+			valid = ['playlist?list=','/sets/','/album/']
+			if any(i in valid for i in valid):
 				objlist = queue_objects_from_list(url)
+				log('len(objlist): '+str(len(objlist)))
 				queue_batch(objlist)
+				log('len(player_queue): '+str(len(player_queue)))
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not ctx.voice_client.is_playing():
-					await playnext(url, ctx)
+					await next_in_queue(ctx, skip=True)
 					return
 			else:
 				# Make sure the video exists.
@@ -375,6 +381,9 @@ class Music(commands.Cog):
 			except Exception as e:
 				print(e)
 				raise e
+		except Exception as e:
+			print(e)
+			raise e
 
 	@commands.command(aliases=['q'])
 	async def queue(self, ctx):
@@ -457,18 +466,17 @@ class QueueItem(object):
 			self.title = urltitle(url)
 
 def queue_objects_from_list(playlist):
-	if type(playlist)==str and 'playlist?list=' not in playlist:
-		log('queue_objects_from_list was called with a non-playlist link.')
-		return False
-	
 	objlist = []
 	if type(playlist)==list:
+		# Usually only is a list for Spotify
 		for i in playlist:
 			objlist.append(QueueItem(i['url'],title=i['title']))
 		return objlist
 	else:
-		playlist_ext = ytdl.extract_info(url,download=False)
+		# Anything youtube-dl natively supports is probably a link
+		playlist_ext = ytdl.extract_info(playlist,download=False)
 		for i in playlist_ext['entries']:
+			log(i['title'])
 			objlist.append(QueueItem(i['original_url'],title=i['title']))
 		return objlist
 
@@ -488,15 +496,6 @@ async def playnext(url, ctx):
 	global lastplayed, lasturl
 	lastplayed=nowplaying
 	lasturl=npurl
-	try:
-		log('Logging last')
-		log(lastplayed.title)
-		log(lasturl)
-		log(lastplayed.src)
-		log(lastplayed.ID)
-		log('End.')
-	except AttributeError as e:
-		pass
 
 	try:
 		player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
@@ -507,12 +506,6 @@ async def playnext(url, ctx):
 
 	nowplaying = player
 	npurl=url
-	log('Logging nowplaying')
-	log(nowplaying.title)
-	log(npurl)
-	log(nowplaying.src)
-	log(nowplaying.ID)
-	log('End.')
 	ctx.voice_client.stop()
 	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
@@ -538,8 +531,11 @@ async def next_in_queue(ctx, **kwargs):
 				for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
 					# Delete last played file
 					os.remove(i)
+			except AttributeError as e:
+				pass
 			except Exception as e:
-				pritn(e)
+				log('Exception in next_in_queue')
+				print(e)
 				raise e
 
 

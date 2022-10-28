@@ -2,6 +2,10 @@
 
 # Changelog
 
+## 1.3.2
+
+- Fixed Bandcamp albums, SoundCloud albums, and SoundCloud playlists not being queued properly (I believe this was also affecting YouTube playlists)
+
 ## 1.3.1
 
 - Bot will remove old files from Youtube DL on startup
@@ -9,9 +13,9 @@
 
 ## 1.3.0
 
-- Added support for YouTube & Spotify playlists, as well as Spotify albums.
-- Improved Spotify-YouTube song matching logic.
-- The bot now clears the queue after disconnecting via `-leave`.
+- Added support for YouTube & Spotify playlists, as well as Spotify albums
+- Improved Spotify-YouTube song matching logic
+- The bot now clears the queue after disconnecting via `-leave`
 
 ---
 

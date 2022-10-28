@@ -7,3 +7,6 @@ basic_voice.py
 headers_auth.json
 spotifyToYoutube.py
 *.webm
+thread.py
+bin/
+*.mp3
