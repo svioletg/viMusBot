@@ -9,12 +9,13 @@ import spoofy
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.0'
+version = '1.3.1'
 
 ### TODO
 TODO = {
 	'Find faster way to check URLs for errors (maybe threading?)':'QOL',
 	'Queueing playlists & albums takes too long':'ISSUE',
+	'Add Bandcamp & SoundCloud playlist/album support':'FEATURE',
 }
 
 # Start logging
@@ -30,12 +31,24 @@ def log(msg):
 	if debug:
 		print('[ bot.py ] '+str(msg))
 
-# Shortcut for title-only embeds; "embed quick"
-def embedq(msg):
-	return discord.Embed(title=msg,color=0xFFFF00)
+# Clear out downloaded files
+log('Removing previously downloaded files...')
+toremove=[f for f_ in [glob.glob(e) for e in ('*.webm', '*.mp3')] for f in f_]
+for i in toremove:
+	log(i)
+	os.remove(i)
+del toremove
+log('Done.')
 
-# Used for bot owner-specific commands
-myID = '141354677752037377'
+# Shortcut for title-only embeds; "embed quick"
+def embedq(*args):
+	if len(args)==1:
+		return discord.Embed(title=args[0],color=0xFFFF00)
+	if len(args)==2:
+		return discord.Embed(title=args[0],description=args[1],color=0xFFFF00)
+	else:
+		print('Invalid number of arguments passed to embedq()')
+		return None
 
 # Based on and adapted from:
 # https://github.com/Rapptz/discord.py/blob/v2.0.1/examples/basic_voice.py
@@ -62,7 +75,7 @@ emoji={
 # Configure youtube dl
 ytdl_format_options = {
 	'format': 'bestaudio/best',
-	'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+	'outtmpl': '%(extractor)s-#-%(id)s-#-%(title)s.%(ext)s',
 	'restrictfilenames': True,
 	'noplaylist': True,
 	'nocheckcertificate': True,
@@ -92,9 +105,12 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
 		self.title = data.get('title')
 		self.url = data.get('url')
+		self.ID = data.get('id')
+		self.src = data.get('extractor')
 
 	@classmethod
 	async def from_url(cls, url, *, loop=None, stream=False):
+		global filename
 		loop = loop or asyncio.get_event_loop()
 		data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
@@ -103,6 +119,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
 			data = data['entries'][0]
 
 		filename = data['url'] if stream else ytdl.prepare_filename(data)
+		src = filename.split('-#-')[0]
+		ID = filename.split('-#-')[1]
 		return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 # Start bot-related events
@@ -206,6 +224,7 @@ class Music(commands.Cog):
 		await ctx.send('Pong!')
 		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
 		await ctx.send(embed=embed)
+		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
 
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
@@ -459,30 +478,41 @@ def queue_batch(batch):
 	for i in batch:
 		player_queue.append(i)
 
-nowplaying=''
+nowplaying=None
 npurl=''
-npid=''
-lastplayed=''
+lastplayed=None
 lasturl=''
-lastid=''
 
 async def playnext(url, ctx):
-	global nowplaying, npurl, npid
-	global lastplayed, lasturl, lastid
+	global nowplaying, npurl
+	global lastplayed, lasturl
 	lastplayed=nowplaying
 	lasturl=npurl
-	lastid=npid
+	try:
+		log('Logging last')
+		log(lastplayed.title)
+		log(lasturl)
+		log(lastplayed.src)
+		log(lastplayed.ID)
+		log('End.')
+	except AttributeError as e:
+		pass
 
 	try:
 		player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
 	except yt_dlp.utils.DownloadError as e:
-		await ctx.send(embed=embedq('This video is unavailable.'))
+		await ctx.send(embed=embedq('This video is unavailable.',url))
 		await next_in_queue(ctx)
 		return
 
 	nowplaying = player
-	npurl = url
-	npid = npurl.split('watch?v=')[-1]
+	npurl=url
+	log('Logging nowplaying')
+	log(nowplaying.title)
+	log(npurl)
+	log(nowplaying.src)
+	log(nowplaying.ID)
+	log('End.')
 	ctx.voice_client.stop()
 	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
@@ -499,11 +529,18 @@ async def next_in_queue(ctx, **kwargs):
 		print(player_queue)
 		if player_queue==[]:
 			ctx.voice_client.stop()
-		else:
-			await playnext(player_queue.pop(0).url, ctx)
-			for i in glob.glob(f'*{lastid}*.webm'):
+			for i in glob.glob(f'*-#-{nowplaying.ID}-#-*'):
 				# Delete last played file
 				os.remove(i)
+		else:
+			await playnext(player_queue.pop(0).url, ctx)
+			try:
+				for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
+					# Delete last played file
+					os.remove(i)
+			except Exception as e:
+				pritn(e)
+				raise e
 
 
 @bot.event

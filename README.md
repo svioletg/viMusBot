@@ -2,11 +2,23 @@
 
 # Changelog
 
+## 1.3.1
+
+- Bot will remove old files from Youtube DL on startup
+- Automatic file removal now includes .mp3 files
+
 ## 1.3.0
 
 - Added support for YouTube & Spotify playlists, as well as Spotify albums.
 - Improved Spotify-YouTube song matching logic.
 - The bot now clears the queue after disconnecting via `-leave`.
+
+---
+
+## TODO
+
+- Find faster way to check URLs for errors (maybe threading?)
+- Queueing playlists & albums takes longer than I'd like
 
 ---
 
