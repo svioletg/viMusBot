@@ -42,8 +42,6 @@ keytable = {
 
 # Youtube
 def searchYT(**kwargs):
-	query=''
-	limit=5
 	unsure=False
 
 	if 'title' not in kwargs:
@@ -51,83 +49,119 @@ def searchYT(**kwargs):
 		return False
 
 	# Process kwargs
+	query=''
 	title=kwargs['title']
 	query+=title
 	artist=kwargs['artist']
 	query+=' '+artist
-	if 'limit' in kwargs:
-		limit=kwargs['limit']
+	limit=5
+	if 'limit' in kwargs: limit=kwargs['limit']
+	from_playlist=False
+	if 'from_playlist' in kwargs: from_playlist = kwargs['from_playlist']
 
 	# Start search
 	log(f'searchYT: Trying query \"{query}\" with a limit of {limit}')
 	search_out=ytmusic.search(query=query,limit=limit,filter='songs')
 	top=search_out[0]
+
+	def is_matching(item,**kwargs):
+		matching_artist = artist.lower() in item['artists'][0]['name'].lower()
+		if 'ignore_artist' in kwargs:
+			matching_artist = True
+		matching_title = title.lower() in item['title'].lower() or (title.split(' - ')[0].lower() in item['title'].lower() and title.split(' - ')[1].lower() in item['title'].lower())
+		rmx_desired = 'remix' in title.lower()
+		rmx_found = 'remix' in item['title'].lower()
+		remix_check = False
+		remix_check = (rmx_desired and rmx_found) or (not rmx_desired and not rmx_found)
+		return (matching_artist) and (matching_title) and (remix_check)
+
 	log('Checking for exact match...')
 	# SET TO FALSE BEFORE GENERAL USE!
 	force_no_match=False
 
-	def is_matching(item):
-		matchingArtist = artist.lower() in item['artists'][0]['name'].lower()
-		matchingTitle = title.lower() in item['title'].lower() or (title.split(' - ')[0].lower() in item['title'].lower() and title.split(' - ')[1].lower() in item['title'].lower())
-		desired = 'remix' in title.lower()
-		found = 'remix' in item['title'].lower()
-		remixcheck = False
-		if (desired and found) or (not desired and not found):
-			remixcheck=True
-		else:
-			remixcheck=False
-		return (matchingArtist) and (matchingTitle) and (remixcheck)
+	# Check for matches
+	match=None
+	for i in search_out[:5]:
+		if is_matching(i):
+			log('Song match found.')
+			match=i
+			break
 
-	# Try user-uploaded videos if no song found
-	if not is_matching(top) or force_no_match:
+	if match==None:
 		log('Not found; checking for close match...')
+		# Check user-uploaded videos
 		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
 		top=search_out[0]
-
 		# If no close match is found, pass to the user
-		if not is_matching(top) or force_no_match:
-			log('Not found; marking for unsure.')
-			unsure=True
-		else:
-			log('Close match check passed.')
+		for i in search_out[:5]:
+			if is_matching(i,ignore_artist=True):
+				log('Video match found.')
+				match=i
+				break
 
-	# Make new dicts with more relevant information
+	if match==None and not from_playlist:
+		log('No match. Returning unsure.')
+		unsure=True
+
+	# Make new dict with more relevant information
 	results={}
-	log('Creating results dictionary...')
-	for result in search_out:
-		results[search_out.index(result)] = {
-		'title': result['title'],
-		'artist': result['artists'][0]['name'],
-		'url': 'https://www.youtube.com/watch?v='+result['videoId'],
-		'duration': result['duration'],
-		}
-
-	# Ask for confirmation if no exact match found
-	if unsure:
-		log('searchYT is returning as unsure.')
-		return 'unsure', results
-
-	# Return top result if not specified otherwise
-	if 'all' in kwargs:
-		if kwargs['all']:
-			return results
-	else:
-		return results[0]
+	try:
+		if match!=None:
+			match={
+				'title': search_out[search_out.index(match)]['title'],
+				'artist': search_out[search_out.index(match)]['artists'][0]['name'],
+				'url': 'https://www.youtube.com/watch?v='+search_out[search_out.index(match)]['videoId'],
+				'duration': search_out[search_out.index(match)]['duration'],
+			}
+			# Return match
+			print(match)
+			log('Returning match.')
+			return match
+		else:
+			log('Creating results dictionary...')
+			for result in search_out:
+				results[search_out.index(result)] = {
+				'title': result['title'],
+				'artist': result['artists'][0]['name'],
+				'url': 'https://www.youtube.com/watch?v='+result['videoId'],
+				'duration': result['duration'],
+				}
+		
+			# Ask for confirmation if no exact match found
+			if from_playlist:
+				# Don't prompt for confirmation for playlist items
+				# Will select the top result
+				return results[0]
+			if unsure:
+				log('searchYT is returning as unsure.')
+				return 'unsure', results
+	except Exception as e:
+		print(e)
+		raise e
 
 # Spotify
-def getURI(url):
+def get_uri(url):
 	return url.split("/")[-1].split("?")[0]
 
-def trackinfo(url):
-	uri=getURI(url)
+def track_info(url):
+	uri=get_uri(url)
 	info=sp.track(uri)
 	title=info['name']
 	# Only retrieves the first artist name
 	artist=info['artists'][0]['name']
 	return title, artist
 
-def analyzetrack(url):
-	uri=getURI(url)
+def playlist_info(url, kind):
+	if kind=='playlist': info=sp.playlist_items(url)
+	if kind=='album': info=sp.album_tracks(url)
+	tracks=[]
+	for i in info['items']:
+		if kind=='playlist': i=i['track']
+		tracks.append([i['name'], i['artists'][0]['name']])
+	return tracks
+
+def analyze_track(url):
+	uri=get_uri(url)
 	title=sp.track(uri)['name']
 	artist=sp.track(uri)['artists'][0]['name']
 	data=sp.audio_features(uri)[0]
@@ -182,13 +216,26 @@ def analyzetrack(url):
 	return embed
 
 def spyt(url, **kwargs):
-	track=trackinfo(url)
 	limit=5
 	if 'limit' in kwargs:
 		limit=kwargs['limit']
 
-	result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
-	if type(result)==tuple and result[0]=='unsure':
-		log('spyt is returning as unsure.')
-		return result
-	return result
+	try:
+		if '/playlist/' or '/album/' in url:
+			tracks=playlist_info(url,kind=url.split('/')[3])
+			playlist=[]
+			for track in tracks:
+				result = searchYT(title=track[0],artist=track[1],limit=limit,from_playlist=True,**kwargs)
+				playlist.append(result)
+			print(playlist)
+			return playlist
+		else:
+			track=track_info(url)
+			result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
+			if type(result)==tuple and result[0]=='unsure':
+				log('spyt is returning as unsure.')
+				return result
+			return result
+	except Exception as e:
+		print(e)
+		raise e

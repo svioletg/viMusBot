@@ -1,5 +1,15 @@
 # viMusBot
 
+---
+# Changelog
+---
+## 1.3.0
+
+- Added support for YouTube & Spotify playlists, as well as Spotify albums.
+- Improved Spotify-YouTube song matching logic.
+- The bot now clears the queue after disconnecting via `-leave`.
+---
+
 A bot made in Python with the help of discord.py, for personal usage.
 
 This repository is **private**, meaning only those granted access can view it - if you're reading this, welcome!

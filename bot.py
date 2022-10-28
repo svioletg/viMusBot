@@ -9,12 +9,12 @@ import spoofy
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.2.2'
+version = '1.3.0'
 
 ### TODO
 TODO = {
-	'Add playlist & album support':'FEATURE',
-	'Find faster way to check URLs for errors':'QOL',
+	'Find faster way to check URLs for errors (maybe threading?)':'QOL',
+	'Queueing playlists & albums takes too long':'ISSUE',
 }
 
 # Start logging
@@ -115,7 +115,7 @@ class General(commands.Cog):
 	@commands.command(aliases=['bugs'])
 	async def todo(self, ctx):
 		"""| -todo (alias: -bugs) | Returns a list of planned features or bugs to be fixed."""
-		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.',color=0xFFFF00)
+		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)
 		for i in TODO:
 			embed.add_field(name=i,value=TODO[i])
 
@@ -137,14 +137,14 @@ class Music(commands.Cog):
 	@commands.command(aliases=['analyse'])
 	async def analyze(self, ctx, spotifyurl: str):
 		"""| -analyze <spotify_url> | Returns spotify API information regarding a track."""
-		embed=spoofy.analyzetrack(spotifyurl)
+		embed=spoofy.analyze_track(spotifyurl)
 		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def clear(self, ctx):
 		"""| -clear | Clears the entire queue."""
-		global ytqueue
-		ytqueue=[]
+		global player_queue
+		player_queue=[]
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command()
@@ -163,7 +163,8 @@ class Music(commands.Cog):
 	@commands.command()
 	async def leave(self, ctx):
 		"""| -leave | Disconnects the bot from voice."""
-		ytqueue=[]
+		global player_queue
+		player_queue=[]
 		await ctx.voice_client.disconnect()
 
 	@commands.command()
@@ -171,8 +172,8 @@ class Music(commands.Cog):
 		"""| -move <current> <new> | Moves a queue item from <current> to <new>."""
 		log('move command')
 		try:
-			ytqueue.insert(new-1, ytqueue.pop(old-1))
-			await ctx.send(embed=embedq(f'Moved {ytqueue[new].title} to #{new}.'))
+			player_queue.insert(new-1, player_queue.pop(old-1))
+			await ctx.send(embed=embedq(f'Moved {player_queue[new].title} to #{new}.'))
 		except IndexError as e:
 			await ctx.send(embed=embedq('The selected number is out of range.'))
 			print(e)
@@ -223,9 +224,11 @@ class Music(commands.Cog):
 			await qmessage.edit(embed=embed)
 			return
 
+		url = url.split('&list=')[0]
+
 		log('Starting play routine')
 		async with ctx.typing():
-			if 'open.spotify.com' in ctx.message.content:
+			if 'open.spotify.com' in url:
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
 				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
@@ -274,7 +277,7 @@ class Music(commands.Cog):
 					log('Checking for reaction...')
 
 					try:
-						reaction, user = await bot.wait_for('reaction_add', timeout=15.0, check=check)
+						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
 					except asyncio.TimeoutError as e:
 						log('Timeout reached.')
 						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
@@ -304,19 +307,40 @@ class Music(commands.Cog):
 
 					await prompt.delete()
 
+				log('Checking if playlist or album...')
+				try:
+					if type(spyt)==list:
+						objlist = queue_objects_from_list(spyt)
+						queue_batch(objlist)
+						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
+						if not ctx.voice_client.is_playing():
+							await next_in_queue(ctx, skip=True)
+							return
+				except Exception as e:
+					print(e)
+					raise e
+
 				url=spyt['url']
 			
-			# Make sure the video exists.
-			try:
-				ytdl.extract_info(url,download=False)
-			except yt_dlp.utils.DownloadError as e:
-				print(e)
-				await qmessage.edit(embed=embedq('That video is not available.'))
-				return
-			except Exception as e:
-				print(e)
-				await qmessage.edit(embed=embedq('An unexpected error occurred.'))
-				return
+			if 'playlist?list=' in url:
+				objlist = queue_objects_from_list(url)
+				queue_batch(objlist)
+				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
+				if not ctx.voice_client.is_playing():
+					await playnext(url, ctx)
+					return
+			else:
+				# Make sure the video exists.
+				try:
+					ytdl.extract_info(url,download=False)
+				except yt_dlp.utils.DownloadError as e:
+					print(e)
+					await qmessage.edit(embed=embedq('That video is not available.'))
+					return
+				except Exception as e:
+					print(e)
+					await qmessage.edit(embed=embedq('An unexpected error occurred.'))
+					return
 
 			# Start the player.
 			try:
@@ -326,9 +350,9 @@ class Music(commands.Cog):
 					await playnext(url, ctx)
 				else:
 					log('URL appended to queue.')
-					ytqueue.append(QueueItem(url))
-					title=ytqueue[-1].title
-					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(ytqueue)}'))
+					player_queue.append(QueueItem(url))
+					title=player_queue[-1].title
+					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue)}'))
 			except Exception as e:
 				print(e)
 				raise e
@@ -338,8 +362,8 @@ class Music(commands.Cog):
 		"""| -queue (alias: -q) | Displays the current queue, up to #10."""
 		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
 		n=1
-		for i in ytqueue:
-			if n<=10: embed.add_field(name=f'#{n}. {i.title}',value=i,inline=False)
+		for i in player_queue:
+			if n<=10: embed.add_field(name=f'#{n}. {i.title}',value=i.url,inline=False)
 			n+=1
 
 		await ctx.send(embed=embed)
@@ -347,20 +371,20 @@ class Music(commands.Cog):
 	@commands.command()
 	async def remove(self, ctx, spot):
 		"""| -remove <number> | Removes an item from the queue. Use -q to get its number."""
-		await ctx.send(embed=embedq(f'Removed {ytqueue.pop(spot+1)} from the queue.'))
-		ytqueue.pop(spot+1)
+		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot+1)} from the queue.'))
+		player_queue.pop(spot+1)
 
 	@commands.command(aliases=['s'])
 	async def skip(self, ctx):
 		"""| -skip (alias: -s)| Skips the currently playing video."""
 		await ctx.send(embed=embedq('Skipping...'))
-		await serverqueue(ctx, skip=True)
+		await next_in_queue(ctx, skip=True)
 
 	@commands.command()
 	async def stop(self, ctx):
 		"""| -stop | Stops the player and clears the queue."""
-		global ytqueue
-		ytqueue=[]
+		global player_queue
+		player_queue=[]
 		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
 			ctx.voice_client.stop()
 			await ctx.send(embed=embedq('Player has been stopped.'))
@@ -402,12 +426,38 @@ except FileNotFoundError:
 	exit()
 
 # Queueing system
-ytqueue=[]
+player_queue=[]
 
 class QueueItem(object):
-	def __init__(self, url):
+	def __init__(self, url, title=None):
 		self.url = url
-		self.title = urltitle(url)
+		# Saves time on downloading if we've already got the title
+		if title is not None:
+			self.title = title
+		else:
+			self.title = urltitle(url)
+
+def queue_objects_from_list(playlist):
+	if type(playlist)==str and 'playlist?list=' not in playlist:
+		log('queue_objects_from_list was called with a non-playlist link.')
+		return False
+	
+	objlist = []
+	if type(playlist)==list:
+		for i in playlist:
+			objlist.append(QueueItem(i['url'],title=i['title']))
+		return objlist
+	else:
+		playlist_ext = ytdl.extract_info(url,download=False)
+		for i in playlist_ext['entries']:
+			objlist.append(QueueItem(i['original_url'],title=i['title']))
+		return objlist
+
+def queue_batch(batch):
+	# batch must be a list of QueueItem objects
+	global player_queue
+	for i in batch:
+		player_queue.append(i)
 
 nowplaying=''
 npurl=''
@@ -423,28 +473,34 @@ async def playnext(url, ctx):
 	lasturl=npurl
 	lastid=npid
 
-	player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
+	try:
+		player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
+	except yt_dlp.utils.DownloadError as e:
+		await ctx.send(embed=embedq('This video is unavailable.'))
+		await next_in_queue(ctx)
+		return
+
 	nowplaying = player
 	npurl = url
 	npid = npurl.split('watch?v=')[-1]
 	ctx.voice_client.stop()
-	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(serverqueue(ctx), bot.loop))
+	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
 	if 'open.spotify.com' in ctx.message.content:
 		await qmessage.edit(embed=embed)
 	else:
 		await ctx.send(embed=embed)
 
-async def serverqueue(ctx, **kwargs):
+async def next_in_queue(ctx, **kwargs):
 	skip=False
 	if 'skip' in kwargs:
 		if kwargs['skip']==True: skip=True
-	if skip or (ytqueue != [] and not ctx.voice_client.is_playing()):
-		print(ytqueue)
-		if ytqueue==[]:
+	if skip or (player_queue != [] and not ctx.voice_client.is_playing()):
+		print(player_queue)
+		if player_queue==[]:
 			ctx.voice_client.stop()
 		else:
-			await playnext(ytqueue.pop(0).url, ctx)
+			await playnext(player_queue.pop(0).url, ctx)
 			for i in glob.glob(f'*{lastid}*.webm'):
 				# Delete last played file
 				os.remove(i)
