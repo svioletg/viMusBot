@@ -17,6 +17,7 @@
 
 ## TODO
 
+- Support queueing Bandcamp/SoundCloud albums or playlists
 - Find faster way to check URLs for errors (maybe threading?)
 - Queueing playlists & albums takes longer than I'd like
 
