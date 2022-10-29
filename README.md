@@ -2,6 +2,10 @@
 
 # Changelog
 
+## 1.3.3
+
+- Fixed broken Spotify queueing; `if` statement at spoofy.py:229 was written incorrectly, and I used `valid` instead of `url` at bot.py:357
+
 ## 1.3.2
 
 - Fixed Bandcamp albums, SoundCloud albums, and SoundCloud playlists not being queued properly (I believe this was also affecting YouTube playlists)

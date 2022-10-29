@@ -10,12 +10,13 @@ import thread
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.2'
+version = '1.3.3'
 
 ### TODO
 TODO = {
 	'Find faster way to check URLs for errors (maybe threading?)':'QOL',
 	'Queueing playlists & albums takes too long\n--flat-playlist may help with this':'ISSUE',
+	'Make better custom help command':'FEATURE',
 }
 
 # Start logging
@@ -113,9 +114,15 @@ class YTDLSource(discord.PCMVolumeTransformer):
 		loop = loop or asyncio.get_event_loop()
 		data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
-		if 'entries' in data:
-			# take first item from a playlist
-			data = data['entries'][0]
+		log('YTDLSource.from_url running')
+		try:
+			if 'entries' in data:
+				# take first item from a playlist
+				data = data['entries'][0]
+		except Exception as e:
+			print('error in from_url')
+			print(e)
+			raise e
 
 		filename = data['url'] if stream else ytdl.prepare_filename(data)
 		src = filename.split('-#-')[0]
@@ -145,8 +152,8 @@ class General(commands.Cog):
 	@commands.command(aliases=['repo', 'github', 'gh'])
 	async def repository(self, ctx):
 		"""| -repository (aliases: -repo, -github, -gh) | Returns the link to the viMusBot GitHub repository."""
-		embed=discord.Embed(title='If you have a GitHub account, you can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
-		embed.add_field(name='A GitHub account is required because the repository is private.',value='Let me know your GitHub account username to allow access.',inline=False)
+		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
+		embed.add_field(name='A GitHub account is required to submit issues.',value='',inline=False)
 		await ctx.send(embed=embed)
 
 class Music(commands.Cog):
@@ -247,8 +254,9 @@ class Music(commands.Cog):
 			return
 
 		url = url.split('&list=')[0]
+		log(url)
 		log('Starting play routine')
-		try:
+		async with ctx.typing():
 			if 'open.spotify.com' in url:
 				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
@@ -338,23 +346,24 @@ class Music(commands.Cog):
 							await next_in_queue(ctx, skip=True)
 							return
 				except Exception as e:
+					print('Exception in spyt playlist check')
 					print(e)
 					raise e
 
 				url=spyt['url']
 			
-			# Detecting YouTube or SoundCloud playlists
+			# Detecting non-spotify playlists or albums
 			valid = ['playlist?list=','/sets/','/album/']
-			if any(i in valid for i in valid):
+			if any(i in url for i in valid):
+				log('playlist detected')
 				objlist = queue_objects_from_list(url)
-				log('len(objlist): '+str(len(objlist)))
 				queue_batch(objlist)
-				log('len(player_queue): '+str(len(player_queue)))
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not ctx.voice_client.is_playing():
 					await next_in_queue(ctx, skip=True)
 					return
 			else:
+				log('not a playlist')
 				# Make sure the video exists.
 				try:
 					ytdl.extract_info(url,download=False)
@@ -381,9 +390,6 @@ class Music(commands.Cog):
 			except Exception as e:
 				print(e)
 				raise e
-		except Exception as e:
-			print(e)
-			raise e
 
 	@commands.command(aliases=['q'])
 	async def queue(self, ctx):

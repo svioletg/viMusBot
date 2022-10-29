@@ -15,7 +15,7 @@ def logln():
 
 def log(msg):
 	if debug:
-		print('[ spoofy.py ] '+msg)
+		print('[ spoofy.py ] '+str(msg))
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -144,9 +144,13 @@ def get_uri(url):
 	return url.split("/")[-1].split("?")[0]
 
 def track_info(url):
+	log('track_info'); logln()
 	uri=get_uri(url)
+	log('track_info'); logln()
 	info=sp.track(uri)
+	log('track_info'); logln()
 	title=info['name']
+	log('track_info'); logln()
 	# Only retrieves the first artist name
 	artist=info['artists'][0]['name']
 	return title, artist
@@ -216,26 +220,27 @@ def analyze_track(url):
 	return embed
 
 def spyt(url, **kwargs):
+	log('beginning spyt')
+	log(url); log(kwargs)
 	limit=5
 	if 'limit' in kwargs:
 		limit=kwargs['limit']
 
-	try:
-		if '/playlist/' or '/album/' in url:
-			tracks=playlist_info(url,kind=url.split('/')[3])
-			playlist=[]
-			for track in tracks:
-				result = searchYT(title=track[0],artist=track[1],limit=limit,from_playlist=True,**kwargs)
-				playlist.append(result)
-			print(playlist)
-			return playlist
-		else:
-			track=track_info(url)
-			result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
-			if type(result)==tuple and result[0]=='unsure':
-				log('spyt is returning as unsure.')
-				return result
+	if '/playlist/' in url or '/album/' in url:
+		log('spyt: playlist detected')
+		tracks=playlist_info(url,kind=url.split('/')[3])
+		playlist=[]
+		for track in tracks:
+			result = searchYT(title=track[0],artist=track[1],limit=limit,from_playlist=True,**kwargs)
+			playlist.append(result)
+		print(playlist)
+		return playlist
+	else:
+		log('spyt: not a playlist')
+		track=track_info(url)
+		log(track)
+		result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
+		if type(result)==tuple and result[0]=='unsure':
+			log('spyt is returning as unsure.')
 			return result
-	except Exception as e:
-		print(e)
-		raise e
+		return result
