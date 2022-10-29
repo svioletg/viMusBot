@@ -21,6 +21,7 @@
 
 ## TODO
 
+- Replace help command with better custom one
 - Find faster way to check URLs for errors (maybe threading?)
 - Queueing playlists & albums takes longer than I'd like
 
