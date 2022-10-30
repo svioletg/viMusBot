@@ -1,33 +1,13 @@
 # viMusBot
 
-# Changelog
-
-## 1.3.3
-
-- Fixed broken Spotify queueing; `if` statement at spoofy.py:229 was written incorrectly, and I used `valid` instead of `url` at bot.py:357
-
-## 1.3.2
-
-- Fixed Bandcamp albums, SoundCloud albums, and SoundCloud playlists not being queued properly (I believe this was also affecting YouTube playlists)
-
-## 1.3.1
-
-- Bot will remove old files from Youtube DL on startup
-- Automatic file removal now includes .mp3 files
-
-## 1.3.0
-
-- Added support for YouTube & Spotify playlists, as well as Spotify albums
-- Improved Spotify-YouTube song matching logic
-- The bot now clears the queue after disconnecting via `-leave`
+### Changelog is now located [here](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
 
 ---
 
 ## TODO
 
 - Replace help command with better custom one
-- Find faster way to check URLs for errors (maybe threading?)
-- Queueing playlists & albums takes longer than I'd like
+- Pagify the queue list to view items past #10
 
 ---
 

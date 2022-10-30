@@ -1,12 +1,13 @@
 __pycache__/
+bin/
 .cache
 token.txt
 config.json
-*.log
-basic_voice.py
 headers_auth.json
+basic_voice.py
 spotifyToYoutube.py
-*.webm
 thread.py
-bin/
+yttesting.py
+*.log
+*.webm
 *.mp3

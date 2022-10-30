@@ -1,5 +1,8 @@
+import time
 import json
 import spotipy
+import colorama
+from colorama import Fore, Back, Style
 from spotipy import SpotifyClientCredentials
 from discord import Embed
 from datetime import datetime
@@ -8,14 +11,26 @@ from ytmusicapi import YTMusic
 
 ### TODO
 
+# Init colorama
+colorama.init(autoreset=True)
+
+# Personal debug logging
+logtimeA = time.time()
+logtimeB = time.time()
+
 debug=True
 def logln():
 	cf = currentframe()
 	if debug: print('@ LINE ', cf.f_back.f_lineno)
 
 def log(msg):
+	global logtimeA
+	global logtimeB
+	logtimeB = time.time()
+	elapsed = logtimeB-logtimeA
 	if debug:
-		print('[ spoofy.py ] '+str(msg))
+		print(f'{Style.BRIGHT}{Fore.GREEN}[ spoofy.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,3)}s')
+	logtimeA = time.time()
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -54,7 +69,7 @@ def searchYT(**kwargs):
 	query+=title
 	artist=kwargs['artist']
 	query+=' '+artist
-	limit=5
+	limit=20
 	if 'limit' in kwargs: limit=kwargs['limit']
 	from_playlist=False
 	if 'from_playlist' in kwargs: from_playlist = kwargs['from_playlist']
@@ -62,8 +77,13 @@ def searchYT(**kwargs):
 	# Start search
 	log(f'searchYT: Trying query \"{query}\" with a limit of {limit}')
 	search_out=ytmusic.search(query=query,limit=limit,filter='songs')
+	# Remove videos over a certain length
+	duration_limit = 5 # in hours
+	for i in search_out:
+		if int(i['duration_seconds'])>duration_limit*60*60: search_out.pop(search_out.index(i))
 	top=search_out[0]
 
+	# Define match logic
 	def is_matching(item,**kwargs):
 		matching_artist = artist.lower() in item['artists'][0]['name'].lower()
 		if 'ignore_artist' in kwargs:
@@ -77,20 +97,26 @@ def searchYT(**kwargs):
 
 	log('Checking for exact match...')
 	# SET TO FALSE BEFORE GENERAL USE!
-	force_no_match=False
+	force_no_match=True
+	if force_no_match: log(f'{Fore.YELLOW}force_no_match is set to True.')
 
 	# Check for matches
 	match=None
+	def match_found():
+		return match!=None and not force_no_match
+
 	for i in search_out[:5]:
 		if is_matching(i):
 			log('Song match found.')
 			match=i
 			break
 
-	if match==None:
+	if not match_found():
 		log('Not found; checking for close match...')
 		# Check user-uploaded videos
 		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
+		for i in search_out:
+			if int(i['duration_seconds'])>duration_limit*60*60: search_out.pop(search_out.index(i))
 		top=search_out[0]
 		# If no close match is found, pass to the user
 		for i in search_out[:5]:
@@ -99,14 +125,15 @@ def searchYT(**kwargs):
 				match=i
 				break
 
-	if match==None and not from_playlist:
+	if not match_found() and not from_playlist:
+		# Do not prompt for confirmation in the middle of queuing a playlist
 		log('No match. Returning unsure.')
 		unsure=True
 
 	# Make new dict with more relevant information
 	results={}
 	try:
-		if match!=None:
+		if match_found():
 			match={
 				'title': search_out[search_out.index(match)]['title'],
 				'artist': search_out[search_out.index(match)]['artists'][0]['name'],
@@ -114,7 +141,6 @@ def searchYT(**kwargs):
 				'duration': search_out[search_out.index(match)]['duration'],
 			}
 			# Return match
-			print(match)
 			log('Returning match.')
 			return match
 		else:
@@ -144,13 +170,9 @@ def get_uri(url):
 	return url.split("/")[-1].split("?")[0]
 
 def track_info(url):
-	log('track_info'); logln()
 	uri=get_uri(url)
-	log('track_info'); logln()
 	info=sp.track(uri)
-	log('track_info'); logln()
 	title=info['name']
-	log('track_info'); logln()
 	# Only retrieves the first artist name
 	artist=info['artists'][0]['name']
 	return title, artist
@@ -222,7 +244,7 @@ def analyze_track(url):
 def spyt(url, **kwargs):
 	log('beginning spyt')
 	log(url); log(kwargs)
-	limit=5
+	limit=20
 	if 'limit' in kwargs:
 		limit=kwargs['limit']
 
@@ -233,7 +255,6 @@ def spyt(url, **kwargs):
 		for track in tracks:
 			result = searchYT(title=track[0],artist=track[1],limit=limit,from_playlist=True,**kwargs)
 			playlist.append(result)
-		print(playlist)
 		return playlist
 	else:
 		log('spyt: not a playlist')

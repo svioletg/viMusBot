@@ -1,36 +1,50 @@
 import os
 import sys
+import subprocess
 import glob
 import yt_dlp
+import pytube
 import asyncio
 import discord
 from discord.ext import commands
 import spoofy
-import thread
+import time
+import colorama
+from colorama import Fore, Back, Style
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.3'
+version = '1.3.4'
 
 ### TODO
 TODO = {
-	'Find faster way to check URLs for errors (maybe threading?)':'QOL',
-	'Queueing playlists & albums takes too long\n--flat-playlist may help with this':'ISSUE',
 	'Make better custom help command':'FEATURE',
+	'Pagify the queue list':'FEATURE',
 }
+
+# Init colorama
+colorama.init(autoreset=True)
 
 # Start logging
 discord.utils.setup_logging()
 
 # Personal debug logging
+logtimeA = time.time()
+logtimeB = time.time()
+
 debug=True
 def logln():
 	cf = currentframe()
 	if debug: print('@ LINE ', cf.f_back.f_lineno)
 
 def log(msg):
+	global logtimeA
+	global logtimeB
+	logtimeB = time.time()
+	elapsed = logtimeB-logtimeA
 	if debug:
-		print('[ bot.py ] '+str(msg))
+		print(f'{Style.BRIGHT}{Fore.YELLOW}[ bot.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,2)}s')
+	logtimeA = time.time()
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -69,7 +83,7 @@ emoji={
 	'7️⃣',
 	'8️⃣',
 	'9️⃣',
-	'🔟'
+	'🔟',
 	],
 }
 
@@ -85,6 +99,7 @@ ytdl_format_options = {
 	'quiet': False,
 	'no_warnings': False,
 	'default_search': 'auto',
+	'extract_flat': True,
 	'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
@@ -92,11 +107,15 @@ ffmpeg_options = {
 	'options': '-vn',
 }
 
+duration_limit = 5 # in hours
+
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 def urltitle(url):
-	info_dict = ytdl.extract_info(url, download=False)
-	return info_dict.get('title', None)
+	log(f'urltitle {url}')
+	# info_dict = ytdl.extract_info(url, download=False)
+	# return info_dict.get('title', None)
+	return pytube.YouTube(url).title
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
@@ -276,17 +295,19 @@ class Music(commands.Cog):
 					# Prompt the user with choice
 					log('Generating embed message...')
 					embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
-
+					
 					for i in spyt:
 						title=spyt[i]['title']
 						url=spyt[i]['url']
-						try:
-							ytdl.extract_info(url,download=False)
-						except yt_dlp.utils.DownloadError as e:
-							# Skip unavailable videos
-							continue
-						except Exception as e:
-							print(e)
+						# log(f'Checking {title} {url}')
+						# try:
+						# 	ytdl.extract_info(url,download=False)
+						# except yt_dlp.utils.DownloadError as e:
+						# 	# Skip unavailable videos
+						# 	continue
+						# except Exception as e:
+						# 	print(e)
+						# 	continue
 						embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
 
 					log('Embed created.')
@@ -325,6 +346,7 @@ class Music(commands.Cog):
 						if str(reaction)==emoji['cancel']:
 							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
 							await qmessage.edit(embed=embed)
+							await prompt.delete()
 							return
 						else:
 							print(str(reaction))
@@ -355,7 +377,7 @@ class Music(commands.Cog):
 			# Detecting non-spotify playlists or albums
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
-				log('playlist detected')
+				log('URL is a playlist.')
 				objlist = queue_objects_from_list(url)
 				queue_batch(objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
@@ -363,13 +385,27 @@ class Music(commands.Cog):
 					await next_in_queue(ctx, skip=True)
 					return
 			else:
-				log('not a playlist')
+				log('URL is not a playlist.')
+				log('Checking duration...')
+				# Try pytube first as it's faster
+				if 'https://www.youtube.com' in url:
+					if pytube.YouTube(url).length>duration_limit*60*60:
+						log('Item over duration limit; not queueing.')
+						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
+						return
+				else:
+					if ytdl.extract_info(url,download=False)['duration']>duration_limit*60*60:
+						log('Item over duration limit; not queueing.')
+						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
+						return
+				log('Checking availability...')
 				# Make sure the video exists.
 				try:
 					ytdl.extract_info(url,download=False)
 				except yt_dlp.utils.DownloadError as e:
+					log('Video unavailable.')
 					print(e)
-					await qmessage.edit(embed=embedq('That video is not available.'))
+					await qmessage.edit(embed=embedq('This video is unavailable.'))
 					return
 				except Exception as e:
 					print(e)
@@ -380,13 +416,13 @@ class Music(commands.Cog):
 			try:
 				log('Trying to start playing or queueing.')
 				if not ctx.voice_client.is_playing():
-					log('Voice client is not playing')
+					log('Voice client is not playing; joining...')
 					await playnext(url, ctx)
 				else:
-					log('URL appended to queue.')
 					player_queue.append(QueueItem(url))
 					title=player_queue[-1].title
 					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue)}'))
+					log('URL appended to queue.')
 			except Exception as e:
 				print(e)
 				raise e
@@ -459,7 +495,12 @@ except FileNotFoundError:
 	print('token.txt does not exist; exiting.')
 	exit()
 
+#
+#
 # Queueing system
+#
+#
+
 player_queue=[]
 
 class QueueItem(object):
@@ -482,8 +523,7 @@ def queue_objects_from_list(playlist):
 		# Anything youtube-dl natively supports is probably a link
 		playlist_ext = ytdl.extract_info(playlist,download=False)
 		for i in playlist_ext['entries']:
-			log(i['title'])
-			objlist.append(QueueItem(i['original_url'],title=i['title']))
+			objlist.append(QueueItem(i['url'],title=i['title']))
 		return objlist
 
 def queue_batch(batch):
