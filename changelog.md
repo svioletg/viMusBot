@@ -2,10 +2,25 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.3.5
+> *2022.10.31*
+
+### Developer
+- Created `bot_stable.py` and `spoofy_stable.py`, which are the last-pushed versions of `bot.py` and `spoofy.py` respectively, to keep the bot running without interruptions from development. `bot.py` and `spoofy.py` will use a different token meant for development use, and are copied over to the "stable" files once ready to commit. These files are not included in the repository, as they would just be duplicates.
+- Defining `bot` has been moved to the bottom of `bot.py`, to keep all of the related sections closer together
+
+### Improvements
+- Changed `-queue` to allow specifying a page (a group of 10 queue items), instead of just now being able to see anything past #10
+- New help command implemented with the [discord-pretty-help](https://github.com/stroupbslayen/discord-pretty-help) library
+
+### Other
+- Added the `-changelog` command, which sends a link to changelog.md and displays the most recent version
+- Using `-queue` when the player queue is empty now sends its own message.
+
 ## 1.3.4
 > *2022.10.30*
 
-### Debugging
+### Developer
 - `colorama` is now being used for better readability in logs
 - `log()` in both `bot.py` and `spoofy.py` will now log the elapsed time between calls of itself
 
@@ -65,8 +80,8 @@ Versions are numbered as X.Y.Z, where:
 
 Each version will contain categories for its changes, which are:
 
-#### Debugging
-Changes that are only applicable to the developer, and that usually make diagnosing problems easier, like improving the logging system.
+#### Developer
+Changes that are only applicable to developers, and that usually make diagnosing problems easier, like improving the logging system.
 
 #### Features
 All-new functionality not previously present in the project. This usually coincides with a new **major version**, for example [1.3.0](#130) with its implementation of playlist/album support.

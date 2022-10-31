@@ -11,15 +11,17 @@ import spoofy
 import time
 import colorama
 from colorama import Fore, Back, Style
+from pretty_help import DefaultMenu, PrettyHelp
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.4'
+version = '1.3.5'
+
+dev=False
 
 ### TODO
 TODO = {
-	'Make better custom help command':'FEATURE',
-	'Pagify the queue list':'FEATURE',
+	
 }
 
 # Init colorama
@@ -151,28 +153,38 @@ class YTDLSource(discord.PCMVolumeTransformer):
 # Start bot-related events
 
 # Commands here
+
 class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
 
 	@commands.command()
-	async def thread(self, ctx):
-		thread.starttest()
+	async def changelog(self, ctx):
+		"""Returns a link to the changelog, and displays most recent version."""
+		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
+		await ctx.send(embed=embed)
+
+	@commands.command()
+	async def ping(self, ctx):
+		"""Test command."""
+		await ctx.send('Pong!')
+		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
+		await ctx.send(embed=embed)
+		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
+
+	@commands.command(aliases=['repo', 'github', 'gh'])
+	async def repository(self, ctx):
+		"""Returns the link to the viMusBot GitHub repository."""
+		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
+		await ctx.send(embed=embed)
 
 	@commands.command(aliases=['bugs'])
 	async def todo(self, ctx):
-		"""| -todo (alias: -bugs) | Returns a list of planned features or bugs to be fixed."""
+		"""Returns a list of planned features or bugs to be fixed."""
 		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)
 		for i in TODO:
 			embed.add_field(name=i,value=TODO[i])
 
-		await ctx.send(embed=embed)
-
-	@commands.command(aliases=['repo', 'github', 'gh'])
-	async def repository(self, ctx):
-		"""| -repository (aliases: -repo, -github, -gh) | Returns the link to the viMusBot GitHub repository."""
-		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot',color=0xFFFF00)
-		embed.add_field(name='A GitHub account is required to submit issues.',value='',inline=False)
 		await ctx.send(embed=embed)
 
 class Music(commands.Cog):
@@ -183,20 +195,20 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=['analyse'])
 	async def analyze(self, ctx, spotifyurl: str):
-		"""| -analyze <spotify_url> | Returns spotify API information regarding a track."""
+		"""Returns spotify API information regarding a track."""
 		embed=spoofy.analyze_track(spotifyurl)
 		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def clear(self, ctx):
-		"""| -clear | Clears the entire queue."""
+		"""Clears the entire queue."""
 		global player_queue
 		player_queue=[]
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command()
 	async def join(self, ctx):
-		"""| -join | Joins the voice channel of the user."""
+		"""Joins the voice channel of the user."""
 		if ctx.author.voice == None:
 			await ctx.send('You are not connected to a voice channel.')
 		else:
@@ -209,14 +221,14 @@ class Music(commands.Cog):
 
 	@commands.command()
 	async def leave(self, ctx):
-		"""| -leave | Disconnects the bot from voice."""
+		"""Disconnects the bot from voice."""
 		global player_queue
 		player_queue=[]
 		await ctx.voice_client.disconnect()
 
 	@commands.command()
 	async def move(self, ctx, old: int, new: int):
-		"""| -move <current> <new> | Moves a queue item from <current> to <new>."""
+		"""Moves a queue item from <old> to <new>."""
 		log('move command')
 		try:
 			player_queue.insert(new-1, player_queue.pop(old-1))
@@ -232,13 +244,13 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=['np'])
 	async def nowplaying(self, ctx):
-		"""| -nowplaying (alias: -np) | Displays the currently playing video."""
+		"""Displays the currently playing video."""
 		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def pause(self, ctx):
-		"""| -pause | Pauses the player."""
+		"""Pauses the player."""
 		if ctx.voice_client.is_playing():
 			ctx.voice_client.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
@@ -246,18 +258,10 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
-		
-	@commands.command()
-	async def ping(self, ctx):
-		"""| -ping | Test command."""
-		await ctx.send('Pong!')
-		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
-		await ctx.send(embed=embed)
-		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
-
+	
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
-		"""| -play <url> (alias: -p) | Adds a link to the queue. Plays immediately if the queue is empty."""
+		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		log('play command')
 		global playctx
 		playctx = ctx
@@ -412,7 +416,7 @@ class Music(commands.Cog):
 					await qmessage.edit(embed=embedq('An unexpected error occurred.'))
 					return
 
-			# Start the player.
+			# Start the player; everything before this should funnel down into here
 			try:
 				log('Trying to start playing or queueing.')
 				if not ctx.voice_client.is_playing():
@@ -428,31 +432,44 @@ class Music(commands.Cog):
 				raise e
 
 	@commands.command(aliases=['q'])
-	async def queue(self, ctx):
-		"""| -queue (alias: -q) | Displays the current queue, up to #10."""
+	async def queue(self, ctx, page: int=1):
+		"""Displays the current queue, up to #10."""
+		print(page)
+		if player_queue==[]:
+			await ctx.send(embed=embedq('The queue is empty.'))
+			return
+
 		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
 		n=1
-		for i in player_queue:
-			if n<=10: embed.add_field(name=f'#{n}. {i.title}',value=i.url,inline=False)
+		start=(10*page)-10
+		end=(10*page)
+		if 10*page>len(player_queue): end=len(player_queue)
+		for i in player_queue[start:end]:
+			embed.add_field(name=f'#{n+start}. {i.title}',value=i.url,inline=False)
 			n+=1
 
+		try:
+			embed.description = (f'Showing {start+1} to {end} of {len(player_queue)} items. Use -queue [page] to see more.')
+		except Exception as e:
+			print(e)
+			raise e
 		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def remove(self, ctx, spot):
-		"""| -remove <number> | Removes an item from the queue. Use -q to get its number."""
+		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot+1)} from the queue.'))
 		player_queue.pop(spot+1)
 
 	@commands.command(aliases=['s'])
 	async def skip(self, ctx):
-		"""| -skip (alias: -s)| Skips the currently playing video."""
+		"""Skips the currently playing video."""
 		await ctx.send(embed=embedq('Skipping...'))
 		await next_in_queue(ctx, skip=True)
 
 	@commands.command()
 	async def stop(self, ctx):
-		"""| -stop | Stops the player and clears the queue."""
+		"""Stops the player and clears the queue."""
 		global player_queue
 		player_queue=[]
 		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
@@ -471,29 +488,6 @@ class Music(commands.Cog):
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 				raise commands.CommandError("Author not connected to a voice channel.")
-
-
-# Establish bot user
-intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True
-intents.voice_states = True
-intents.reactions = True
-intents.guilds = True
-intents.members = True
-
-bot = commands.Bot(
-	command_prefix=commands.when_mentioned_or('-'),
-	description='',
-	intents=intents,
-)
-
-# Retrieve bot token
-try:
-	token = open('token.txt').read()
-except FileNotFoundError:
-	print('token.txt does not exist; exiting.')
-	exit()
 
 #
 #
@@ -585,6 +579,25 @@ async def next_in_queue(ctx, **kwargs):
 				raise e
 
 
+
+# Establish bot user
+intents = discord.Intents.default()
+intents.messages = True
+intents.message_content = True
+intents.voice_states = True
+intents.reactions = True
+intents.guilds = True
+intents.members = True
+
+bot = commands.Bot(
+	command_prefix=commands.when_mentioned_or('-'),
+	description='',
+	intents=intents,
+)
+
+menu = DefaultMenu('◀️', '▶️', '❌') # You can copy-paste any icons you want.
+bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
+
 @bot.event
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
@@ -603,6 +616,15 @@ async def on_command_error(ctx, error):
 async def on_ready():
 	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
 	print('------')
+
+# Retrieve bot token
+if dev: f='devtoken.txt'; log(f'{Fore.YELLOW}NOTICE: Starting in dev mode.')
+if not dev: f='token.txt'
+try:
+	token = open(f).read()
+except FileNotFoundError:
+	print('token.txt does not exist; exiting.')
+	exit()
 
 async def main():
 	async with bot:

@@ -1,6 +1,7 @@
 __pycache__/
 bin/
 .cache
+devtoken.txt
 token.txt
 config.json
 headers_auth.json
@@ -8,6 +9,7 @@ basic_voice.py
 spotifyToYoutube.py
 thread.py
 yttesting.py
+*_stable.py
 *.log
 *.webm
 *.mp3
