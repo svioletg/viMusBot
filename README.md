@@ -6,6 +6,7 @@
 
 ## TODO
 
+- Have the bot leave after X minutes of inactivity
 - Add current timestamp to `-nowplaying` command
 - Add command to skip to item in queue
 
