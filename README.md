@@ -6,7 +6,7 @@
 
 ## TODO
 
-- Have the bot leave after X minutes of inactivity
+- Fix the bot seemingly not deleting downloaded videos that have since been played
 - Add current timestamp to `-nowplaying` command
 - Add command to skip to specified item in queue
 
