@@ -6,9 +6,11 @@
 
 ## TODO
 
-- Fix the bot seemingly not deleting downloaded videos that have since been played
-- Add current timestamp to `-nowplaying` command
-- Add command to skip to specified item in queue
+- [bug] Fix the bot seemingly not deleting downloaded videos that have since been played
+- [feature] Allow the bot to download and queue local audio/video files
+- [feature] Add current timestamp to `-nowplaying` command
+- [feature] Add command to skip to specified item in queue
+- [feature] Have the `-todo` and `-changelog` commands grab contents from this repository's corresponding markdown files
 
 ---
 
