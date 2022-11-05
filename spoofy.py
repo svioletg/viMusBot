@@ -18,19 +18,21 @@ colorama.init(autoreset=True)
 logtimeA = time.time()
 logtimeB = time.time()
 
-debug=True
+print_logs=True
 def logln():
 	cf = currentframe()
-	if debug: print('@ LINE ', cf.f_back.f_lineno)
+	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
 def log(msg):
 	global logtimeA
 	global logtimeB
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
-	if debug:
+	if print_logs:
 		print(f'{Style.BRIGHT}{Fore.GREEN}[ spoofy.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,3)}s')
 	logtimeA = time.time()
+
+log('Imported.')
 
 force_no_match=False
 if 'fnm' in sys.argv: force_no_match=True
@@ -94,10 +96,12 @@ def searchYT(**kwargs):
 		if 'ignore_artist' in kwargs:
 			matching_artist = True
 		matching_title = title.lower() in item['title'].lower() or (title.split(' - ')[0].lower() in item['title'].lower() and title.split(' - ')[1].lower() in item['title'].lower())
-		rmx_desired = 'remix' in title.lower()
-		rmx_found = 'remix' in item['title'].lower()
+		# Do not count tracks with "remix" or "cover" as a match,
+		# unless "remix" or "cover" is in the original query
+		remix_desired = any(i in title.lower() for i in ['remix', 'cover'])
+		remix_found = any(i in item['title'].lower() for i in ['remix', 'cover'])
 		remix_check = False
-		remix_check = (rmx_desired and rmx_found) or (not rmx_desired and not rmx_found)
+		remix_check = (remix_desired and remix_found) or (not remix_desired and not remix_found)
 		return (matching_artist) and (matching_title) and (remix_check)
 
 	log('Checking for exact match...')

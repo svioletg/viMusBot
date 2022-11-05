@@ -2,7 +2,22 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.3.7
+> *2022.11.05*
+
+### Debugging
+- `debug` has been renamed to `print_logs` to be more accurate
+
+### Fixes
+- Errors should now be caught automatically, and the bot will now actually use `discord.log` as intended
+- Links that use the [generic] youtube-dl extractor (like direct links to files) now queue correctly, they were failing at the duration check the generic extractor does not retrieve the length of the file
+- Downloaded files will delete themselves correctly after finishing or being skipped
+
+### Improvements
+- Matching logic: Checking for remixes will now include covers
+
 ## 1.3.6
+> *2022.11.04*
 
 ### Developer
 - Moved `force_no_match` further up in `spoofy.py`'s code so that it warns the user at startup
@@ -11,7 +26,7 @@
 - Logging functions in `spoofy.py` have been moved to the top of the file
 - Removed a few `print()` commands added for testing and weren't removed before commit
 
-### Features
+### Improvements
 - Bot will now leave voice after 10 minutes of inactivity.
 
 ### Fixes
@@ -90,6 +105,8 @@ Versions are numbered as X.Y.Z, where:
 - X is the **project version**, which should always remain at 1 unless the project is re-written almost entirely
 - Y is the **major version**, for all-new functionality or other large changes
 - Z is the **minor version**, for things like bugfixes or minor improvements to the code
+
+Version numbers do *not* roll over into the next highest spot, e.g if the last update was `1.0.9`, the next update would not be `1.1.0` - it would be labelled as `1.0.10`.
 
 ## Categories
 

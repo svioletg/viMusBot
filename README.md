@@ -6,11 +6,10 @@
 
 ## TODO
 
-- [bug] Fix the bot seemingly not deleting downloaded videos that have since been played
-- [feature] Allow the bot to download and queue local audio/video files
-- [feature] Add current timestamp to `-nowplaying` command
-- [feature] Add command to skip to specified item in queue
+- [feature] Add support for searching with plain text
 - [feature] Have the `-todo` and `-changelog` commands grab contents from this repository's corresponding markdown files
+- [feature] Add command to skip to specified item in queue
+- [feature] Add current timestamp to `-nowplaying` command
 
 ---
 
@@ -25,15 +24,13 @@ I must stress that I'm a hobbyist programmer first and foremost, and this is far
 To run this yourself you'll need:
 - Python 3.10\*
 - Required Python packages (run `pip install -r requirements.txt`)
-- `ffmpeg` installed
- - If you're running Windows, I'd recommend you add FFmpeg to your PATH.
- - If you've installed it on Linux through `apt install ffmpeg`, you're likely good to go.
+- `ffmpeg` & `ffprobe` installed
+ - If you're running Windows, I'd recommend you add these to your PATH.
+ - Running `apt install ffmpeg` (or whatever your distro's equivalent manager is) should install both for you, as well as adding them to the system's PATH.
 - A `token.txt` file containing your bot's token
 - A `config.json` file for your Spotify API credentials
 - A `headers_auth.json` file for ytmusicapi; see [here](https://ytmusicapi.readthedocs.io/en/latest/setup.html) for more details
 
 \**I've been running it off of Python 3.10, so this is mostly just a precautionary measure - it might work with lower versions, I would recommend upgrading regardless.*
 
-**Note:** I try to remember to do this myself before I push commits, but just incase -  before you run the bot make sure `dev` is set to **false** in `bot.py`, and `force_no_match` is set to **false** in `spoofy.py`. If you don't know how to do this, open the files and look near the top, there should be something like `dev=False` and `force_no_match=False`. If it says `True`, instead, simply replace it with `False` - and the capitlization *is* important.
-
-If these are left on `True` then the bot won't start correctly as it would be looking for `devtoken.txt`, and `force_no_match` is for testing purposes - leaving it set to `True` would make it so automatic matching is disabled and you would always get a selection menu when queueing Spotify links.
+**Note:** When running the bot for general use, make sure to pass "public" as a command-line argument. e.g `python3 bot.py public`

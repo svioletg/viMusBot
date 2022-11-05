@@ -9,41 +9,43 @@ import discord
 from discord.ext import commands
 import spoofy
 import time
+import logging
 import colorama
 from colorama import Fore, Back, Style
+from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
+from datetime import timedelta
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.6'
+version = '1.3.7'
 
 ### TODO
 TODO = {
-	'Add current timestamp to `-nowplaying` command':'QOL',
-	'Add command to skip to item in queue':'FEATURE',
 }
 
 # Init colorama
 colorama.init(autoreset=True)
 
 # Start logging
-discord.utils.setup_logging()
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
 # Personal debug logging
 logtimeA = time.time()
 logtimeB = time.time()
 
-debug=True
+print_logs=True
 def logln():
 	cf = currentframe()
-	if debug: print('@ LINE ', cf.f_back.f_lineno)
+	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
 def log(msg):
 	global logtimeA
 	global logtimeB
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
-	if debug:
+	if print_logs:
 		print(f'{Style.BRIGHT}{Fore.YELLOW}[ bot.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,2)}s')
 	logtimeA = time.time()
 
@@ -69,7 +71,7 @@ def embedq(*args):
 	if len(args)==2:
 		return discord.Embed(title=args[0],description=args[1],color=0xFFFF00)
 	else:
-		print('Invalid number of arguments passed to embedq()')
+		log('Invalid number of arguments passed to embedq()')
 		return None
 
 # Based on and adapted from:
@@ -275,14 +277,24 @@ class Music(commands.Cog):
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
 		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
+		# Attempt at displaying the current timestamp; shelved for now
+		
+		# timestamp=str(timedelta(seconds=round(time.time()-audio_started-paused_for,0)))
+		# # Remove the hours spot if hours is 0
+		# if timestamp.split(':')[0]=='0': timestamp=timestamp[2:]
+		# length=nowplaying.data['duration_string']
+		# # embed.add_field(f'Duration: {timestamp} / {length}')
+		# embed.add_field(name=f'Duration: {timestamp} / {length}',value='Duration may not be accurate if the bot is experiencing connection issues.')
 		await ctx.send(embed=embed)
 
 	@commands.command()
 	async def pause(self, ctx):
+		global paused_at
 		"""Pauses the player."""
 		if ctx.voice_client.is_playing():
 			ctx.voice_client.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
+			paused_at=time.time()
 		elif ctx.voice_client.is_paused():
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
@@ -427,7 +439,13 @@ class Music(commands.Cog):
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
 				else:
-					if ytdl.extract_info(url,download=False)['duration']>duration_limit*60*60:
+					try:
+						duration = ytdl.extract_info(url,download=False)['duration']
+					# 'duration' is not retrieved from the generic extractor used for direct links
+					except KeyError as e:
+						duration = float(subprocess.check_output(f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0').decode('utf-8').split('\r')[0])
+
+					if duration>duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
@@ -491,6 +509,7 @@ class Music(commands.Cog):
 	@commands.command(aliases=['s'])
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
+		log('Trying skip command...')
 		await ctx.send(embed=embedq('Skipping...'))
 		await next_in_queue(ctx, skip=True)
 
@@ -557,10 +576,15 @@ nowplaying=None
 npurl=''
 lastplayed=None
 lasturl=''
+audio_started=0
+paused_at=0
+paused_for=0
 
 async def playnext(url, ctx):
 	global nowplaying, npurl
 	global lastplayed, lasturl
+	global audio_started, paused_at, paused_for
+	paused_at, paused_for = 0, 0
 	lastplayed=nowplaying
 	lasturl=npurl
 
@@ -571,15 +595,20 @@ async def playnext(url, ctx):
 		await next_in_queue(ctx)
 		return
 
-	nowplaying = player
+	nowplaying=player
 	npurl=url
 	ctx.voice_client.stop()
 	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
+	audio_started = time.time()
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
 	if 'open.spotify.com' in ctx.message.content:
 		await qmessage.edit(embed=embed)
 	else:
 		await ctx.send(embed=embed)
+	for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
+		# Delete last played file
+		os.remove(i)
+		log(f'Removing: {i}')
 
 async def next_in_queue(ctx, **kwargs):
 	skip=False
@@ -588,21 +617,8 @@ async def next_in_queue(ctx, **kwargs):
 	if skip or (player_queue != [] and not ctx.voice_client.is_playing()):
 		if player_queue==[]:
 			ctx.voice_client.stop()
-			for i in glob.glob(f'*-#-{nowplaying.ID}-#-*'):
-				# Delete last played file
-				os.remove(i)
 		else:
 			await playnext(player_queue.pop(0).url, ctx)
-			try:
-				for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
-					# Delete last played file
-					os.remove(i)
-			except AttributeError as e:
-				pass
-			except Exception as e:
-				log('Exception in next_in_queue')
-				print(e)
-				raise e
 
 
 
@@ -621,7 +637,7 @@ bot = commands.Bot(
 	intents=intents,
 )
 
-menu = DefaultMenu('◀️', '▶️', '❌') # You can copy-paste any icons you want.
+menu = DefaultMenu('◀️', '▶️', '❌')
 bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 
 @bot.event
@@ -631,12 +647,17 @@ async def on_command_error(ctx, error):
 			if ctx.voice_client.is_paused():
 				ctx.voice_client.resume()
 				await ctx.send(embed=embedq('Player is resuming.'))
+				global paused_for
+				paused_for=time.time()-paused_at
 			else:
 				await ctx.send(embed=embedq('No URL given.'))
 		if ctx.command.name == 'volume':
 			await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
 		if ctx.command.name == 'analyze':
 			await ctx.send(embed=embedq('A spotify track URL is required.'))
+	else:
+		log(f'Error encountered in command `{ctx.command}`.')
+		log(error)
 
 @bot.event
 async def on_ready():
@@ -649,7 +670,7 @@ if not dev: f='token.txt'
 try:
 	token = open(f).read()
 except FileNotFoundError:
-	print('token.txt does not exist; exiting.')
+	print(f'{f} does not exist; exiting.')
 	exit()
 
 async def main():
