@@ -12,8 +12,10 @@
 - Removed a few `print()` commands added for testing and weren't removed before commit
 
 ### Features
-- Added a command to remove an item from the queue
 - Bot will now leave voice after 10 minutes of inactivity.
+
+### Fixes
+- The `-remove` was added long ago but never worked due to an oversight on my end, it works properly now
 
 ## 1.3.5
 > *2022.10.31*
