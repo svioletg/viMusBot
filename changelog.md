@@ -2,6 +2,19 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.3.6
+
+### Developer
+- Moved `force_no_match` further up in `spoofy.py`'s code so that it warns the user at startup
+- Dev mode can now be turned off by adding "public" as a command-line argument, and thus the files no longer need to be directly edited for this.
+- `force_no_match` is now set from the command line by passing the "fnm" argument.
+- Logging functions in `spoofy.py` have been moved to the top of the file
+- Removed a few `print()` commands added for testing and weren't removed before commit
+
+### Features
+- Added a command to remove an item from the queue
+- Bot will now leave voice after 10 minutes of inactivity.
+
 ## 1.3.5
 > *2022.10.31*
 
@@ -94,6 +107,9 @@ General improvements to the either the user or developer experience, like making
 
 #### Other
 Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporarily solution or workaround.
+
+#### Notes
+Usually unused, any additional notes regarding the release. Listed last, out of alphabetical order.
 
 ---
 

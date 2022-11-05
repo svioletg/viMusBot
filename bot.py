@@ -1,5 +1,5 @@
-import os
 import sys
+import os
 import subprocess
 import glob
 import yt_dlp
@@ -15,13 +15,12 @@ from pretty_help import DefaultMenu, PrettyHelp
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.5'
-
-dev=False
+version = '1.3.6'
 
 ### TODO
 TODO = {
-	
+	'Add current timestamp to `-nowplaying` command':'QOL',
+	'Add command to skip to item in queue':'FEATURE',
 }
 
 # Init colorama
@@ -47,6 +46,12 @@ def log(msg):
 	if debug:
 		print(f'{Style.BRIGHT}{Fore.YELLOW}[ bot.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,2)}s')
 	logtimeA = time.time()
+
+# Determine dev mode
+if 'public' in sys.argv:
+	dev=False
+else:
+	dev=True
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -157,6 +162,30 @@ class YTDLSource(discord.PCMVolumeTransformer):
 class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
+
+	# Taken from: https://stackoverflow.com/a/73819537/8108924
+	@commands.Cog.listener()
+	async def on_voice_state_update(self, member, before, after):
+		
+		# Ignore if change from voice channels not from bot
+		if not member.id == self.bot.user.id:
+			return
+		
+		# Ignore if change from voice channels was triggered by disconnect()
+		elif before.channel is not None:
+			return
+		
+		# Check if playing when in voice channel, every 180 seconds
+		else:
+			voice = after.channel.guild.voice_client
+			while True:
+				await asyncio.sleep(600)
+				
+				# If not playing, disconnect
+				if voice.is_playing() == False:
+					await voice.disconnect()
+					break
+
 
 	@commands.command()
 	async def changelog(self, ctx):
@@ -434,7 +463,6 @@ class Music(commands.Cog):
 	@commands.command(aliases=['q'])
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
-		print(page)
 		if player_queue==[]:
 			await ctx.send(embed=embedq('The queue is empty.'))
 			return
@@ -456,10 +484,9 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command()
-	async def remove(self, ctx, spot):
+	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
-		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot+1)} from the queue.'))
-		player_queue.pop(spot+1)
+		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=['s'])
 	async def skip(self, ctx):
@@ -559,7 +586,6 @@ async def next_in_queue(ctx, **kwargs):
 	if 'skip' in kwargs:
 		if kwargs['skip']==True: skip=True
 	if skip or (player_queue != [] and not ctx.voice_client.is_playing()):
-		print(player_queue)
 		if player_queue==[]:
 			ctx.voice_client.stop()
 			for i in glob.glob(f'*-#-{nowplaying.ID}-#-*'):

@@ -1,4 +1,5 @@
 import time
+import sys
 import json
 import spotipy
 import colorama
@@ -11,10 +12,9 @@ from ytmusicapi import YTMusic
 
 ### TODO
 
-# Init colorama
+# Personal debug logging
 colorama.init(autoreset=True)
 
-# Personal debug logging
 logtimeA = time.time()
 logtimeB = time.time()
 
@@ -31,6 +31,10 @@ def log(msg):
 	if debug:
 		print(f'{Style.BRIGHT}{Fore.GREEN}[ spoofy.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,3)}s')
 	logtimeA = time.time()
+
+force_no_match=False
+if 'fnm' in sys.argv: force_no_match=True
+if force_no_match: log(f'{Fore.YELLOW}force_no_match is set to True.')
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -57,6 +61,7 @@ keytable = {
 
 # Youtube
 def searchYT(**kwargs):
+	global force_no_match
 	unsure=False
 
 	if 'title' not in kwargs:
@@ -96,8 +101,6 @@ def searchYT(**kwargs):
 		return (matching_artist) and (matching_title) and (remix_check)
 
 	log('Checking for exact match...')
-	# SET TO FALSE BEFORE GENERAL USE!
-	force_no_match=True
 	if force_no_match: log(f'{Fore.YELLOW}force_no_match is set to True.')
 
 	# Check for matches
