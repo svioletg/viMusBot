@@ -18,7 +18,7 @@
  - The `item` argument in `is_matching()` has been renamed to `ytresult` for clarity
 
 ### Features
-- `-play` now works with a search query instead of a link, and will give the user a choice between the top song and top user-uploaded video found
+- `-play` now can work with a search query instead of a link, and will give the user a choice between the top song and top user-uploaded video found (if they're the same video, it automatically queues)
 
 ### Fixes
 - Generic extractor bug thought to be fixed in 1.3.7 should now be *properly* fixed, the `subprocess.check_output()` function wasn't working when a string was passed and needed a list to work correctly; I hadn't tested it thoroughly enough
