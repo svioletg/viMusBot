@@ -489,7 +489,7 @@ class Music(commands.Cog):
 					# 'duration' is not retrieved from the generic extractor used for direct links
 					except KeyError as e:
 						ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-						duration = float(subprocess.check_output(f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0').decode('utf-8').split('.')[0])
+						duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 
 					if duration>duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
