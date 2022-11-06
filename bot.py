@@ -21,7 +21,7 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.8'
+version = '1.4.0'
 
 ### TODO
 TODO = {
