@@ -6,7 +6,7 @@
 
 ## TODO
 
-- [feature] Add support for searching with plain text
+- [improvement] Find a way to build the discord.py embed in `spoofy.py` without importing `discord`
 - [feature] Have the `-todo` and `-changelog` commands grab contents from this repository's corresponding markdown files
 - [feature] Add command to skip to specified item in queue
 - [feature] Add current timestamp to `-nowplaying` command

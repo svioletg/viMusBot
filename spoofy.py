@@ -1,24 +1,30 @@
 import time
 import sys
+import os
 import json
 import spotipy
 import colorama
 from colorama import Fore, Back, Style
+from palette import Palette
 from spotipy import SpotifyClientCredentials
 from discord import Embed
 from datetime import datetime
 from inspect import currentframe, getframeinfo
 from ytmusicapi import YTMusic
 
+_here = os.path.basename(__file__)
+
 ### TODO
 
 # Personal debug logging
 colorama.init(autoreset=True)
+plt = Palette()
 
 logtimeA = time.time()
 logtimeB = time.time()
 
-print_logs=True
+print_logs='quiet' not in sys.argv
+
 def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
@@ -28,15 +34,17 @@ def log(msg):
 	global logtimeB
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
+	called_from = ' '+sys._getframe().f_back.f_code.co_name+':'
+	if called_from==' <module>:': called_from=''
 	if print_logs:
-		print(f'{Style.BRIGHT}{Fore.GREEN}[ spoofy.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,3)}s')
+		print(f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s')
 	logtimeA = time.time()
 
 log('Imported.')
 
 force_no_match=False
 if 'fnm' in sys.argv: force_no_match=True
-if force_no_match: log(f'{Fore.YELLOW}force_no_match is set to True.')
+if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -61,51 +69,54 @@ keytable = {
 	11: 'B major or G#/Ab minor',
 }
 
+# Define matching logic
+def is_matching(reference,ytresult,**kwargs):
+	title=reference[0]
+	artist=reference[1]
+	album=reference[2]
+	if 'ignore_album' in kwargs: matching_album = True; log('Ignoring album match.')
+	else: matching_album = album.lower() in ytresult['album']['name'].lower()
+	if 'ignore_artist' in kwargs: matching_artist = True; log('Ignoring artist match.')
+	else: matching_artist = artist.lower() in ytresult['artists'][0]['name'].lower()
+	matching_title = title.lower() in ytresult['title'].lower() or (title.split(' - ')[0].lower() in ytresult['title'].lower() and title.split(' - ')[1].lower() in ytresult['title'].lower())
+	# Do not count tracks that are specific/alternate version,
+	# unless said keyword matches the original Spotify title
+	alternate_desired = any(i in title.lower() for i in ['remix', 'cover', 'version'])
+	alternate_found = any(i in ytresult['title'].lower() for i in ['remix', 'cover', 'version'])
+	alternate_check = False
+	alternate_check = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
+	return (matching_album) and (matching_artist) and (matching_title) and (alternate_check)
+
 # Youtube
-def searchYT(**kwargs):
+def search_ytmusic_text(query, **kwargs):
+	# For plain-text searching
+	top_song=ytmusic.search(query=query,limit=1,filter='songs')[0]
+	top_video=ytmusic.search(query=query,limit=1,filter='songs')[0]
+	return top_song, top_video
+
+def search_ytmusic(title, artist, album, **kwargs):
 	global force_no_match
 	unsure=False
 
-	if 'title' not in kwargs:
-		print('spoofy.searchYT: "title" was not passed, aborting.')
-		return False
-
 	# Process kwargs
-	query=''
-	title=kwargs['title']
-	query+=title
-	artist=kwargs['artist']
-	query+=' '+artist
+	reference=[title, artist, album]
+	query=f'{title} {album}'
+	# The search limit doesn't actually seem to work, investigate this
 	limit=20
 	if 'limit' in kwargs: limit=kwargs['limit']
 	from_playlist=False
 	if 'from_playlist' in kwargs: from_playlist = kwargs['from_playlist']
 
 	# Start search
-	log(f'searchYT: Trying query \"{query}\" with a limit of {limit}')
+	log(f'Trying query \"{query}\" with a limit of {limit}')
 	search_out=ytmusic.search(query=query,limit=limit,filter='songs')
 	# Remove videos over a certain length
 	duration_limit = 5 # in hours
 	for i in search_out:
 		if int(i['duration_seconds'])>duration_limit*60*60: search_out.pop(search_out.index(i))
-	top=search_out[0]
-
-	# Define match logic
-	def is_matching(item,**kwargs):
-		matching_artist = artist.lower() in item['artists'][0]['name'].lower()
-		if 'ignore_artist' in kwargs:
-			matching_artist = True
-		matching_title = title.lower() in item['title'].lower() or (title.split(' - ')[0].lower() in item['title'].lower() and title.split(' - ')[1].lower() in item['title'].lower())
-		# Do not count tracks with "remix" or "cover" as a match,
-		# unless "remix" or "cover" is in the original query
-		remix_desired = any(i in title.lower() for i in ['remix', 'cover'])
-		remix_found = any(i in item['title'].lower() for i in ['remix', 'cover'])
-		remix_check = False
-		remix_check = (remix_desired and remix_found) or (not remix_desired and not remix_found)
-		return (matching_artist) and (matching_title) and (remix_check)
 
 	log('Checking for exact match...')
-	if force_no_match: log(f'{Fore.YELLOW}force_no_match is set to True.')
+	if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
 
 	# Check for matches
 	match=None
@@ -113,7 +124,7 @@ def searchYT(**kwargs):
 		return match!=None and not force_no_match
 
 	for i in search_out[:5]:
-		if is_matching(i):
+		if is_matching(reference,i,ignore_artist=True):
 			log('Song match found.')
 			match=i
 			break
@@ -124,10 +135,9 @@ def searchYT(**kwargs):
 		search_out=ytmusic.search(query=query,limit=limit,filter='videos')
 		for i in search_out:
 			if int(i['duration_seconds'])>duration_limit*60*60: search_out.pop(search_out.index(i))
-		top=search_out[0]
 		# If no close match is found, pass to the user
 		for i in search_out[:5]:
-			if is_matching(i,ignore_artist=True):
+			if is_matching(reference,i,ignore_artist=True,ignore_album=True):
 				log('Video match found.')
 				match=i
 				break
@@ -166,7 +176,7 @@ def searchYT(**kwargs):
 				# Will select the top result
 				return results[0]
 			if unsure:
-				log('searchYT is returning as unsure.')
+				log('Returning as unsure.')
 				return 'unsure', results
 	except Exception as e:
 		print(e)
@@ -182,7 +192,8 @@ def track_info(url):
 	title=info['name']
 	# Only retrieves the first artist name
 	artist=info['artists'][0]['name']
-	return title, artist
+	album=info['album']['name']
+	return title, artist, album
 
 def playlist_info(url, kind):
 	if kind=='playlist': info=sp.playlist_items(url)
@@ -249,26 +260,24 @@ def analyze_track(url):
 	return embed
 
 def spyt(url, **kwargs):
-	log('beginning spyt')
-	log(url); log(kwargs)
+	log('spyt() called.')
 	limit=20
 	if 'limit' in kwargs:
 		limit=kwargs['limit']
 
 	if '/playlist/' in url or '/album/' in url:
-		log('spyt: playlist detected')
+		log('playlist detected')
 		tracks=playlist_info(url,kind=url.split('/')[3])
 		playlist=[]
 		for track in tracks:
-			result = searchYT(title=track[0],artist=track[1],limit=limit,from_playlist=True,**kwargs)
+			result = search_ytmusic(title=track[0],artist=track[1],album=track[2],limit=limit,from_playlist=True,**kwargs)
 			playlist.append(result)
 		return playlist
 	else:
-		log('spyt: not a playlist')
+		log('not a playlist')
 		track=track_info(url)
-		log(track)
-		result = searchYT(title=track[0],artist=track[1],limit=limit,**kwargs)
+		result = search_ytmusic(title=track[0],artist=track[1],album=track[2],limit=limit,**kwargs)
 		if type(result)==tuple and result[0]=='unsure':
-			log('spyt is returning as unsure.')
+			log('Returning as unsure.')
 			return result
 		return result

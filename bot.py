@@ -12,30 +12,34 @@ import time
 import logging
 import colorama
 from colorama import Fore, Back, Style
+from palette import Palette
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 from datetime import timedelta
 
+_here = os.path.basename(__file__)
+
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.3.7'
+version = '1.3.8'
 
 ### TODO
 TODO = {
 }
-
-# Init colorama
-colorama.init(autoreset=True)
 
 # Start logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
 # Personal debug logging
+colorama.init(autoreset=True)
+plt = Palette()
+
 logtimeA = time.time()
 logtimeB = time.time()
 
-print_logs=True
+print_logs='quiet' not in sys.argv
+
 def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
@@ -45,8 +49,10 @@ def log(msg):
 	global logtimeB
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
+	called_from = ' '+sys._getframe().f_back.f_code.co_name+':'
+	if called_from==' <module>:': called_from=''
 	if print_logs:
-		print(f'{Style.BRIGHT}{Fore.YELLOW}[ bot.py ]{Style.RESET_ALL} {msg}{Style.RESET_ALL} {Style.BRIGHT}{Fore.MAGENTA} {round(elapsed,2)}s')
+		print(f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s')
 	logtimeA = time.time()
 
 # Determine dev mode
@@ -142,7 +148,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
 		loop = loop or asyncio.get_event_loop()
 		data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
-		log('YTDLSource.from_url running')
 		try:
 			if 'entries' in data:
 				# take first item from a playlist
@@ -186,6 +191,7 @@ class General(commands.Cog):
 				# If not playing, disconnect
 				if voice.is_playing() == False:
 					await voice.disconnect()
+					log('Disconnecting from voice due to inactivity.')
 					break
 
 
@@ -312,17 +318,10 @@ class Music(commands.Cog):
 		# Will resume if paused
 		# This is handled in on_command_error()
 
-		if 'https://' not in ctx.message.content:
-			embed=discord.Embed(title='Query must be a link.')
-			await qmessage.edit(embed=embed)
-			return
-
 		url = url.split('&list=')[0]
-		log(url)
-		log('Starting play routine')
 		async with ctx.typing():
+			# Locate youtube equivalent if spotify link given
 			if 'open.spotify.com' in url:
-				# Locate YT equivalent if spotify link given
 				log('Spotify URL was received from play command.')
 				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
 				await qmessage.edit(embed=embed)
@@ -344,15 +343,6 @@ class Music(commands.Cog):
 					for i in spyt:
 						title=spyt[i]['title']
 						url=spyt[i]['url']
-						# log(f'Checking {title} {url}')
-						# try:
-						# 	ytdl.extract_info(url,download=False)
-						# except yt_dlp.utils.DownloadError as e:
-						# 	# Skip unavailable videos
-						# 	continue
-						# except Exception as e:
-						# 	print(e)
-						# 	continue
 						embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
 
 					log('Embed created.')
@@ -419,7 +409,61 @@ class Music(commands.Cog):
 
 				url=spyt['url']
 			
-			# Detecting non-spotify playlists or albums
+			# Search with text if no url is provided
+			if 'https://' not in ctx.message.content:
+				log('Link not detected, searching with query')
+				log(url)
+				options=spoofy.search_ytmusic_text(url)
+				top_song_title = options[0]['title']
+				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
+				top_video_title = options[1]['title']
+				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
+				if top_song_url==top_video_url:
+					url=top_song_url
+				else:
+					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
+					embed.add_field(name=f'Top song result: {top_song_title}',value=top_song_url,inline=False)
+					embed.add_field(name=f'Top video result: {top_video_title}',value=top_video_url,inline=False)
+					prompt = await ctx.send(embed=embed)
+					log('Adding reactions.')
+					await prompt.add_reaction(emoji['num'][1])
+					await prompt.add_reaction(emoji['num'][2])
+					await prompt.add_reaction(emoji['cancel'])
+					def check(reaction, user):
+						log('Reaction check is being called.')
+						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
+	
+					log('Checking for reaction...')
+	
+					try:
+						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
+					except asyncio.TimeoutError as e:
+						log('Timeout reached.')
+						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
+						await qmessage.edit(embed=embed)
+						return
+					except Exception as e:
+						log('An error occurred.')
+						print(e)
+						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
+						await qmessage.edit(embed=embed)
+						return
+					else:
+						# If a valid reaction was received.
+						log('Received a valid reaction.')
+						if str(reaction)==emoji['cancel']:
+							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+							await qmessage.edit(embed=embed)
+							await prompt.delete()
+							return
+						else:
+							choice=emoji['num'].index(str(reaction))
+							log(choice)
+							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
+							await qmessage.edit(embed=embed)
+					url='https://www.youtube.com/watch?v='+options[choice-1]['videoId']
+
+			# Determines if the input was a playlist
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
 				log('URL is a playlist.')
@@ -430,6 +474,7 @@ class Music(commands.Cog):
 					await next_in_queue(ctx, skip=True)
 					return
 			else:
+				# Runs if the input given was not a playlist
 				log('URL is not a playlist.')
 				log('Checking duration...')
 				# Try pytube first as it's faster
@@ -443,7 +488,8 @@ class Music(commands.Cog):
 						duration = ytdl.extract_info(url,download=False)['duration']
 					# 'duration' is not retrieved from the generic extractor used for direct links
 					except KeyError as e:
-						duration = float(subprocess.check_output(f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0').decode('utf-8').split('\r')[0])
+						ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
+						duration = float(subprocess.check_output(f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0').decode('utf-8').split('.')[0])
 
 					if duration>duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
@@ -665,7 +711,7 @@ async def on_ready():
 	print('------')
 
 # Retrieve bot token
-if dev: f='devtoken.txt'; log(f'{Fore.YELLOW}NOTICE: Starting in dev mode.')
+if dev: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
 if not dev: f='token.txt'
 try:
 	token = open(f).read()

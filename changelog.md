@@ -2,10 +2,34 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
-## 1.3.7
-> *2022.11.05*
+## 1.4.0
+> *2022.11.05* / *[view commit]()*
 
-### Debugging
+### Developer
+- `print_logs` can be set to false by passing "quiet" as a command-line argument
+- `palette.py` created with the `Palette` class, which will help keep log message styling consistent
+- The `log()` function in both files will now retrieve the name of the function it was called from, and add it to the message
+ - `log()` should now be identical across each file, as everything is retrieved automatically
+- The following apply to `spoofy.py`:
+ - `remix_check` and related variables have been renamed to `alternate_check`, as they are now used for multiple different terms
+ - `searchYT()` renamed to `search_ytmusic()` for consistency
+ - `search_ytmusic()` now requires `title`, `artist`, and `album` as positional arguments
+ - `is_matching()` is now defined outside of `search_ytmusic()`, and now requires the `reference` argument (a *list* containing the title, artist, and album originally obtained from the Spotify data)
+ - The `item` argument in `is_matching()` has been renamed to `ytresult` for clarity
+
+### Features
+- `-play` now works with a search query instead of a link, and will give the user a choice between the top song and top user-uploaded video found
+
+### Fixes
+- Generic extractor bug thought to be fixed in 1.3.7 should now be *properly* fixed, the `subprocess.check_output()` function wasn't working when a string was passed and needed a list to work correctly; I hadn't tested it thoroughly enough
+
+### Improvements
+- Spotify/YouTube matching logic: The first YouTube search checks for a matching album instead of a matching artist, checking the artist was causing problems when the artist name on YouTube Music was not the same as on Spotify
+
+## 1.3.7
+> *2022.11.05* / *[view commit](https://github.com/svioletg/viMusBot/commit/530cda2d9cd53d244a2801d556e12028847a873e)*
+
+### Developer
 - `debug` has been renamed to `print_logs` to be more accurate
 
 ### Fixes
@@ -14,10 +38,10 @@
 - Downloaded files will delete themselves correctly after finishing or being skipped
 
 ### Improvements
-- Matching logic: Checking for remixes will now include covers
+- Spotify/YouTube matching logic: Checking for remixes will now include covers
 
 ## 1.3.6
-> *2022.11.04*
+> *2022.11.04* / *[view commit](https://github.com/svioletg/viMusBot/commit/09d6597a1fd80abb32a939e76bf3bef0b15b5e8c)*
 
 ### Developer
 - Moved `force_no_match` further up in `spoofy.py`'s code so that it warns the user at startup
@@ -33,7 +57,7 @@
 - The `-remove` was added long ago but never worked due to an oversight on my end, it works properly now
 
 ## 1.3.5
-> *2022.10.31*
+> *2022.10.31* / *[view commit](https://github.com/svioletg/viMusBot/commit/3b52e4fbbe48f663893b3613c98c53faedb388dc)*
 
 ### Developer
 - Created `bot_stable.py` and `spoofy_stable.py`, which are the last-pushed versions of `bot.py` and `spoofy.py` respectively, to keep the bot running without interruptions from development. `bot.py` and `spoofy.py` will use a different token meant for development use, and are copied over to the "stable" files once ready to commit. These files are not included in the repository, as they would just be duplicates.
@@ -48,7 +72,7 @@
 - Using `-queue` when the player queue is empty now sends its own message.
 
 ## 1.3.4
-> *2022.10.30*
+> *2022.10.30* / *[view commit](https://github.com/svioletg/viMusBot/commit/85b5edc141a66416416633812f80326c19783215)*
 
 ### Developer
 - `colorama` is now being used for better readability in logs
@@ -67,19 +91,19 @@
 - When building YouTube results message (after `unsure` has been returned from `spoofy.spyt()`), the bot will no longer check every video's availability before adding it to the list of options, speeding up the process significantly; it will still check for availability when queueing the video, however
 
 ## 1.3.3
-> *2022.10.29*
+> *2022.10.29* / *[view commit](https://github.com/svioletg/viMusBot/commit/02d4ba3e45bebb97115f3ede7e1377482ca92931)*
 
 ### Fixes
 - Fixed broken Spotify queueing; `if` statement at [`spoofy.py`:224](https://github.com/svioletg/viMusBot/blob/1141ce31113920ecdf2591d65f58e5780d9b273d/spoofy.py#L224) was written incorrectly, and `valid` was used instead of `url` at [`bot.py`:348](https://github.com/svioletg/viMusBot/blob/1141ce31113920ecdf2591d65f58e5780d9b273d/bot.py#L348)
 
 ## 1.3.2
-> *2022.10.28*
+> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/1141ce31113920ecdf2591d65f58e5780d9b273d)*
 
 ### Fixes
 - Fixed Bandcamp albums, SoundCloud albums, and SoundCloud playlists not being queued properly (I believe this was also affecting YouTube playlists)
 
 ## 1.3.1
-> *2022.10.28*
+> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/08ba730fafb1165de2d6fb82752c71d0ac70dd2d)*
 
 ### Fixes
 - Automatic file removal now includes .mp3 files
@@ -88,7 +112,7 @@
 - Bot will remove old files from Youtube DL on startup
 
 ## 1.3.0
-> *2022.10.28*
+> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/1b8b3caee4aaf6ad65733b34963b16069a3bb5c6)*
 
 ### Features
 - Added support for YouTube & Spotify playlists, as well as Spotify albums
