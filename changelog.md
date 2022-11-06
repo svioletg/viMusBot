@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
 ## 1.4.0
-> *2022.11.05* / *[view commit]()*
+> *2022.11.05* / *[view commit](https://github.com/svioletg/viMusBot/commit/d71fc727627f0f785f4538fea30d9c377a29c92c)*
 
 ### Developer
 - `print_logs` can be set to false by passing "quiet" as a command-line argument
