@@ -2,6 +2,44 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.5.0
+> *2022.11.10* / *[view commit]()*
+
+### Developer
+- Added the `help` command-line argument
+- The embed for `-analyze` is now built inside `bot.py`, removing the need for `spoofy.py` to import the discord library
+- `queue_objects_from_list()` renamed to `generate_QueueItems()`
+- Changes in `spoofy.py`:
+    - `match` is now directly used when returning `search_ytmusic()`, instead of indexing `search_out`
+    - `search_out` replaced by two separate variables instead of overwriting itself; `song_results` and `video_results`
+    - `reference` in must now be a dictionary
+    - `config.json` renamed to `spotify_config.json`
+    - `queue_batch()` renamed to `queue_multiple()`
+    - `track_info()` renamed to `spotify_track()`
+    - `playlist_info()` removed
+    - `spotify_album()` created
+    - `soundcloud_playlist()` created
+- Library/requirement changes:
+    - `soundcloud-api` is now required (see [here](https://github.com/3jackdaws/soundcloud-lib))
+    - `fuzzywuzzy` is now required
+    - `python-Levenshtein` is now required
+
+### Fixes
+- Fixed `-move` not printing the right video title
+- Fixed SoundCloud playlists not working because of a missing 'title' key - the title will be approximated from the URL
+- Fixed SoundCloud playlist items past #5 not queueing correctly; youtube-dl's info extractor fails to get proper metadata past 5 tracks and only returns an API URL, so [this library by 3jackdraws](https://github.com/3jackdaws/soundcloud-lib) is being used
+- Fixed Spotify albums not queueing correctly
+
+### Features
+- Added `-shuffle` to randomize the queue
+
+### Improvements
+- Spotify albums will queue faster
+
+### Other
+- If the bot is unsure about a Spotify-YouTube match, instead of giving 5 user-uploaded results, it will provide the top 2 song results and top 2 video results
+- Spotify playlist support has been removed until a faster solution is found
+
 ## 1.4.0
 > *2022.11.05* / *[view commit](https://github.com/svioletg/viMusBot/commit/d71fc727627f0f785f4538fea30d9c377a29c92c)*
 
@@ -11,11 +49,11 @@
 - The `log()` function in both files will now retrieve the name of the function it was called from, and add it to the message
  - `log()` should now be identical across each file, as everything is retrieved automatically
 - The following apply to `spoofy.py`:
- - `remix_check` and related variables have been renamed to `alternate_check`, as they are now used for multiple different terms
- - `searchYT()` renamed to `search_ytmusic()` for consistency
- - `search_ytmusic()` now requires `title`, `artist`, and `album` as positional arguments
- - `is_matching()` is now defined outside of `search_ytmusic()`, and now requires the `reference` argument (a *list* containing the title, artist, and album originally obtained from the Spotify data)
- - The `item` argument in `is_matching()` has been renamed to `ytresult` for clarity
+    - `remix_check` and related variables have been renamed to `alternate_check`, as they are now used for multiple different terms
+    - `searchYT()` renamed to `search_ytmusic()` for consistency
+    - `search_ytmusic()` now requires `title`, `artist`, and `album` as positional arguments
+    - `is_matching()` is now defined outside of `search_ytmusic()`, and now requires the `reference` argument (a *list* containing the title, artist, and album originally obtained from the Spotify data)
+    - The `item` argument in `is_matching()` has been renamed to `ytresult` for clarity
 
 ### Features
 - `-play` now can work with a search query instead of a link, and will give the user a choice between the top song and top user-uploaded video found (if they're the same video, it automatically queues)

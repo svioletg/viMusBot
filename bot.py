@@ -1,4 +1,11 @@
 import sys
+if 'help' in sys.argv:
+	print("""Valid command-line arguments:
+  help - Displays this text and does not start the bot
+  public - Starts the bot and connects using the token provided in token.txt
+  fnm - Forces every Spotify link to result in a video selection menu.""")
+	exit()
+
 import os
 import subprocess
 import glob
@@ -10,18 +17,20 @@ from discord.ext import commands
 import spoofy
 import time
 import logging
+import random
 import colorama
 from colorama import Fore, Back, Style
 from palette import Palette
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 from datetime import timedelta
+from datetime import datetime
 
 _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.4.0'
+version = '1.4.1'
 
 ### TODO
 TODO = {
@@ -38,7 +47,7 @@ plt = Palette()
 logtimeA = time.time()
 logtimeB = time.time()
 
-print_logs='quiet' not in sys.argv
+print_logs = 'quiet' not in sys.argv
 
 def logln():
 	cf = currentframe()
@@ -47,19 +56,18 @@ def logln():
 def log(msg):
 	global logtimeA
 	global logtimeB
+	timestamp = datetime.utcfromtimestamp(time.time()).strftime('[%Y-%m-%d %H:%M:%S]')
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
 	called_from = ' '+sys._getframe().f_back.f_code.co_name+':'
 	if called_from==' <module>:': called_from=''
+	logstring = f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
 	if print_logs:
-		print(f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s')
+		print(logstring)
 	logtimeA = time.time()
 
 # Determine dev mode
-if 'public' in sys.argv:
-	dev=False
-else:
-	dev=True
+dev = 'public' not in sys.argv
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -224,16 +232,42 @@ class General(commands.Cog):
 
 		await ctx.send(embed=embed)
 
+
 class Music(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
 
 	# Playing music / Voice-related
-
 	@commands.command(aliases=['analyse'])
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
-		embed=spoofy.analyze_track(spotifyurl)
+		info=spoofy.spotify_track(spotifyurl)
+		title=info['title']
+		artist=info['artist']
+		result=spoofy.analyze_track(spotifyurl)
+		data=result[0]
+		skip=result[1]
+		# Assemble embed object
+		embed=discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=0xFFFF00)
+		# Put key, time sig, and tempo at the top
+		embed.add_field(name='Key',value=data['key']); data.pop('key')
+		embed.add_field(name='Tempo',value=data['tempo']); data.pop('tempo')
+		embed.add_field(name='Time Signature',value=data['time_signature']); data.pop('time_signature')
+
+		# Add the rest
+		for i in data:
+			if i in skip:
+				continue
+
+			value=data[i]
+			# Change decimals to percentages
+			# Exclude loudness
+			if type(data[i])==int or type(data[i])==float:
+				if data[i]<1 and i!='loudness':
+					value=str(round(data[i]*100,2))+'%'
+
+			value=str(value)
+			embed.add_field(name=i.title(),value=value)
 		await ctx.send(embed=embed)
 
 	@commands.command()
@@ -266,10 +300,10 @@ class Music(commands.Cog):
 	@commands.command()
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
-		log('move command')
 		try:
+			to_move = player_queue[old-1].title
 			player_queue.insert(new-1, player_queue.pop(old-1))
-			await ctx.send(embed=embedq(f'Moved {player_queue[new].title} to #{new}.'))
+			await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
 		except IndexError as e:
 			await ctx.send(embed=embedq('The selected number is out of range.'))
 			print(e)
@@ -295,6 +329,7 @@ class Music(commands.Cog):
 
 	@commands.command()
 	async def pause(self, ctx):
+		"""Pauses the player. Can be resumed with -play."""
 		global paused_at
 		"""Pauses the player."""
 		if ctx.voice_client.is_playing():
@@ -309,7 +344,6 @@ class Music(commands.Cog):
 	@commands.command(aliases=['p'])
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
-		log('play command')
 		global playctx
 		playctx = ctx
 		global qmessage
@@ -323,91 +357,95 @@ class Music(commands.Cog):
 			# Locate youtube equivalent if spotify link given
 			if 'open.spotify.com' in url:
 				log('Spotify URL was received from play command.')
-				embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
-				await qmessage.edit(embed=embed)
-				spyt=spoofy.spyt(url)
+				log('Checking for playlist...')
+				if '/playlist/' in url:
+					log('Spotify playlist detected.')
+					await ctx.send(embed=embedq('Spotify playlists are not supported.'))
+					return
 
-				log('Checking if unsure...')
-				if type(spyt)==tuple and spyt[0]=='unsure':
-					# This indicates no match was found
-					log('spyt returned unsure.')
-					# Remove the warning, no longer needed
-					spyt=spyt[1]
-					# Shorten to {limit} results
-					limit=5
-					spyt=dict(list(spyt.items())[:limit])
-					# Prompt the user with choice
-					log('Generating embed message...')
-					embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
-					
-					for i in spyt:
-						title=spyt[i]['title']
-						url=spyt[i]['url']
-						embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
-
-					log('Embed created.')
-					prompt = await ctx.send(embed=embed)
-					# Get reaction menu ready
-					log('Adding reactions.')
-
-					for i in spyt:
-						await prompt.add_reaction(emoji['num'][i+1])
-
-					await prompt.add_reaction(emoji['cancel'])
-
-					def check(reaction, user):
-						log('Reaction check is being called.')
-						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
-
-					log('Checking for reaction...')
-
-					try:
-						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
-					except asyncio.TimeoutError as e:
-						log('Timeout reached.')
-						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
+				log('Checking for album...')
+				if '/album/' in url:
+					log('Spotify album detected.')
+					album_info = spoofy.spotify_album(url)
+					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
+					if url==None:
+						await ctx.send(embed=embedq('No match could be found.'))
 						return
-					except Exception as e:
-						log('An error occurred.')
-						print(e)
-						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
-						return
-					else:
-						# If a valid reaction was received.
-						log('Received a valid reaction.')
+				else:
+					embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
+					await qmessage.edit(embed=embed)
+					spyt=spoofy.spyt(url)
 
-						if str(reaction)==emoji['cancel']:
-							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+					log('Checking if unsure...')
+					if type(spyt)==tuple and spyt[0]=='unsure':
+						# This indicates no match was found
+						log('spyt returned unsure.')
+						# Remove the warning, no longer needed
+						spyt=spyt[1]
+						# Shorten to {limit} results
+						limit=5
+						spyt=dict(list(spyt.items())[:limit])
+						# Prompt the user with choice
+						log('Generating embed message...')
+						embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+						
+						for i in spyt:
+							title=spyt[i]['title']
+							url=spyt[i]['url']
+							artist=spyt[i]['artist']
+							album=spyt[i]['album']
+							if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
+							else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
+
+						log('Embed created.')
+						prompt = await ctx.send(embed=embed)
+						# Get reaction menu ready
+						log('Adding reactions.')
+
+						for i in spyt:
+							await prompt.add_reaction(emoji['num'][i+1])
+
+						await prompt.add_reaction(emoji['cancel'])
+
+						def check(reaction, user):
+							log('Reaction check is being called.')
+							return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
+
+						log('Checking for reaction...')
+
+						try:
+							reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
+						except asyncio.TimeoutError as e:
+							log('Timeout reached.')
+							embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
 							await qmessage.edit(embed=embed)
-							await prompt.delete()
+							return
+						except Exception as e:
+							log('An error occurred.')
+							print(e)
+							embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
+							await qmessage.edit(embed=embed)
 							return
 						else:
-							print(str(reaction))
-							choice=emoji['num'].index(str(reaction))
-							print(choice)
-							spyt=spyt[choice-1]
-							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
+							# If a valid reaction was received.
+							log('Received a valid reaction.')
 
-					await prompt.delete()
+							if str(reaction)==emoji['cancel']:
+								embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+								await qmessage.edit(embed=embed)
+								await prompt.delete()
+								return
+							else:
+								print(str(reaction))
+								choice=emoji['num'].index(str(reaction))
+								print(choice)
+								spyt=spyt[choice-1]
+								embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
+								await qmessage.edit(embed=embed)
 
-				log('Checking if playlist or album...')
-				try:
-					if type(spyt)==list:
-						objlist = queue_objects_from_list(spyt)
-						queue_batch(objlist)
-						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-						if not ctx.voice_client.is_playing():
-							await next_in_queue(ctx, skip=True)
-							return
-				except Exception as e:
-					print('Exception in spyt playlist check')
-					print(e)
-					raise e
+						await prompt.delete()
 
-				url=spyt['url']
+					url=spyt['url']
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
@@ -434,7 +472,7 @@ class Music(commands.Cog):
 						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
 	
 					log('Checking for reaction...')
-	
+					# 
 					try:
 						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
 					except asyncio.TimeoutError as e:
@@ -467,10 +505,11 @@ class Music(commands.Cog):
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
 				log('URL is a playlist.')
-				objlist = queue_objects_from_list(url)
-				queue_batch(objlist)
+				objlist = generate_QueueItems(url)
+				queue_multiple(objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not ctx.voice_client.is_playing():
+					log('triggering next_in_queue')
 					await next_in_queue(ctx, skip=True)
 					return
 			else:
@@ -552,10 +591,15 @@ class Music(commands.Cog):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot-1).title} from the queue.'))
 
+	@commands.command()
+	async def shuffle(self, ctx):
+		"""Randomizes the order of the queue."""
+		random.shuffle(player_queue)
+		await ctx.send(embed=embedq('Queue has been shuffled.'))
+
 	@commands.command(aliases=['s'])
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
-		log('Trying skip command...')
 		await ctx.send(embed=embedq('Skipping...'))
 		await next_in_queue(ctx, skip=True)
 
@@ -593,26 +637,26 @@ class QueueItem(object):
 	def __init__(self, url, title=None):
 		self.url = url
 		# Saves time on downloading if we've already got the title
-		if title is not None:
-			self.title = title
-		else:
-			self.title = urltitle(url)
+		if title is not None: self.title = title
+		else: self.title = urltitle(url)
 
-def queue_objects_from_list(playlist):
+def generate_QueueItems(playlist):
 	objlist = []
 	if type(playlist)==list:
-		# Usually only is a list for Spotify
-		for i in playlist:
-			objlist.append(QueueItem(i['url'],title=i['title']))
+		objlist = [QueueItem(i['url'],title=i['title']) for i in playlist]
 		return objlist
 	else:
 		# Anything youtube-dl natively supports is probably a link
-		playlist_ext = ytdl.extract_info(playlist,download=False)
-		for i in playlist_ext['entries']:
-			objlist.append(QueueItem(i['url'],title=i['title']))
+		if 'soundcloud.com' in playlist:
+			# SoundCloud playlists have to be processed differently
+			playlist_entries = spoofy.soundcloud_playlist(playlist)
+			objlist = [QueueItem(i.permalink_url,title=i.title) for i in playlist_entries]
+		else:
+			playlist_entries = ytdl.extract_info(playlist,download=False)
+			objlist = [QueueItem(i['url'],title=i['title']) for i in playlist_entries['entries']]
 		return objlist
 
-def queue_batch(batch):
+def queue_multiple(batch):
 	# batch must be a list of QueueItem objects
 	global player_queue
 	for i in batch:
