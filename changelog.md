@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
 ## 1.5.0
-> *2022.11.10* / *[view commit]()*
+> *2022.11.10* / *[view commit](https://github.com/svioletg/viMusBot/commit/e2f0e17618eb00427b2263e189b72c556235f582)*
 
 ### Developer
 - Added the `help` command-line argument
