@@ -9,12 +9,12 @@
 - Added the `help` command-line argument
 - The embed for `-analyze` is now built inside `bot.py`, removing the need for `spoofy.py` to import the discord library
 - `queue_objects_from_list()` renamed to `generate_QueueItems()`
+- `queue_batch()` renamed to `queue_multiple()`
+- `config.json` renamed to `spotify_config.json`
 - Changes in `spoofy.py`:
     - `match` is now directly used when returning `search_ytmusic()`, instead of indexing `search_out`
     - `search_out` replaced by two separate variables instead of overwriting itself; `song_results` and `video_results`
     - `reference` in must now be a dictionary
-    - `config.json` renamed to `spotify_config.json`
-    - `queue_batch()` renamed to `queue_multiple()`
     - `track_info()` renamed to `spotify_track()`
     - `playlist_info()` removed
     - `spotify_album()` created
