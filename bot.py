@@ -30,7 +30,7 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.4.1'
+version = '1.5.1'
 
 ### TODO
 TODO = {
@@ -136,9 +136,13 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 def urltitle(url):
 	log(f'urltitle {url}')
-	# info_dict = ytdl.extract_info(url, download=False)
-	# return info_dict.get('title', None)
-	return pytube.YouTube(url).title
+	if 'youtube.com' in url:
+		return pytube.YouTube(url).title
+	elif 'soundcloud.com' in url:
+		return spoofy.sc.resolve(url).title
+	else:
+		info_dict = ytdl.extract_info(url, download=False)
+		return info_dict.get('title', None)
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):

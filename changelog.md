@@ -2,6 +2,12 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.5.1
+> *2022.11.11* / *[view commit]()*
+
+### Fixes
+- Fixed broken SoundCloud link queueing
+
 ## 1.5.0
 > *2022.11.10* / *[view commit](https://github.com/svioletg/viMusBot/commit/e2f0e17618eb00427b2263e189b72c556235f582)*
 
