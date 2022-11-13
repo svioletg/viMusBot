@@ -46,7 +46,6 @@ if 'nodefault' not in sys.argv:
 	with open('default_args.txt') as f:
 		script_args = sys.argv+[i.strip() for i in f.read().split(',')]
 		f.close()
-		print(script_args)
 
 # Personal debug logging
 colorama.init(autoreset=True)

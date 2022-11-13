@@ -16,9 +16,10 @@ from ytmusicapi import YTMusic
 _here = os.path.basename(__file__)
 
 # Get default arguments from file, add them and the command-line arguments to one variable
-with open('default_args.txt') as f:
-	script_args = sys.argv+[i.strip() for i in f.read().split(',')]
-	f.close()
+if 'nodefault' not in sys.argv:
+	with open('default_args.txt') as f:
+		script_args = sys.argv+[i.strip() for i in f.read().split(',')]
+		f.close()
 
 # Personal debug logging
 colorama.init(autoreset=True)
