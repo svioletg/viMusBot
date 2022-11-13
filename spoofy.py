@@ -15,7 +15,10 @@ from ytmusicapi import YTMusic
 
 _here = os.path.basename(__file__)
 
-### TODO
+# Get default arguments from file, add them and the command-line arguments to one variable
+with open('default_args.txt') as f:
+	script_args = sys.argv+[i.strip() for i in f.read().split(',')]
+	f.close()
 
 # Personal debug logging
 colorama.init(autoreset=True)
@@ -24,7 +27,7 @@ plt = Palette()
 logtimeA = time.time()
 logtimeB = time.time()
 
-print_logs='quiet' not in sys.argv
+print_logs='quiet' not in script_args
 
 def logln():
 	cf = currentframe()
@@ -35,9 +38,8 @@ def log(msg):
 	global logtimeB
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
-	called_from = ' '+sys._getframe().f_back.f_code.co_name+':'
-	if called_from==' <module>:': called_from=''
-	logstring = f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
+	called_from = sys._getframe().f_back.f_code.co_name
+	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
 	if print_logs:
 		print(logstring)
 	logtimeA = time.time()
@@ -45,7 +47,7 @@ def log(msg):
 log('Imported.')
 
 force_no_match=False
-if 'fnm' in sys.argv: force_no_match=True
+if 'fnm' in script_args: force_no_match=True
 if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
 
 # Connect to youtube music API
@@ -76,22 +78,50 @@ keytable = {
 }
 
 # Define matching logic
-def is_matching(reference,ytresult,**kwargs):
-	title=reference['title']
-	artist=reference['artist']
-	album=reference['album']
-	if 'ignore_album' in kwargs: matching_album = True; log('Ignoring album match.')
-	else: matching_album = album.lower() in ytresult['album']['name'].lower()
-	if 'ignore_artist' in kwargs: matching_artist = True; log('Ignoring artist match.')
-	else: matching_artist = artist.lower() in ytresult['artists'][0]['name'].lower()
-	matching_title = title.lower() in ytresult['title'].lower() or (title.split(' - ')[0].lower() in ytresult['title'].lower() and title.split(' - ')[1].lower() in ytresult['title'].lower())
+def is_matching(reference, ytresult, **kwargs):
+	if kwargs!={}:
+		for key, value in kwargs.items():
+			log(f'{key} is set to {value}.')
+	# mode is how exactly the code will determine a match
+	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
+	# 'old' = checking for strings in other strings, how matching was done beforehand
+	mode = kwargs.get('mode','fuzz')
+	if mode not in ['fuzz', 'old']: log(f'{mode} is not a valid mode.'); return
+
+	# overrides the fuzzy matching threshold, default is 75%
+	threshold = kwargs.get('threshold',75)
+	title_threshold = kwargs.get('title_threshold',threshold)
+	artist_threshold = kwargs.get('artist_threshold',threshold)
+	album_threshold = kwargs.get('album_threshold',threshold)
+
+	ignore_title = kwargs.get('ignore_title', False)
+	ignore_artist = kwargs.get('ignore_artist', False)
+	ignore_album = kwargs.get('ignore_album', False)
+
+	ref_title, ref_artist, ref_album = reference['title'], reference['artist'], reference['album']
+	yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
+	try:
+		yt_album = ytresult['album']['name']
+	except KeyError:
+		# User-uploaded videos have no 'album' key
+		yt_album = ''
+
+	if mode=='fuzz':
+		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
+		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
+		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
+	elif mode=='old':
+		matching_title = ref_title.lower() in yt_title.lower() or (ref_title.split(' - ')[0].lower() in yt_title.lower() and ref_title.split(' - ')[1].lower() in yt_title.lower())
+		matching_artist = ref_artist.lower() in yt_artist.lower()
+		matching_album = ref_album.lower() in yt_album.lower()
+
 	# Do not count tracks that are specific/alternate version,
 	# unless said keyword matches the original Spotify title
-	alternate_desired = any(i in title.lower() for i in ['remix', 'cover', 'version'])
-	alternate_found = any(i in ytresult['title'].lower() for i in ['remix', 'cover', 'version'])
-	alternate_check = False
+	alternate_desired = any(i in ref_title.lower() for i in ['remix', 'cover', 'version'])
+	alternate_found = any(i in yt_title.lower() for i in ['remix', 'cover', 'version'])
 	alternate_check = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
-	return (matching_album) and (matching_artist) and (matching_title) and (alternate_check)
+
+	return (matching_title or ignore_title) and (matching_artist or ignore_artist) and (matching_album or ignore_album) and (alternate_check)
 
 # Youtube
 def search_ytmusic_album(title, artist, **kwargs):

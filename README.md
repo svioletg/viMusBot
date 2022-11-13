@@ -39,5 +39,6 @@ You can download the repository as a ZIP file directly from the repository page 
 3. With Python 3.10 installed, run `pip --version` and ensure that it reads "(python 3.10)" at the end so that everything installs to the right version.
 4. In a command prompt or terminal, enter the viMusBot directory and run `pip install -r requirements.txt`. This should install all of the required packages.
 5. Use `python3 bot.py public` to start it, and everything should be good to go. `public` ensures that it will use `token.txt` and not `devtoken.txt` (this file is not required for general use).
+    **Note:** You can also type "public" into `default_args.txt`, which will automatically add itself to the list of arguments when you run `bot.py`.
 
 In order to update your files you can simply use `git pull` if you did `git clone`, or just download the ZIP again and replace your files. You can also run `python3 bot.py help` to get a list of options for running the script - doing this will *not* start the bot.

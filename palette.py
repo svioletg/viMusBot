@@ -12,6 +12,6 @@ class Palette:
 			'spoofy.py':Style.BRIGHT+Fore.GREEN,
 		}
 		self.warn = Style.NORMAL+Fore.YELLOW
-		self.error = Style.NORMAL+Fore.RED
+		self.error = Style.BRIGHT+Fore.RED
 		self.timer = Style.BRIGHT+Fore.MAGENTA
 		self.func = Style.BRIGHT+Fore.BLUE

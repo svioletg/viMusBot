@@ -3,9 +3,9 @@ if 'help' in sys.argv:
 	print("""Valid command-line arguments:
   help - Displays this text and does not start the bot
   public - Starts the bot and connects using the token provided in token.txt
-  fnm - Forces every Spotify link to result in a video selection menu.""")
+  fnm - Forces every Spotify link to result in a video selection menu.
+  quiet - Hides logs created by bot.py and spoofy.py with log().""")
 	exit()
-
 import os
 import subprocess
 import glob
@@ -16,6 +16,7 @@ import discord
 from discord.ext import commands
 import spoofy
 import time
+import traceback
 import logging
 import random
 import colorama
@@ -30,7 +31,7 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.5.1'
+version = '1.5.2'
 
 ### TODO
 TODO = {
@@ -40,6 +41,13 @@ TODO = {
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
+# Get default arguments from file, add them and the command-line arguments to one variable
+if 'nodefault' not in sys.argv:
+	with open('default_args.txt') as f:
+		script_args = sys.argv+[i.strip() for i in f.read().split(',')]
+		f.close()
+		print(script_args)
+
 # Personal debug logging
 colorama.init(autoreset=True)
 plt = Palette()
@@ -47,7 +55,7 @@ plt = Palette()
 logtimeA = time.time()
 logtimeB = time.time()
 
-print_logs = 'quiet' not in sys.argv
+print_logs = 'quiet' not in script_args
 
 def logln():
 	cf = currentframe()
@@ -56,18 +64,18 @@ def logln():
 def log(msg):
 	global logtimeA
 	global logtimeB
-	timestamp = datetime.utcfromtimestamp(time.time()).strftime('[%Y-%m-%d %H:%M:%S]')
 	logtimeB = time.time()
 	elapsed = logtimeB-logtimeA
-	called_from = ' '+sys._getframe().f_back.f_code.co_name+':'
-	if called_from==' <module>:': called_from=''
-	logstring = f'{plt.file[_here]}[ {_here} ]{plt.reset}{plt.func}{called_from}{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
+	called_from = sys._getframe().f_back.f_code.co_name
+	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
 	if print_logs:
 		print(logstring)
 	logtimeA = time.time()
 
+log('Starting.')
+
 # Determine dev mode
-dev = 'public' not in sys.argv
+dev = 'public' not in script_args
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -134,8 +142,8 @@ duration_limit = 5 # in hours
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
-def urltitle(url):
-	log(f'urltitle {url}')
+def title_from_url(url):
+	log(f'Fetching title of \'{url}\'...')
 	if 'youtube.com' in url:
 		return pytube.YouTube(url).title
 	elif 'soundcloud.com' in url:
@@ -200,12 +208,11 @@ class General(commands.Cog):
 			while True:
 				await asyncio.sleep(600)
 				
-				# If not playing, disconnect
-				if voice.is_playing() == False:
+				# If not playing and not paused, disconnect
+				if not voice.is_playing() and not voice.is_paused():
 					await voice.disconnect()
 					log('Disconnecting from voice due to inactivity.')
 					break
-
 
 	@commands.command()
 	async def changelog(self, ctx):
@@ -390,7 +397,6 @@ class Music(commands.Cog):
 						limit=5
 						spyt=dict(list(spyt.items())[:limit])
 						# Prompt the user with choice
-						log('Generating embed message...')
 						embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
 						
 						for i in spyt:
@@ -401,53 +407,11 @@ class Music(commands.Cog):
 							if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
 							else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
 
-						log('Embed created.')
 						prompt = await ctx.send(embed=embed)
-						# Get reaction menu ready
-						log('Adding reactions.')
-
-						for i in spyt:
-							await prompt.add_reaction(emoji['num'][i+1])
-
-						await prompt.add_reaction(emoji['cancel'])
-
-						def check(reaction, user):
-							log('Reaction check is being called.')
-							return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
-
-						log('Checking for reaction...')
-
-						try:
-							reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
-						except asyncio.TimeoutError as e:
-							log('Timeout reached.')
-							embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
+						choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
+						if choice==None:
 							return
-						except Exception as e:
-							log('An error occurred.')
-							print(e)
-							embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
-							return
-						else:
-							# If a valid reaction was received.
-							log('Received a valid reaction.')
-
-							if str(reaction)==emoji['cancel']:
-								embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-								await qmessage.edit(embed=embed)
-								await prompt.delete()
-								return
-							else:
-								print(str(reaction))
-								choice=emoji['num'].index(str(reaction))
-								print(choice)
-								spyt=spyt[choice-1]
-								embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-								await qmessage.edit(embed=embed)
-
-						await prompt.delete()
+						spyt = spyt[choice-1]
 
 					url=spyt['url']
 			
@@ -562,7 +526,7 @@ class Music(commands.Cog):
 					player_queue.append(QueueItem(url))
 					title=player_queue[-1].title
 					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue)}'))
-					log('URL appended to queue.')
+					log('Appened to queue.')
 			except Exception as e:
 				print(e)
 				raise e
@@ -629,11 +593,66 @@ class Music(commands.Cog):
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 				raise commands.CommandError("Author not connected to a voice channel.")
 
-#
-#
+# 
+# 
+# End command code.
+# 
+# 
+
+# Misc. helper functions
+async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
+	# msg = The message *before* the choice menu (prompt) to be edited based on the outcome
+	# Get reaction menu ready
+	log('Adding reactions.')
+
+	if choices > len(emoji['num']): log('Choices out of range for emoji number list.'); return
+
+	for i in list(range(0,choices)):
+		await prompt.add_reaction(emoji['num'][i+1])
+
+	await prompt.add_reaction(emoji['cancel'])
+
+	def check(reaction, user):
+		log('Reaction check is being called.')
+		return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
+
+	log('Checking for reaction...')
+
+	try:
+		reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
+	except asyncio.TimeoutError as e:
+		log('Timeout reached.')
+		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
+		await msg.edit(embed=embed)
+		return None
+	except Exception as e:
+		log('An error occurred.')
+		print(e)
+		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
+		await msg.edit(embed=embed)
+		return None
+	else:
+		# If a valid reaction was received.
+		log('Received a valid reaction.')
+
+		if str(reaction)==emoji['cancel']:
+			log('Selection cancelled.')
+			embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+			await msg.edit(embed=embed)
+			await prompt.delete()
+			return None
+		else:
+			choice=emoji['num'].index(str(reaction))
+			log(f'{choice} selected.')
+			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
+			await prompt.delete()
+			await msg.edit(embed=embed)
+			return choice
+	# Theoretically the code shouldn't reach this point
+	log('Prompt returned outside try/except/else')
+	await prompt.delete()
+
 # Queueing system
-#
-#
 
 player_queue=[]
 
@@ -642,7 +661,7 @@ class QueueItem(object):
 		self.url = url
 		# Saves time on downloading if we've already got the title
 		if title is not None: self.title = title
-		else: self.title = urltitle(url)
+		else: self.title = title_from_url(url)
 
 def generate_QueueItems(playlist):
 	objlist = []
@@ -699,10 +718,11 @@ async def playnext(url, ctx):
 		await qmessage.edit(embed=embed)
 	else:
 		await ctx.send(embed=embed)
-	for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
-		# Delete last played file
-		os.remove(i)
-		log(f'Removing: {i}')
+	if lastplayed!=None:
+		for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
+			# Delete last played file
+			os.remove(i)
+			log(f'Removing: {i}')
 
 async def next_in_queue(ctx, **kwargs):
 	skip=False
@@ -752,6 +772,9 @@ async def on_command_error(ctx, error):
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)
+		trace=traceback.format_exception(error)
+		# A second traceback is created from this command itself, usually not useful
+		log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
 @bot.event
 async def on_ready():
