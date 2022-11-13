@@ -7,12 +7,12 @@
 
 ### Developer
 - `default_args.txt` created, entering a list of arguments into this file will automatically add them to the command anytime you run the bot; use the `nodefault` argument to ignore this file
-    **Note:** Use `bot.py help` for a list of valid arguments. Arguments must be entered in one line, separated by commas. For example, if the content of `default_args.txt` is `public, quiet, fnm`, the bot will start as if you ran `bot.py public quiet fnm`. The `help` argument will be ignored if added to this file.
+    - **Note:** Use `bot.py help` for a list of valid arguments. Arguments must be entered in one line, separated by commas. For example, if the content of `default_args.txt` is `public, quiet, fnm`, the bot will start as if you ran `bot.py public quiet fnm`. The `help` argument will be ignored if added to this file.
 - Changes in `bot.py`:
+    - Created `prompt_for_choice()` for easier creation of selection prompt messages; prompt message must be built beforehand
     - `urltitle()` renamed to `title_from_url()`
     - `on_command_error()` will now log the full traceback, which can be disabled by passing the `notrace` command-line argument
 - Changes in `spoofy.py`:
-    - Created `prompt_for_choice()` for easier creation of selection prompt messages; prompt message must be built beforehand
     - In `is_matching()`, the `title`, `artist`, and `album` variables were replaced with `ref_title` and so on; matching `yt_title` etc. variables were created as shortcuts to `ytresult`'s keys
     - Fuzzy matching was implemented, and can be turned off by passing `mode='old'` to `is_matching()`
     - `is_matching()` takes new optional arguments for determing the threshold of fuzzy matching; `threshold` sets one threshold for title, artist, and album, or you can specify `title_threshold` etc.
