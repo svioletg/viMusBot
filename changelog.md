@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
 ## 1.5.2
-> *2022.11.12* / *[view commit]()*
+> *2022.11.12* / *[view commit](https://github.com/svioletg/viMusBot/commit/91c7109a77c8700a72d3e8b9c3ed334bbb039d88)*
 
 ### Developer
 - `default_args.txt` created, entering a list of arguments into this file will automatically add them to the command anytime you run the bot; use the `nodefault` argument to ignore this file
