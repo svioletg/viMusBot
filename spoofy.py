@@ -153,7 +153,7 @@ def search_ytmusic(title, artist, album, **kwargs):
 
 	# Process kwargs
 	reference={'title':title, 'artist':artist, 'album':album}
-	query=f'{title} {album}'
+	query=f'{title} {artist} {album}'
 	# The search limit doesn't actually seem to work, investigate this
 	limit=20
 	if 'limit' in kwargs: limit=kwargs['limit']
