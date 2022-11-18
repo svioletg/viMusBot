@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
 ## 1.5.3
-> *2022.11.18* / *[view commit]()*
+> *2022.11.18* / *[view commit](https://github.com/svioletg/viMusBot/commit/9185f52120ca5738c8a821fb6e360d56ab7a894f)*
 
 ### Improvements
 - Spotify-YouTube song matching will now try to match the ISRC code (or UPC for albums) first before falling back on the text search method, this is slightly faster and usually more accurate
