@@ -2,6 +2,17 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.5.3
+> *2022.11.18* / *[view commit]()*
+
+### Improvements
+- Spotify-YouTube song matching will now try to match the ISRC code (or UPC for albums) first before falling back on the text search method, this is slightly faster and usually more accurate
+
+### Other
+- Command-line arguments are no longer supported, instead `config.ini` has been added with the same options; this effectively replaces `default_args.txt` as well
+- Playlist support has been re-added, but it turned off by default; set `allow_spotify_playlists` in the config to enable it
+    - **Note:** This is still very slow, as it takes around 1-2 seconds per track, which can build up very fast on large playlists. I am searching for a way to speed up the process, but it will likely be a while
+
 ## 1.5.2
 > *2022.11.12* / *[view commit](https://github.com/svioletg/viMusBot/commit/91c7109a77c8700a72d3e8b9c3ed334bbb039d88)*
 

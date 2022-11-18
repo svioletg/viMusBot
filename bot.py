@@ -22,6 +22,7 @@ import random
 import colorama
 from colorama import Fore, Back, Style
 from palette import Palette
+from configparser import ConfigParser
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 from datetime import timedelta
@@ -31,7 +32,7 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.5.2'
+version = '1.5.3'
 
 ### TODO
 TODO = {
@@ -41,11 +42,12 @@ TODO = {
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
-# Get default arguments from file, add them and the command-line arguments to one variable
-if 'nodefault' not in sys.argv:
-	with open('default_args.txt') as f:
-		script_args = sys.argv+[i.strip() for i in f.read().split(',')]
-		f.close()
+# Get options
+config = ConfigParser()
+config.read('config.ini')
+allow_spotify_playlists = config.getboolean('OPTIONS','allow_spotify_playlists')
+print_logs = config.getboolean('OPTIONS','print_logs')
+public = config.getboolean('OPTIONS','public')
 
 # Personal debug logging
 colorama.init(autoreset=True)
@@ -53,8 +55,6 @@ plt = Palette()
 
 logtimeA = time.time()
 logtimeB = time.time()
-
-print_logs = 'quiet' not in script_args
 
 def logln():
 	cf = currentframe()
@@ -71,10 +71,14 @@ def log(msg):
 		print(logstring)
 	logtimeA = time.time()
 
-log('Starting.')
+log('Starting...')
 
-# Determine dev mode
-dev = 'public' not in script_args
+for key, value in config['OPTIONS'].items():
+	value = config.getboolean('OPTIONS',key)
+	if value:
+		log(f'{key} is {plt.green}{value}')
+	elif not value:
+		log(f'{key} is {plt.red}{value}')
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -370,8 +374,18 @@ class Music(commands.Cog):
 				log('Checking for playlist...')
 				if '/playlist/' in url:
 					log('Spotify playlist detected.')
-					await ctx.send(embed=embedq('Spotify playlists are not supported.'))
-					return
+					if allow_spotify_playlists:
+						await ctx.send(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
+						objlist = generate_QueueItems(spoofy.spyt(url))
+						queue_multiple(objlist)
+						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
+						if not ctx.voice_client.is_playing():
+							log('Voice client is not playing; joining...')
+							await next_in_queue(ctx, skip=True)
+						return
+					else:
+						await ctx.send(embed=embedq('Spotify playlist support is disabled.','Contact whoever is hosting your bot if you believe this is a mistake.'))
+						return
 
 				log('Checking for album...')
 				if '/album/' in url:
@@ -781,8 +795,8 @@ async def on_ready():
 	print('------')
 
 # Retrieve bot token
-if dev: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
-if not dev: f='token.txt'
+if public: f='token.txt'
+if not public: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
 try:
 	token = open(f).read()
 except FileNotFoundError:

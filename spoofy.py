@@ -5,8 +5,10 @@ import json
 import spotipy
 import sclib
 import colorama
+import pytube
 from colorama import Fore, Back, Style
 from palette import Palette
+from configparser import ConfigParser
 from fuzzywuzzy import fuzz
 from spotipy import SpotifyClientCredentials
 from datetime import datetime
@@ -15,11 +17,11 @@ from ytmusicapi import YTMusic
 
 _here = os.path.basename(__file__)
 
-# Get default arguments from file, add them and the command-line arguments to one variable
-if 'nodefault' not in sys.argv:
-	with open('default_args.txt') as f:
-		script_args = sys.argv+[i.strip() for i in f.read().split(',')]
-		f.close()
+# Get options
+config = ConfigParser()
+config.read('config.ini')
+print_logs = config.getboolean('OPTIONS','print_logs')
+force_no_match = config.getboolean('OPTIONS','force_no_match')
 
 # Personal debug logging
 colorama.init(autoreset=True)
@@ -27,8 +29,6 @@ plt = Palette()
 
 logtimeA = time.time()
 logtimeB = time.time()
-
-print_logs='quiet' not in script_args
 
 def logln():
 	cf = currentframe()
@@ -47,8 +47,7 @@ def log(msg):
 
 log('Imported.')
 
-force_no_match=False
-if 'fnm' in script_args: force_no_match=True
+# Useful to point this out if left on accidentally
 if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
 
 # Connect to youtube music API
@@ -125,7 +124,27 @@ def is_matching(reference, ytresult, **kwargs):
 	return (matching_title or ignore_title) and (matching_artist or ignore_artist) and (matching_album or ignore_album) and (alternate_check)
 
 # Youtube
-def search_ytmusic_album(title, artist, **kwargs):
+def isrc_search_test(playlist):
+	# For testing, generally not a useful function
+	tracks = spotify_playlist(playlist)
+	yes=0
+	no=0
+	for i in tracks:
+		isrc = i['isrc']
+		# For whatever reason, pytube seems to be more accurate here
+		isrc_match = pytube.Search(isrc).results
+		for match in isrc_match:
+			print(Fore.CYAN+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
+			if fuzz.ratio(match.title, i['title']) > 75:
+				log(f'{plt.good} {tracks.index(i)+1}/{len(tracks)}: Cleared. {isrc}')
+				yes+=1
+				break
+			elif isrc_match.index(match)==len(isrc_match)-1:
+				no+=1
+				log(f'{plt.error} {tracks.index(i)+1}/{len(tracks)}: Not cleared. {isrc}')
+	log(f'{yes} successes / {no} fails')
+
+def search_ytmusic_album(title, artist):
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query=f'{title} {artist}'
@@ -141,24 +160,54 @@ def search_ytmusic_album(title, artist, **kwargs):
 	log('No match found.')
 	return None
 
-def search_ytmusic_text(query, **kwargs):
+def search_ytmusic_text(query):
 	# For plain-text searching
 	top_song=ytmusic.search(query=query,limit=1,filter='songs')[0]
 	top_video=ytmusic.search(query=query,limit=1,filter='songs')[0]
 	return top_song, top_video
 
-def search_ytmusic(title, artist, album, **kwargs):
+def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False, **kwargs):
 	global force_no_match
 	unsure=False
 
-	# Process kwargs
-	reference={'title':title, 'artist':artist, 'album':album}
 	query=f'{title} {artist} {album}'
-	# The search limit doesn't actually seem to work, investigate this
-	limit=20
-	if 'limit' in kwargs: limit=kwargs['limit']
+	reference={'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
+
+	# Trim ytmusic song data down to what's relevant to us
+	def trim_ytmusic_data(data, album='', from_pytube=False):
+		if from_pytube:
+			# ytmusicapi has a get_song function, but it doesn't retrieve
+			# things like artist, album, etc.
+			data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			try:
+				album = data['album']['name']
+			except KeyError as e:
+				log(e)
+				pass
+		if 'duration' in data: duration = data['duration']
+		elif 'length' in data: duration = data['length']
+		relevant = {
+			'title': data['title'],
+			'artist': data['artists'][0]['name'],
+			'url': 'https://www.youtube.com/watch?v='+data['videoId'],
+			'album': album,
+			'duration': duration,
+		}
+		return relevant
 
 	# Start search
+	if isrc!=None:
+		log(f'Searching for ISRC: {isrc}')
+		# For whatever reason, pytube seems to be more accurate here
+		isrc_matches = pytube.Search(isrc).results
+		for i in isrc_matches:
+			if fuzz.ratio(i.title, reference['title']) > 75:
+				log('Found an ISRC match.')
+				return trim_ytmusic_data(i,from_pytube=True)
+		# If a successful match is found, the functions returns
+		# Thus this code will only continue past this point otherwise
+		log('No ISRC match found, falling back on text search.')
+
 	log(f'Trying query \"{query}\" with a limit of {limit}')
 	song_results=ytmusic.search(query=query,limit=limit,filter='songs')
 	video_results=ytmusic.search(query=query,limit=limit,filter='videos')
@@ -168,6 +217,12 @@ def search_ytmusic(title, artist, album, **kwargs):
 		if int(i['duration_seconds'])>duration_limit*60*60: song_results.pop(song_results.index(i))
 	for i in video_results:
 		if int(i['duration_seconds'])>duration_limit*60*60: video_results.pop(video_results.index(i))
+
+	fast_search = kwargs.get('fast_search',False)
+	if fast_search:
+		log('fast_search is True.')
+		log('Returning match.')
+		return trim_ytmusic_data(song_results[0])
 
 	log('Checking for exact match...')
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
@@ -203,38 +258,20 @@ def search_ytmusic(title, artist, album, **kwargs):
 	results={}
 	# Determine what to queue
 	if match_found():
-		match={
-			'title': match['title'],
-			'artist': match['artists'][0]['name'],
-			'url': 'https://www.youtube.com/watch?v='+match['videoId'],
-			'duration': match['duration'],
-		}
 		# Return match
 		log('Returning match.')
-		return match
+		return trim_ytmusic_data(match)
 	else:
 		log('Creating results dictionary...')
 		song_choices=2
 		video_choices=2
 		position = 0
 		for result in song_results[:song_choices]:
-			results[position] = {
-				'title': result['title'],
-				'artist': result['artists'][0]['name'],
-				'album': result['album']['name'],
-				'url': 'https://www.youtube.com/watch?v='+result['videoId'],
-				'duration': result['duration'],
-			}
+			results[position] = trim_ytmusic_data(result,album=result['album']['name'])
 			position+=1
 
 		for result in video_results[:video_choices]:
-			results[position] = {
-				'title': result['title'],
-				'artist': '',
-				'album': '',
-				'url': 'https://www.youtube.com/watch?v='+result['videoId'],
-				'duration': result['duration'],
-			}
+			results[position] = trim_ytmusic_data(result)
 			position+=1
 
 		# Ask for confirmation if no exact match found
@@ -251,13 +288,26 @@ def soundcloud_playlist(url):
 def get_uri(url):
 	return url.split("/")[-1].split("?")[0]
 
+def spotify_playlist(url):
+	tracks = sp.playlist(url)['tracks']['items']
+	newlist = []
+	for i in tracks:
+		newlist.append({
+			'title':i['track']['name'],
+			'artist':i['track']['artists'][0]['name'],
+			'album':i['track']['album']['name'],
+			'isrc':i['track']['external_ids']['isrc'],
+		})
+	return newlist
+
 def spotify_track(url):
 	info=sp.track(url)
 	title=info['name']
 	# Only retrieves the first artist name
 	artist=info['artists'][0]['name']
 	album=info['album']['name']
-	return {'title':title, 'artist':artist, 'album':album, 'url':info['external_urls']['spotify']}
+	isrc = info['external_ids']['isrc']
+	return {'title':title, 'artist':artist, 'album':album, 'url':info['external_urls']['spotify'], 'isrc':isrc}
 
 def spotify_album(url):
 	info=sp.album(url)
@@ -300,20 +350,25 @@ def spyt(url, **kwargs):
 	if 'limit' in kwargs:
 		limit=kwargs['limit']
 
-	if '/album/' in url:
-		log('Album detected.')
-		return # work on this later
-		tracks=spotify_playlist(url)
-		playlist=[]
-		for track in tracks:
+	if '/playlist/' in url:
+		# Experimental! Shouldn't run unless "spotifylistOK" is in the command-line args
+		log('Playlist detected.')
+		spotify_list=spotify_playlist(url)
+		yt_list=[]
+		for track in spotify_list:
+			log(f'Playlist item {spotify_list.index(track)+1} of {len(spotify_list)}.')
 			# For playlists, each track is searched for when its turn in the queue is reached.
 			# This will pass along the title and spotify url
-			playlist.append(track)
-		return playlist
+			try:
+				yt_list.append(search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,fast_search=True,**kwargs))
+			except IndexError:
+				log(f'No match found, skipping.')
+				pass
+		return yt_list
 	else:
 		log('Not a playlist.')
 		track=spotify_track(url)
-		result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],limit=limit,**kwargs)
+		result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
 		if type(result)==tuple and result[0]=='unsure':
 			log('Returning as unsure.')
 			return result
