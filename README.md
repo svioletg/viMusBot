@@ -6,7 +6,6 @@
 
 ## TODO
 
-- [developer] Bundle reaction choices into some sort of function(s) for quicker use
 - [feature] Have the `-todo` and `-changelog` commands grab contents from this repository's corresponding markdown files
 - [feature] Add command to skip to specified item in queue
 ---
@@ -38,7 +37,7 @@ You can download the repository as a ZIP file directly from the repository page 
 2. Once cloned you'll have the files necessary to run the bot, excluding the `token.txt`, `spotify_config.json`, and `headers_auth.json` files, which you'll need to create yourself.
 3. With Python 3.10 installed, run `pip --version` and ensure that it reads "(python 3.10)" at the end so that everything installs to the right version.
 4. In a command prompt or terminal, enter the viMusBot directory and run `pip install -r requirements.txt`. This should install all of the required packages.
-5. Use `python3 bot.py public` to start it, and everything should be good to go. `public` ensures that it will use `token.txt` and not `devtoken.txt` (this file is not required for general use).
-    **Note:** You can also type "public" into `default_args.txt`, which will automatically add itself to the list of arguments when you run `bot.py`.
+5. Check `config.ini` and change any options you'd like - in most cases you'll want `public` set to `yes`, the rest can be left as default.
+6. Use `python3 bot.py` to start it, and everything should be good to go.
 
-In order to update your files you can simply use `git pull` if you did `git clone`, or just download the ZIP again and replace your files. You can also run `python3 bot.py help` to get a list of options for running the script - doing this will *not* start the bot.
+In order to update your files you can simply use `git pull` if you did `git clone`, or just download the ZIP again and replace your files.
