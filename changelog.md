@@ -2,6 +2,19 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.5.4
+> *2022.11.22* / *[view commit]()*
+
+### Other
+- Added an option to limit how long Spotify playlists can be for queueing (40 by default, see notes)
+- Split `print_logs` into `print_bot_logs` and `print_spoofy_logs`
+- When queueing a Spotify playlist, the bot will list what tracks it could not find a match for
+
+### Notes
+It was discovered that queueing a Spotify playlist longer than roughly 40 tracks will lock up the bot, due to the voice client returning as not connected despite it still being so. I can't seem to locate the root cause of this problem, so for now a limit has been added to circumvent this.
+
+This would likely be fixed by having a faster method of queueing up Spotify tracks, but with pyspotify not functioning these days, it's going to be a long time until I find a solution.
+
 ## 1.5.3
 > *2022.11.18* / *[view commit](https://github.com/svioletg/viMusBot/commit/9185f52120ca5738c8a821fb6e360d56ab7a894f)*
 

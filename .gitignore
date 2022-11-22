@@ -4,7 +4,7 @@ past-versions/
 .cache
 devtoken.txt
 token.txt
-config.json
+config.ini
 spotify_config.json
 headers_auth.json
 yttesting.py

@@ -1,11 +1,4 @@
 import sys
-if 'help' in sys.argv:
-	print("""Valid command-line arguments:
-  help - Displays this text and does not start the bot
-  public - Starts the bot and connects using the token provided in token.txt
-  fnm - Forces every Spotify link to result in a video selection menu.
-  quiet - Hides logs created by bot.py and spoofy.py with log().""")
-	exit()
 import os
 import subprocess
 import glob
@@ -46,7 +39,8 @@ discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 config = ConfigParser()
 config.read('config.ini')
 allow_spotify_playlists = config.getboolean('OPTIONS','allow_spotify_playlists')
-print_logs = config.getboolean('OPTIONS','print_logs')
+spotify_playlist_limit = config.getint('OPTIONS','spotify_playlist_limit')
+print_bot_logs = config.getboolean('OPTIONS','print_bot_logs')
 public = config.getboolean('OPTIONS','public')
 
 # Personal debug logging
@@ -67,18 +61,11 @@ def log(msg):
 	elapsed = logtimeB-logtimeA
 	called_from = sys._getframe().f_back.f_code.co_name
 	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if print_logs:
+	if print_bot_logs:
 		print(logstring)
 	logtimeA = time.time()
 
 log('Starting...')
-
-for key, value in config['OPTIONS'].items():
-	value = config.getboolean('OPTIONS',key)
-	if value:
-		log(f'{key} is {plt.green}{value}')
-	elif not value:
-		log(f'{key} is {plt.red}{value}')
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -195,7 +182,7 @@ class General(commands.Cog):
 
 	# Taken from: https://stackoverflow.com/a/73819537/8108924
 	@commands.Cog.listener()
-	async def on_voice_state_update(self, member, before, after):
+	async def on_voice_state_update(self, ctx, member, before, after):
 		
 		# Ignore if change from voice channels not from bot
 		if not member.id == self.bot.user.id:
@@ -207,14 +194,12 @@ class General(commands.Cog):
 		
 		# Check if playing when in voice channel, every 180 seconds
 		else:
-			voice = after.channel.guild.voice_client
 			while True:
-				await asyncio.sleep(600)
-				
+				await asyncio.sleep(600)				
 				# If not playing and not paused, disconnect
 				if not voice.is_playing() and not voice.is_paused():
-					await voice.disconnect()
 					log('Disconnecting from voice due to inactivity.')
+					await voice.disconnect()
 					break
 
 	@commands.command()
@@ -299,8 +284,8 @@ class Music(commands.Cog):
 		else:
 			channel = ctx.author.voice.channel
 
-		if ctx.voice_client is not None:
-			return await ctx.voice_client.move_to(channel)
+		if voice is not None:
+			return await voice.move_to(channel)
 
 		await channel.connect()
 
@@ -309,7 +294,7 @@ class Music(commands.Cog):
 		"""Disconnects the bot from voice."""
 		global player_queue
 		player_queue=[]
-		await ctx.voice_client.disconnect()
+		await voice.disconnect()
 
 	@commands.command()
 	async def move(self, ctx, old: int, new: int):
@@ -346,11 +331,11 @@ class Music(commands.Cog):
 		"""Pauses the player. Can be resumed with -play."""
 		global paused_at
 		"""Pauses the player."""
-		if ctx.voice_client.is_playing():
-			ctx.voice_client.pause()
+		if voice.is_playing():
+			voice.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
 			paused_at=time.time()
-		elif ctx.voice_client.is_paused():
+		elif voice.is_paused():
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
@@ -376,10 +361,19 @@ class Music(commands.Cog):
 					log('Spotify playlist detected.')
 					if allow_spotify_playlists:
 						await ctx.send(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
-						objlist = generate_QueueItems(spoofy.spyt(url))
+						spytout = spoofy.spyt(url)
+						if spytout == 'too_long':
+							await ctx.send(embed=embedq(f'Spotify playlists must have less than {spotify_playlist_limit} tracks.'))
+							return
+						objlist = generate_QueueItems(spytout[0])
+						failstring = 'No items failed to queue.'
+						if len(failstring)!=0:
+							failstring = 'The following items failed to queue:'
+							for i in spytout[1]:
+								failstring+=f'\n{i}'
 						queue_multiple(objlist)
-						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-						if not ctx.voice_client.is_playing():
+						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.',f'{failstring}'))
+						if not voice.is_playing():
 							log('Voice client is not playing; joining...')
 							await next_in_queue(ctx, skip=True)
 						return
@@ -489,7 +483,7 @@ class Music(commands.Cog):
 				objlist = generate_QueueItems(url)
 				queue_multiple(objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-				if not ctx.voice_client.is_playing():
+				if not voice.is_playing():
 					log('triggering next_in_queue')
 					await next_in_queue(ctx, skip=True)
 					return
@@ -532,7 +526,7 @@ class Music(commands.Cog):
 			# Start the player; everything before this should funnel down into here
 			try:
 				log('Trying to start playing or queueing.')
-				if not ctx.voice_client.is_playing():
+				if not voice.is_playing():
 					log('Voice client is not playing; joining...')
 					await playnext(url, ctx)
 				else:
@@ -589,8 +583,8 @@ class Music(commands.Cog):
 		"""Stops the player and clears the queue."""
 		global player_queue
 		player_queue=[]
-		if ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
-			ctx.voice_client.stop()
+		if voice.is_playing() or voice.is_paused():
+			voice.stop()
 			await ctx.send(embed=embedq('Player has been stopped.'))
 		else:
 			await ctx.send(embed=embedq('Nothing is playing.'))
@@ -601,7 +595,8 @@ class Music(commands.Cog):
 	async def ensure_voice(self, ctx):
 		if ctx.voice_client is None:
 			if ctx.author.voice:
-				await ctx.author.voice.channel.connect()
+				global voice
+				voice = await ctx.author.voice.channel.connect()
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 				raise commands.CommandError("Author not connected to a voice channel.")
@@ -723,8 +718,8 @@ async def playnext(url, ctx):
 
 	nowplaying=player
 	npurl=url
-	ctx.voice_client.stop()
-	ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
+	voice.stop()
+	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
 	audio_started = time.time()
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
 	if 'open.spotify.com' in ctx.message.content:
@@ -741,9 +736,9 @@ async def next_in_queue(ctx, **kwargs):
 	skip=False
 	if 'skip' in kwargs:
 		if kwargs['skip']==True: skip=True
-	if skip or (player_queue != [] and not ctx.voice_client.is_playing()):
+	if skip or (player_queue != [] and not voice.is_playing()):
 		if player_queue==[]:
-			ctx.voice_client.stop()
+			voice.stop()
 		else:
 			await playnext(player_queue.pop(0).url, ctx)
 
@@ -771,8 +766,8 @@ bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
 		if ctx.command.name == 'play':
-			if ctx.voice_client.is_paused():
-				ctx.voice_client.resume()
+			if voice.is_paused():
+				voice.resume()
 				await ctx.send(embed=embedq('Player is resuming.'))
 				global paused_for
 				paused_for=time.time()-paused_at

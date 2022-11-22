@@ -20,8 +20,9 @@ _here = os.path.basename(__file__)
 # Get options
 config = ConfigParser()
 config.read('config.ini')
-print_logs = config.getboolean('OPTIONS','print_logs')
+print_spoofy_logs = config.getboolean('OPTIONS','print_spoofy_logs')
 force_no_match = config.getboolean('OPTIONS','force_no_match')
+spotify_playlist_limit = config.getint('OPTIONS','spotify_playlist_limit')
 
 # Personal debug logging
 colorama.init(autoreset=True)
@@ -41,7 +42,7 @@ def log(msg):
 	elapsed = logtimeB-logtimeA
 	called_from = sys._getframe().f_back.f_code.co_name
 	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if print_logs:
+	if print_spoofy_logs:
 		print(logstring)
 	logtimeA = time.time()
 
@@ -79,9 +80,6 @@ keytable = {
 
 # Define matching logic
 def is_matching(reference, ytresult, **kwargs):
-	if kwargs!={}:
-		for key, value in kwargs.items():
-			log(f'{key} is set to {value}.')
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
 	# 'old' = checking for strings in other strings, how matching was done beforehand
@@ -296,7 +294,7 @@ def spotify_playlist(url):
 			'title':i['track']['name'],
 			'artist':i['track']['artists'][0]['name'],
 			'album':i['track']['album']['name'],
-			'isrc':i['track']['external_ids']['isrc'],
+			'isrc':i['track']['external_ids'].get('isrc',None),
 		})
 	return newlist
 
@@ -354,17 +352,28 @@ def spyt(url, **kwargs):
 		# Experimental! Shouldn't run unless "spotifylistOK" is in the command-line args
 		log('Playlist detected.')
 		spotify_list=spotify_playlist(url)
+		if len(spotify_list) > spotify_playlist_limit:
+			# Abort if playlist is longer than the set cap
+			return 'too_long'
+
 		yt_list=[]
+		failed=[]
 		for track in spotify_list:
 			log(f'Playlist item {spotify_list.index(track)+1} of {len(spotify_list)}.')
 			# For playlists, each track is searched for when its turn in the queue is reached.
 			# This will pass along the title and spotify url
 			try:
-				yt_list.append(search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,fast_search=True,**kwargs))
+				ytmatch = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,fast_search=True,**kwargs)
+				if type(ytmatch) == tuple:
+					failed.append(track['title'])
+				elif type(ytmatch) == dict:
+					yt_list.append(ytmatch)
+				else:
+					log(f'{plt.warn}ytmatch is not a tuple or dictionary, which should not be possible.')
 			except IndexError:
 				log(f'No match found, skipping.')
 				pass
-		return yt_list
+		return yt_list, failed
 	else:
 		log('Not a playlist.')
 		track=spotify_track(url)
