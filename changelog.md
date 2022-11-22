@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
 ## 1.5.4
-> *2022.11.22* / *[view commit]()*
+> *2022.11.22* / *[view commit](https://github.com/svioletg/viMusBot/commit/96ad0dd19870b0462293c2e6a458922730a5a01d)*
 
 ### Other
 - Added an option to limit how long Spotify playlists can be for queueing (40 by default, see notes)
