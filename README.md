@@ -4,12 +4,6 @@
 
 ---
 
-## TODO
-
-- [feature] Have the `-todo` and `-changelog` commands grab contents from this repository's corresponding markdown files
-- [feature] Add command to skip to specified item in queue
----
-
 A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/discord.py) library, for personal usage.
 
 Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you've experienced a bug or otherwise odd behavior, or have a feature to request, and feel free to comment on existing issues to provide any additional details that may help narrow down the issue or reach a solution. No bug or feature is too large/small to be submitted, this system is best for me to keep track of everything.
@@ -31,7 +25,7 @@ The bot will require at least these permissions:
 
 ![Required Bot Permissions](https://cdn.discordapp.com/attachments/327195739346173962/1039979708219129966/image.png)
 
-You can download the repository as a ZIP file directly from the repository page and you'll be set, but I would recommend installing `git` for easier updating:
+You can download the repository as a ZIP file directly from the repository page and you'll be set, but I would recommend installing `git` for easier updating; use `apt-get install git` or equivalent on Linux, or [download it here](https://git-scm.com/download/win) for Windows.
 
 1. Running `git clone https://github.com/svioletg/viMusBot.git` will create a `viMusBot` folder within wherever the command was run, there's no need to create a folder for it in advance.
 2. Once cloned you'll have the files necessary to run the bot, excluding the `token.txt`, `spotify_config.json`, and `headers_auth.json` files, which you'll need to create yourself.

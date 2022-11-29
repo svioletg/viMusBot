@@ -1,55 +1,48 @@
 import time
 import sys
 import os
-import json
 import spotipy
 import sclib
-import colorama
 import pytube
+import yaml
+import json
+import customlog
+import colorama
 from colorama import Fore, Back, Style
 from palette import Palette
-from configparser import ConfigParser
 from fuzzywuzzy import fuzz
 from spotipy import SpotifyClientCredentials
-from datetime import datetime
 from inspect import currentframe, getframeinfo
 from ytmusicapi import YTMusic
 
 _here = os.path.basename(__file__)
 
-# Get options
-config = ConfigParser()
-config.read('config.ini')
-print_spoofy_logs = config.getboolean('OPTIONS','print_spoofy_logs')
-force_no_match = config.getboolean('OPTIONS','force_no_match')
-spotify_playlist_limit = config.getint('OPTIONS','spotify_playlist_limit')
+# Parse configuration and set variables
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+force_no_match = config['force-no-match']
+spotify_playlist_limit = config['spotify-playlist-limit']
 
 # Personal debug logging
 colorama.init(autoreset=True)
 plt = Palette()
 
-logtimeA = time.time()
-logtimeB = time.time()
+last_logtime = time.time()
+
+def log(msg):
+	global last_logtime
+	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
+	last_logtime = time.time()
 
 def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
-def log(msg):
-	global logtimeA
-	global logtimeB
-	logtimeB = time.time()
-	elapsed = logtimeB-logtimeA
-	called_from = sys._getframe().f_back.f_code.co_name
-	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if print_spoofy_logs:
-		print(logstring)
-	logtimeA = time.time()
-
 log('Imported.')
 
 # Useful to point this out if left on accidentally
-if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
+if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -127,6 +120,7 @@ def isrc_search_test(playlist):
 	tracks = spotify_playlist(playlist)
 	yes=0
 	no=0
+	log('STARTING')
 	for i in tracks:
 		isrc = i['isrc']
 		# For whatever reason, pytube seems to be more accurate here
@@ -134,13 +128,31 @@ def isrc_search_test(playlist):
 		for match in isrc_match:
 			print(Fore.CYAN+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
 			if fuzz.ratio(match.title, i['title']) > 75:
-				log(f'{plt.good} {tracks.index(i)+1}/{len(tracks)}: Cleared. {isrc}')
+				log(f'{plt.green} {tracks.index(i)+1}/{len(tracks)}: Cleared. {isrc}')
 				yes+=1
 				break
 			elif isrc_match.index(match)==len(isrc_match)-1:
 				no+=1
 				log(f'{plt.error} {tracks.index(i)+1}/{len(tracks)}: Not cleared. {isrc}')
 	log(f'{yes} successes / {no} fails')
+
+def pytube_track_data(pytube_object):
+	description_list = pytube_object.description.split('\n')
+	if 'Provided to YouTube by' not in description_list[0]:
+		# This function won't work if it doesn't follow the auto-generated template
+		return None
+	for i in description_list:
+		if i=='':
+			description_list.pop(description_list.index(i))
+	description_dict = {
+		# some keys have been added for previous code compatbility
+		'title': pytube_object.title,
+		'artists': [{'name':description_list[1].split(' · ')[1]}],
+		'album': {'name': description_list[2]},
+		'length': pytube_object.length,
+		'videoId': pytube_object.video_id
+	}
+	return description_dict
 
 def search_ytmusic_album(title, artist):
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.'); return None
@@ -172,11 +184,14 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	reference={'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_ytmusic_data(data, album='', from_pytube=False):
+	def trim_track_data(data, album='', from_pytube=False, extract_from_ytmusic=False):
 		if from_pytube:
 			# ytmusicapi has a get_song function, but it doesn't retrieve
 			# things like artist, album, etc.
-			data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			if extract_from_ytmusic:
+				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			else:
+				data = pytube_track_data(data)
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -201,7 +216,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.')
-				return trim_ytmusic_data(i,from_pytube=True)
+				return trim_track_data(i,from_pytube=True)
 		# If a successful match is found, the functions returns
 		# Thus this code will only continue past this point otherwise
 		log('No ISRC match found, falling back on text search.')
@@ -220,7 +235,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	if fast_search:
 		log('fast_search is True.')
 		log('Returning match.')
-		return trim_ytmusic_data(song_results[0])
+		return trim_track_data(song_results[0])
 
 	log('Checking for exact match...')
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
@@ -258,18 +273,18 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	if match_found():
 		# Return match
 		log('Returning match.')
-		return trim_ytmusic_data(match)
+		return trim_track_data(match)
 	else:
 		log('Creating results dictionary...')
-		song_choices=2
-		video_choices=2
+		song_choices = 2
+		video_choices = 2
 		position = 0
 		for result in song_results[:song_choices]:
-			results[position] = trim_ytmusic_data(result,album=result['album']['name'])
+			results[position] = trim_track_data(result,album=result['album']['name'])
 			position+=1
 
 		for result in video_results[:video_choices]:
-			results[position] = trim_ytmusic_data(result)
+			results[position] = trim_track_data(result)
 			position+=1
 
 		# Ask for confirmation if no exact match found
@@ -295,6 +310,7 @@ def spotify_playlist(url):
 			'artist':i['track']['artists'][0]['name'],
 			'album':i['track']['album']['name'],
 			'isrc':i['track']['external_ids'].get('isrc',None),
+			'url':i['track']['external_urls']['spotify'],
 		})
 	return newlist
 
@@ -349,7 +365,8 @@ def spyt(url, **kwargs):
 		limit=kwargs['limit']
 
 	if '/playlist/' in url:
-		# Experimental! Shouldn't run unless "spotifylistOK" is in the command-line args
+		# Deprecated!
+		log(f'{plt.warn}NOTICE: Using deprecated playlist queueing code.')
 		log('Playlist detected.')
 		spotify_list=spotify_playlist(url)
 		if len(spotify_list) > spotify_playlist_limit:

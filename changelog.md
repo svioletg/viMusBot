@@ -2,6 +2,32 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.0
+> *2022.11.29*
+
+### Remember to replace your INI file with the new YAML template!
+
+### Developer
+- The `log()` function in `bot.py` and `spoofy.py` has been moved to `newlog()` in `customlog.py`, so the log template and other aspects can be edited without needing to copy-paste between files
+- `log()` still exists in the other files, now as a wrapper for `customlog.newlog()` so that you can still call it with only a message
+
+### Features
+- `bot.py` and `spoofy.py` will now write to `vimusbot.log` in addition to printing to console
+    - When the bot is stopped and started, this is copied to `vimusbot-old.log`
+- Various new options added/renamed in config
+    - Inlucing an option to specify which functions you'd like to blacklist log messages from - note that this only affects what's printed to the console, it will still be written to `vimusbot.log`
+- `test()` added to `palette.py` to display every currently set color
+    - This can be seen by running `python3 palette.py --show`
+
+### Improvements
+- Spotify URLs will now be queued directly, and matching will be done once its turn in the queue has been reached
+    - Subsequently, queueing Spotify playlists has become *significantly* faster, and should no longer cause major problems
+- Config files now use YAML instead of INI
+- If an ISRC match succeeds, data will be obtained with pytube, which is slightly faster than ytmusicapi
+
+### Notes
+I've stopped including the commit link so that each update doesn't require two separate commits for it. You can find a version's latest commit by searching through all of them and finding the last commit before one with a new version number.
+
 ## 1.5.4
 > *2022.11.22* / *[view commit](https://github.com/svioletg/viMusBot/commit/96ad0dd19870b0462293c2e6a458922730a5a01d)*
 

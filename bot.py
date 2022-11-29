@@ -11,11 +11,12 @@ import spoofy
 import time
 import traceback
 import logging
+import customlog
 import random
+import yaml
 import colorama
 from colorama import Fore, Back, Style
 from palette import Palette
-from configparser import ConfigParser
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 from datetime import timedelta
@@ -25,45 +26,40 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.5.3'
+version = '1.6.0'
 
 ### TODO
 TODO = {
 }
 
-# Start logging
+# Start discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
 # Get options
-config = ConfigParser()
-config.read('config.ini')
-allow_spotify_playlists = config.getboolean('OPTIONS','allow_spotify_playlists')
-spotify_playlist_limit = config.getint('OPTIONS','spotify_playlist_limit')
-print_bot_logs = config.getboolean('OPTIONS','print_bot_logs')
-public = config.getboolean('OPTIONS','public')
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+allow_spotify_playlists = config['allow-spotify-playlists']
+spotify_playlist_limit = config['spotify-playlist-limit']
+public_prefix = config['prefixes']['public']
+dev_prefix = config['prefixes']['developer']
+public = config['public']
 
 # Personal debug logging
 colorama.init(autoreset=True)
 plt = Palette()
 
-logtimeA = time.time()
-logtimeB = time.time()
+last_logtime = time.time()
+
+def log(msg):
+	global last_logtime
+	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
+	last_logtime = time.time()
 
 def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
-
-def log(msg):
-	global logtimeA
-	global logtimeB
-	logtimeB = time.time()
-	elapsed = logtimeB-logtimeA
-	called_from = sys._getframe().f_back.f_code.co_name
-	logstring = f'{plt.file[_here]}[{_here}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if print_bot_logs:
-		print(logstring)
-	logtimeA = time.time()
 
 log('Starting...')
 
@@ -138,6 +134,8 @@ def title_from_url(url):
 		return pytube.YouTube(url).title
 	elif 'soundcloud.com' in url:
 		return spoofy.sc.resolve(url).title
+	elif 'open.spotify.com' in url:
+		return spoofy.spotify_track(url)['title']
 	else:
 		info_dict = ytdl.extract_info(url, download=False)
 		return info_dict.get('title', None)
@@ -294,6 +292,7 @@ class Music(commands.Cog):
 		"""Disconnects the bot from voice."""
 		global player_queue
 		player_queue=[]
+		log('Leaving voice channel.')
 		await voice.disconnect()
 
 	@commands.command()
@@ -360,23 +359,32 @@ class Music(commands.Cog):
 				if '/playlist/' in url:
 					log('Spotify playlist detected.')
 					if allow_spotify_playlists:
-						await ctx.send(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
-						spytout = spoofy.spyt(url)
-						if spytout == 'too_long':
-							await ctx.send(embed=embedq(f'Spotify playlists must have less than {spotify_playlist_limit} tracks.'))
-							return
-						objlist = generate_QueueItems(spytout[0])
-						failstring = 'No items failed to queue.'
-						if len(failstring)!=0:
-							failstring = 'The following items failed to queue:'
-							for i in spytout[1]:
-								failstring+=f'\n{i}'
+						await qmessage.edit(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
+						objlist = generate_QueueItems(spoofy.spotify_playlist(url))
 						queue_multiple(objlist)
-						await ctx.send(embed=embedq(f'Queued {len(objlist)} items.',f'{failstring}'))
+						list_name = spoofy.sp.playlist(url)['name']
+						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
 						if not voice.is_playing():
-							log('Voice client is not playing; joining...')
-							await next_in_queue(ctx, skip=True)
+							log('Voice client is not playing; starting...')
+							await next_in_queue(ctx)
 						return
+						### Old, much slower method
+						# spytout = spoofy.spyt(url)
+						# if spytout == 'too_long':
+						# 	await ctx.send(embed=embedq(f'Spotify playlists must have less than {spotify_playlist_limit} tracks.'))
+						# 	return
+						# objlist = generate_QueueItems(spytout[0])
+						# failstring = 'No items failed to queue.'
+						# if len(failstring)!=0:
+						# 	failstring = 'The following items failed to queue:'
+						# 	for i in spytout[1]:
+						# 		failstring+=f'\n{i}'
+						# queue_multiple(objlist)
+						# await ctx.send(embed=embedq(f'Queued {len(objlist)} items.',f'{failstring}'))
+						# if not voice.is_playing():
+						# 	log('Voice client is not playing; joining...')
+						# 	await next_in_queue(ctx, skip=True)
+						# return
 					else:
 						await ctx.send(embed=embedq('Spotify playlist support is disabled.','Contact whoever is hosting your bot if you believe this is a mistake.'))
 						return
@@ -389,38 +397,6 @@ class Music(commands.Cog):
 					if url==None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
-				else:
-					embed=discord.Embed(title=f'Spotify link detected, searching YouTube...',description='Please wait; this may take a while!',color=0xFFFF00)
-					await qmessage.edit(embed=embed)
-					spyt=spoofy.spyt(url)
-
-					log('Checking if unsure...')
-					if type(spyt)==tuple and spyt[0]=='unsure':
-						# This indicates no match was found
-						log('spyt returned unsure.')
-						# Remove the warning, no longer needed
-						spyt=spyt[1]
-						# Shorten to {limit} results
-						limit=5
-						spyt=dict(list(spyt.items())[:limit])
-						# Prompt the user with choice
-						embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
-						
-						for i in spyt:
-							title=spyt[i]['title']
-							url=spyt[i]['url']
-							artist=spyt[i]['artist']
-							album=spyt[i]['album']
-							if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
-							else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
-
-						prompt = await ctx.send(embed=embed)
-						choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
-						if choice==None:
-							return
-						spyt = spyt[choice-1]
-
-					url=spyt['url']
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
@@ -484,8 +460,7 @@ class Music(commands.Cog):
 				queue_multiple(objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not voice.is_playing():
-					log('triggering next_in_queue')
-					await next_in_queue(ctx, skip=True)
+					await next_in_queue(ctx)
 					return
 			else:
 				# Runs if the input given was not a playlist
@@ -498,12 +473,15 @@ class Music(commands.Cog):
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
 				else:
-					try:
-						duration = ytdl.extract_info(url,download=False)['duration']
-					# 'duration' is not retrieved from the generic extractor used for direct links
-					except KeyError as e:
-						ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-						duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
+					if 'open.spotify.com' in url:
+						duration = spoofy.sp.track(url)['duration_ms']/1000
+					else:
+						try:
+							duration = ytdl.extract_info(url,download=False)['duration']
+						# 'duration' is not retrieved from the generic extractor used for direct links
+						except KeyError as e:
+							ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
+							duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 
 					if duration>duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
@@ -511,23 +489,24 @@ class Music(commands.Cog):
 						return
 				log('Checking availability...')
 				# Make sure the video exists.
-				try:
-					ytdl.extract_info(url,download=False)
-				except yt_dlp.utils.DownloadError as e:
-					log('Video unavailable.')
-					print(e)
-					await qmessage.edit(embed=embedq('This video is unavailable.'))
-					return
-				except Exception as e:
-					print(e)
-					await qmessage.edit(embed=embedq('An unexpected error occurred.'))
-					return
+				if 'open.spotify.com' not in url:
+					try:
+						ytdl.extract_info(url,download=False)
+					except yt_dlp.utils.DownloadError as e:
+						log('Video unavailable.')
+						print(e)
+						await qmessage.edit(embed=embedq('This video is unavailable.'))
+						return
+					except Exception as e:
+						print(e)
+						await qmessage.edit(embed=embedq('An unexpected error occurred.'))
+						return
 
-			# Start the player; everything before this should funnel down into here
+			# Start the player if we can use the url itself
 			try:
 				log('Trying to start playing or queueing.')
 				if not voice.is_playing():
-					log('Voice client is not playing; joining...')
+					log('Voice client is not playing; starting...')
 					await playnext(url, ctx)
 				else:
 					player_queue.append(QueueItem(url))
@@ -595,6 +574,7 @@ class Music(commands.Cog):
 	async def ensure_voice(self, ctx):
 		if ctx.voice_client is None:
 			if ctx.author.voice:
+				log('Joining voice channel.')
 				global voice
 				voice = await ctx.author.voice.channel.connect()
 			else:
@@ -708,6 +688,39 @@ async def playnext(url, ctx):
 	paused_at, paused_for = 0, 0
 	lastplayed=nowplaying
 	lasturl=npurl
+	log('Trying to start playing...')
+	# Check if we need to match a Spotify link
+	if 'open.spotify.com' in url:
+		log('Trying to match Spotify track...')
+		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!'))
+		spyt=spoofy.spyt(url)
+
+		log('Checking if unsure...')
+		if type(spyt)==tuple and spyt[0]=='unsure':
+			# This indicates no match was found
+			log('spyt returned unsure.')
+			# Remove the warning, no longer needed
+			spyt=spyt[1]
+			# Shorten to {limit} results
+			limit=5
+			spyt=dict(list(spyt.items())[:limit])
+			# Prompt the user with choice
+			embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+			
+			for i in spyt:
+				title=spyt[i]['title']
+				url=spyt[i]['url']
+				artist=spyt[i]['artist']
+				album=spyt[i]['album']
+				if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
+				else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
+
+			prompt = await ctx.send(embed=embed)
+			choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
+			if choice==None:
+				return
+			spyt = spyt[choice-1]
+		url = spyt['url']
 
 	try:
 		player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
@@ -733,9 +746,7 @@ async def playnext(url, ctx):
 			log(f'Removing: {i}')
 
 async def next_in_queue(ctx, **kwargs):
-	skip=False
-	if 'skip' in kwargs:
-		if kwargs['skip']==True: skip=True
+	skip=kwargs.get('skip',False)
 	if skip or (player_queue != [] and not voice.is_playing()):
 		if player_queue==[]:
 			voice.stop()
@@ -753,8 +764,12 @@ intents.reactions = True
 intents.guilds = True
 intents.members = True
 
+# Use separate dev and public mode prefixes
+if public: command_prefix = public_prefix
+else: command_prefix = dev_prefix
+
 bot = commands.Bot(
-	command_prefix=commands.when_mentioned_or('-'),
+	command_prefix=commands.when_mentioned_or(command_prefix),
 	description='',
 	intents=intents,
 )
@@ -791,7 +806,8 @@ async def on_ready():
 
 # Retrieve bot token
 if public: f='token.txt'
-if not public: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
+else: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
+
 try:
 	token = open(f).read()
 except FileNotFoundError:

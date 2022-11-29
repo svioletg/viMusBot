@@ -1,7 +1,18 @@
+import sys
+import yaml
 import colorama
 from colorama import Fore, Back, Style
 
 colorama.init(autoreset=True)
+
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+colorconfig = config['logging-options']['colors']
+
+if colorconfig['no-color']==True:
+	for i in colorconfig:
+		colorconfig[i] = 'reset'
 
 class Palette:
 	def __init__(self):
@@ -18,12 +29,29 @@ class Palette:
 		self.darkmagenta = Style.NORMAL+Fore.MAGENTA
 		self.blue = Style.BRIGHT+Fore.BLUE
 		self.darkblue = Style.NORMAL+Fore.BLUE
+		# Make dictionary for config usage
+		self.colors = vars(self)
+		# User-defined
 		self.file = {
-			'bot.py': self.yellow,
-			'spoofy.py':self.lime,
+			'bot.py': self.colors[colorconfig['bot.py']],
+			'spoofy.py': self.colors[colorconfig['spoofy.py']],
 		}
-		# Presets
-		self.warn = self.gold
-		self.error = self.red
-		self.timer = self.magenta
-		self.func = self.blue
+		self.warn = self.colors[colorconfig['warn']]
+		self.error = self.colors[colorconfig['error']]
+		self.timer = self.colors[colorconfig['timer']]
+		self.func = self.colors[colorconfig['function']]
+
+palette = Palette()
+def test():
+	for k, v in vars(palette).items():
+		if k=='colors':
+			# Skip the colors dictionary
+			continue
+		elif type(v)==dict:
+			for k2, v2 in v.items():
+				print(f'{v2}{k}[\'{k2}\']')
+		else:
+			print(v+k)
+
+if '--show' in sys.argv:
+	test()
