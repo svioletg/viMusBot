@@ -361,6 +361,9 @@ class Music(commands.Cog):
 					if allow_spotify_playlists:
 						await qmessage.edit(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
 						objlist = generate_QueueItems(spoofy.spotify_playlist(url))
+						if len(objlist) > spotify_playlist_limit:
+							await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
+							return
 						queue_multiple(objlist)
 						list_name = spoofy.sp.playlist(url)['name']
 						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
