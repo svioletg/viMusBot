@@ -28,12 +28,10 @@ def newlog(msg='', last_logtime=time.time(), called_from=''):
 			break
 
 	elapsed = time.time()-last_logtime
-	if called_from in log_blacklist:
-		return
 	timestamp = datetime.now().strftime('%m-%d-%Y %H:%M:%S')
 	logstring = f'[{timestamp}] [{source}] {called_from}: {msg}  {round(elapsed,3)}s'
 	logfile.write(logstring+'\n')
 
 	logstring = f'{plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if config['logging-options']['show-console-logs'][source]:
+	if not (called_from in log_blacklist) and config['logging-options']['show-console-logs'][source]:
 		print(logstring)
