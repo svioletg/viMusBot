@@ -33,5 +33,6 @@ def newlog(msg='', last_logtime=time.time(), called_from=''):
 	logfile.write(logstring+'\n')
 
 	logstring = f'{plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
-	if not (called_from in log_blacklist) and config['logging-options']['show-console-logs'][source]:
+	blacklist_exceptions = [plt.warn, plt.error]
+	if (any(i in logstring for i in blacklist_exceptions) or called_from not in log_blacklist) and config['logging-options']['show-console-logs'][source]:
 		print(logstring)

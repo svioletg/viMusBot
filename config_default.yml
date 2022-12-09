@@ -11,16 +11,20 @@ prefixes:
     public: "-"
     developer: "$"
 
-# Will allow queueing entire Spotify playlists
+# Allows queueing entire Spotify playlists
 # This currently takes a long time (~1-2 seconds per track) to do, so it's disabled by default
 allow-spotify-playlists: yes
 
 # Limit the amount of tracks Spotify playlists can have before queueing
 spotify-playlist-limit: 40
 
-# If yes, will force Spotify links to not find an automatic YouTube match,
+# Forces Spotify links to not find an automatic YouTube match,
 # and will always trigger the choice menu
 force-no-match: no
+
+# Automatically queues the top result of a Spotify-YouTube match,
+# regardless of how close the match is
+use-top-match: yes
 
 # Set various options for output logs
 logging-options:

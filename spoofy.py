@@ -17,13 +17,6 @@ from ytmusicapi import YTMusic
 
 _here = os.path.basename(__file__)
 
-# Parse configuration and set variables
-with open('config.yml','r') as f:
-	config = yaml.safe_load(f)
-
-force_no_match = config['force-no-match']
-spotify_playlist_limit = config['spotify-playlist-limit']
-
 # Personal debug logging
 colorama.init(autoreset=True)
 plt = Palette()
@@ -39,7 +32,38 @@ def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
-log('Imported.')
+# Parse config from YAML
+if not os.path.isfile('config_default.yml'):
+	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+
+with open('config_default.yml','r') as f:
+	config_default = yaml.safe_load(f)
+
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+def keys_recursive(d):
+	vals = []
+	for k, v in d.items():
+		vals.append(k)
+		if isinstance(v, dict):
+			vals=vals+keys_recursive(v)
+	return vals
+
+default_options = keys_recursive(config_default)
+user_options = keys_recursive(config)
+
+for i in user_options:
+	if i not in default_options:
+		log(f'{plt.warn}NOTICE: {i} is no longer used; it may have been renamed or removed in a recent update.')
+
+for i in default_options:
+	if i not in user_options:
+		log(f'{plt.error}ERROR: {i} was not found in config.yml; exiting.')
+		exit()
+
+force_no_match = config['force-no-match']
+spotify_playlist_limit = config['spotify-playlist-limit']
 
 # Useful to point this out if left on accidentally
 if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
@@ -214,6 +238,8 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
 		for i in isrc_matches:
+			# Exit loop if we're forcing the prompt
+			if force_no_match: break
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.')
 				return trim_track_data(i,from_pytube=True)
@@ -238,12 +264,13 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		return trim_track_data(song_results[0])
 
 	log('Checking for exact match...')
-	if force_no_match: log(f'{plt.warn}force_no_match is set to True.')
+	if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 	# Check for matches
 	match=None
 	def match_found():
-		return match!=None and not force_no_match
+		if force_no_match: return False
+		else: return match!=None
 
 	for i in song_results[:5]:
 		if is_matching(reference,i,ignore_artist=True):

@@ -14,6 +14,7 @@ import logging
 import customlog
 import random
 import yaml
+import urllib.request
 import colorama
 from colorama import Fore, Back, Style
 from palette import Palette
@@ -26,7 +27,7 @@ _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.6.0'
+version = '1.6.1'
 
 ### TODO
 TODO = {
@@ -35,16 +36,6 @@ TODO = {
 # Start discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
-
-# Get options
-with open('config.yml','r') as f:
-	config = yaml.safe_load(f)
-
-allow_spotify_playlists = config['allow-spotify-playlists']
-spotify_playlist_limit = config['spotify-playlist-limit']
-public_prefix = config['prefixes']['public']
-dev_prefix = config['prefixes']['developer']
-public = config['public']
 
 # Personal debug logging
 colorama.init(autoreset=True)
@@ -60,6 +51,46 @@ def log(msg):
 def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
+
+log(f'v{version}')
+log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
+
+# Parse config from YAML
+if not os.path.isfile('config_default.yml'):
+	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+
+with open('config_default.yml','r') as f:
+	config_default = yaml.safe_load(f)
+
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+def keys_recursive(d):
+	vals = []
+	for k, v in d.items():
+		vals.append(k)
+		if isinstance(v, dict):
+			vals=vals+keys_recursive(v)
+	return vals
+
+default_options = keys_recursive(config_default)
+user_options = keys_recursive(config)
+
+for i in user_options:
+	if i not in default_options:
+		log(f'{plt.warn}NOTICE: {i} is no longer used; it may have been renamed or removed in a recent update.')
+
+for i in default_options:
+	if i not in user_options:
+		log(f'{plt.error}ERROR: {i} was not found in config.yml; exiting.')
+		exit()
+
+allow_spotify_playlists = config['allow-spotify-playlists']
+spotify_playlist_limit = config['spotify-playlist-limit']
+use_top_match = config['use-top-match']
+public_prefix = config['prefixes']['public']
+dev_prefix = config['prefixes']['developer']
+public = config['public']
 
 log('Starting...')
 
@@ -180,6 +211,7 @@ class General(commands.Cog):
 
 	# Taken from: https://stackoverflow.com/a/73819537/8108924
 	@commands.Cog.listener()
+	# Doesn't work, to fix later
 	async def on_voice_state_update(self, ctx, member, before, after):
 		
 		# Ignore if change from voice channels not from bot
@@ -468,6 +500,20 @@ class Music(commands.Cog):
 			else:
 				# Runs if the input given was not a playlist
 				log('URL is not a playlist.')
+				log('Checking availability...')
+				# Make sure the video exists, store the result so we don't have to make two requests
+				if 'open.spotify.com' not in url:
+					try:
+						ytdl_extracted = ytdl.extract_info(url,download=False)
+					except yt_dlp.utils.DownloadError as e:
+						log('Video unavailable.')
+						print(e)
+						await qmessage.edit(embed=embedq('This video is unavailable.'))
+						return
+					except Exception as e:
+						print(e)
+						await qmessage.edit(embed=embedq('An unexpected error occurred.'))
+						return
 				log('Checking duration...')
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
@@ -480,29 +526,17 @@ class Music(commands.Cog):
 						duration = spoofy.sp.track(url)['duration_ms']/1000
 					else:
 						try:
-							duration = ytdl.extract_info(url,download=False)['duration']
+							duration = ytdl_extracted['duration']
 						# 'duration' is not retrieved from the generic extractor used for direct links
 						except KeyError as e:
+							# I'd like to avoid executing something outside of the script here,
+							# but I couldn't find any library for ffprobe
 							ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
 							duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 
 					if duration>duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
-						return
-				log('Checking availability...')
-				# Make sure the video exists.
-				if 'open.spotify.com' not in url:
-					try:
-						ytdl.extract_info(url,download=False)
-					except yt_dlp.utils.DownloadError as e:
-						log('Video unavailable.')
-						print(e)
-						await qmessage.edit(embed=embedq('This video is unavailable.'))
-						return
-					except Exception as e:
-						print(e)
-						await qmessage.edit(embed=embedq('An unexpected error occurred.'))
 						return
 
 			# Start the player if we can use the url itself
@@ -615,12 +649,14 @@ async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
 		log('Timeout reached.')
 		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
 		await msg.edit(embed=embed)
+		await prompt.delete()
 		return None
 	except Exception as e:
 		log('An error occurred.')
 		print(e)
 		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
 		await msg.edit(embed=embed)
+		await prompt.delete()
 		return None
 	else:
 		# If a valid reaction was received.
@@ -636,11 +672,11 @@ async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
 			choice=emoji['num'].index(str(reaction))
 			log(f'{choice} selected.')
 			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-			await prompt.delete()
 			await msg.edit(embed=embed)
+			await prompt.delete()
 			return choice
 	# Theoretically the code shouldn't reach this point
-	log('Prompt returned outside try/except/else')
+	log(f'{plt.warn}NOTICE: Unexpected behavior; prompt returned outside try/except/else')
 	await prompt.delete()
 
 # Queueing system
@@ -678,6 +714,7 @@ def queue_multiple(batch):
 
 nowplaying=None
 npurl=''
+npmessage=None
 lastplayed=None
 lasturl=''
 audio_started=0
@@ -686,11 +723,14 @@ paused_for=0
 
 async def playnext(url, ctx):
 	global nowplaying, npurl
+	global npmessage
 	global lastplayed, lasturl
 	global audio_started, paused_at, paused_for
+
 	paused_at, paused_for = 0, 0
 	lastplayed=nowplaying
 	lasturl=npurl
+
 	log('Trying to start playing...')
 	# Check if we need to match a Spotify link
 	if 'open.spotify.com' in url:
@@ -707,22 +747,27 @@ async def playnext(url, ctx):
 			# Shorten to {limit} results
 			limit=5
 			spyt=dict(list(spyt.items())[:limit])
-			# Prompt the user with choice
-			embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
-			
-			for i in spyt:
-				title=spyt[i]['title']
-				url=spyt[i]['url']
-				artist=spyt[i]['artist']
-				album=spyt[i]['album']
-				if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
-				else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
+			if use_top_match:
+				# Use first result if that's set in config
+				spyt = spyt[0]
+			else:
+				# Otherwise, prompt the user with choice
+				embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+				
+				for i in spyt:
+					title=spyt[i]['title']
+					url=spyt[i]['url']
+					artist=spyt[i]['artist']
+					album=spyt[i]['album']
+					if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
+					else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
 
-			prompt = await ctx.send(embed=embed)
-			choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
-			if choice==None:
-				return
-			spyt = spyt[choice-1]
+				prompt = await ctx.send(embed=embed)
+				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
+				if choice==None:
+					await next_in_queue(ctx)
+					return
+				spyt = spyt[choice-1]
 		url = spyt['url']
 
 	try:
@@ -737,11 +782,14 @@ async def playnext(url, ctx):
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
 	audio_started = time.time()
+
+	if npmessage!=None: await npmessage.delete()
+	try:
+		await qmessage.delete()
+	except UnboundLocalError:
+		pass
 	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
-	if 'open.spotify.com' in ctx.message.content:
-		await qmessage.edit(embed=embed)
-	else:
-		await ctx.send(embed=embed)
+	npmessage = await ctx.send(embed=embed)
 	if lastplayed!=None:
 		for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
 			# Delete last played file

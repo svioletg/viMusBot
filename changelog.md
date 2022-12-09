@@ -2,6 +2,32 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.1
+> *2022.12.09*
+
+### Developer
+- Video duration is now checked *after* checking its availability
+    - The result of `ytdl.extract_info()` is now stored in a variable to avoid waiting for it each time
+
+### Features
+- `use-top-match` (boolean) added to the config
+    - Automatically queues the top result of a Spotify-YouTube match, regardless of how close the match is
+- Starting the bot will now notify you if you're missing config options, and will exit
+    - `config_default.yml` will be downloaded if it does not exist in the directory
+
+### Fixes
+- Fixed queue stalling until -skip is called when a Spotify choice prompt is timed out (Issue #7)
+- Fixed force_no_match not functioning
+
+### Improvements
+- Old "Now playing" messages now automatically delete themselves
+- Log messages marked as a warning or an error will now output regardless of function blacklist
+
+### Notes
+I had intended to include more in this update, but I've been sick and too low on energy to work on the more complicated stuff, so I'm at least getting these live for now.
+
+In the future, your config file will be automatically merged & updated with the latest config_default.yml; this current method of warning the user is just do mitigate issues until that's set in place.
+
 ## 1.6.0
 > *2022.11.29*
 
