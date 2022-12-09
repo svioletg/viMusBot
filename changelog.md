@@ -16,7 +16,7 @@
     - `config_default.yml` will be downloaded if it does not exist in the directory
 
 ### Fixes
-- Fixed queue stalling until -skip is called when a Spotify choice prompt is timed out (Issue #7)
+- Fixed [Issue #7](https://github.com/svioletg/viMusBot/issues/7): Queue stalls until -skip is called when a Spotify choice prompt is timed out
 - Fixed force_no_match not functioning
 
 ### Improvements
