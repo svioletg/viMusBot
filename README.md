@@ -31,7 +31,7 @@ You can download the repository as a ZIP file directly from the repository page 
 2. Once cloned you'll have the files necessary to run the bot, excluding the `token.txt`, `spotify_config.json`, and `headers_auth.json` files, which you'll need to create yourself.
 3. With Python 3.10 installed, run `pip --version` and ensure that it reads "(python 3.10)" at the end so that everything installs to the right version.
 4. In a command prompt or terminal, enter the viMusBot directory and run `pip install -r requirements.txt`. This should install all of the required packages.
-5. Rename or copy `config_example.ini` to `config.ini`, and change any options you'd like. The default settings should be about right for most cases.
+5. Rename or copy `config_example.yml` to `config.yml`, and change any options you'd like. The default settings should be about right for most cases.
 6. Use `python3 bot.py` to start it up, and everything should be good to go.
 
 Use `git pull` to update your files if you ran `git clone`, otherwise download the ZIP again and overwrite your files.
