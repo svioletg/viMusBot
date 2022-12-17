@@ -33,37 +33,12 @@ def logln():
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
 # Parse config from YAML
-if not os.path.isfile('config_default.yml'):
-	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
-
-with open('config_default.yml','r') as f:
-	config_default = yaml.safe_load(f)
-
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-def keys_recursive(d):
-	vals = []
-	for k, v in d.items():
-		vals.append(k)
-		if isinstance(v, dict):
-			vals=vals+keys_recursive(v)
-	return vals
-
-default_options = keys_recursive(config_default)
-user_options = keys_recursive(config)
-
-for i in user_options:
-	if i not in default_options:
-		log(f'{plt.warn}NOTICE: {i} is no longer used; it may have been renamed or removed in a recent update.')
-
-for i in default_options:
-	if i not in user_options:
-		log(f'{plt.error}ERROR: {i} was not found in config.yml; exiting.')
-		exit()
-
 force_no_match = config['force-no-match']
 spotify_playlist_limit = config['spotify-playlist-limit']
+duration_limit = config['duration-limit']
 
 # Useful to point this out if left on accidentally
 if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
@@ -251,7 +226,6 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	song_results=ytmusic.search(query=query,limit=limit,filter='songs')
 	video_results=ytmusic.search(query=query,limit=limit,filter='videos')
 	# Remove videos over a certain length
-	duration_limit = 5 # in hours
 	for i in song_results:
 		if int(i['duration_seconds'])>duration_limit*60*60: song_results.pop(song_results.index(i))
 	for i in video_results:

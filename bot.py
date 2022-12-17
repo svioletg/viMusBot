@@ -7,7 +7,6 @@ import pytube
 import asyncio
 import discord
 from discord.ext import commands
-import spoofy
 import time
 import traceback
 import logging
@@ -17,17 +16,64 @@ import yaml
 import urllib.request
 import colorama
 from colorama import Fore, Back, Style
-from palette import Palette
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 from datetime import timedelta
 from datetime import datetime
 
+# Validate config
+if not os.path.isfile('config_default.yml'):
+	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+
+with open('config_default.yml','r') as f:
+	config_default = yaml.safe_load(f)
+
+with open('config.yml','r') as f:
+	config = yaml.safe_load(f)
+
+def keys_recursive(d):
+	vals = []
+	for k, v in d.items():
+		vals.append(k)
+		if isinstance(v, dict):
+			vals=vals+keys_recursive(v)
+	return vals
+
+default_options = keys_recursive(config_default)
+user_options = keys_recursive(config)
+
+for i in user_options:
+	if i not in default_options:
+		print(f'{i} is no longer used; it may have been renamed or removed in a recent update. Check the changelog linked above for what might have moved.')
+
+for i in default_options:
+	if i not in user_options:
+		if config.get('auto-update-config',False):
+			print('config.yml is missing new options; merging...')
+			new_config = {**config_default, **config}
+			os.replace('config.yml','config_old.yml')
+			with open('config.yml','w') as f:
+				yaml.dump(new_config, f, default_flow_style=False, indent=4)
+			print('config.yml has been updated with new options, and your previous settings have been preserved.\nconfig_old.yml has been created in case this process has gone wrong.')
+			break
+		else:
+			print('config.yml is missing new options.\nSet auto-update-config to true to update your config automatically, or check the latest default config and add the missing options manually.')
+			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
+			print('You are missing:\n')
+			for i in list(set(config_default) - set(config)): print(i)
+			print('\nThe auto-update-config option is either missing or set to false, so the script will exit.')
+			exit()
+
+# Import local files after main packages, and after validating config
+import spoofy
+from palette import Palette
+
 _here = os.path.basename(__file__)
 
 # For personal reference
 # Represents the version of the overall project, not just this file
-version = '1.6.1'
+with open('version.txt','r') as f:
+	version = f.read()
 
 ### TODO
 TODO = {
@@ -56,34 +102,8 @@ log(f'v{version}')
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
 # Parse config from YAML
-if not os.path.isfile('config_default.yml'):
-	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
-
-with open('config_default.yml','r') as f:
-	config_default = yaml.safe_load(f)
-
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
-
-def keys_recursive(d):
-	vals = []
-	for k, v in d.items():
-		vals.append(k)
-		if isinstance(v, dict):
-			vals=vals+keys_recursive(v)
-	return vals
-
-default_options = keys_recursive(config_default)
-user_options = keys_recursive(config)
-
-for i in user_options:
-	if i not in default_options:
-		log(f'{plt.warn}NOTICE: {i} is no longer used; it may have been renamed or removed in a recent update.')
-
-for i in default_options:
-	if i not in user_options:
-		log(f'{plt.error}ERROR: {i} was not found in config.yml; exiting.')
-		exit()
 
 allow_spotify_playlists = config['allow-spotify-playlists']
 spotify_playlist_limit = config['spotify-playlist-limit']
@@ -91,6 +111,7 @@ use_top_match = config['use-top-match']
 public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
 public = config['public']
+inactivity_timeout = config['inactivity-timeout']
 
 log('Starting...')
 
@@ -209,27 +230,28 @@ class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
 
-	# Taken from: https://stackoverflow.com/a/73819537/8108924
+	# Adapted from: https://stackoverflow.com/a/68599108/8108924
 	@commands.Cog.listener()
-	# Doesn't work, to fix later
-	async def on_voice_state_update(self, ctx, member, before, after):
-		
-		# Ignore if change from voice channels not from bot
+	# Disconnect after set amount of inactivity
+	async def on_voice_state_update(self, member, before, after):
+		global voice
 		if not member.id == self.bot.user.id:
 			return
-		
-		# Ignore if change from voice channels was triggered by disconnect()
-		elif before.channel is not None:
-			return
-		
-		# Check if playing when in voice channel, every 180 seconds
-		else:
+
+		elif before.channel is None:
+			if inactivity_timeout == 0:
+				return
+			elapsed = 0
 			while True:
-				await asyncio.sleep(600)				
-				# If not playing and not paused, disconnect
-				if not voice.is_playing() and not voice.is_paused():
-					log('Disconnecting from voice due to inactivity.')
+				await asyncio.sleep(1)
+				elapsed = elapsed + 1
+				if voice.is_playing() and not voice.is_paused():
+					elapsed = 0
+				if elapsed == inactivity_timeout*60:
+					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
+				if not voice.is_connected():
+					voice = None
 					break
 
 	@commands.command()
@@ -309,23 +331,31 @@ class Music(commands.Cog):
 	@commands.command()
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
+		global voice
 		if ctx.author.voice == None:
 			await ctx.send('You are not connected to a voice channel.')
 		else:
 			channel = ctx.author.voice.channel
 
-		if voice is not None:
-			return await voice.move_to(channel)
+		try:
+			if voice is not None:
+				log(f'Changing to voice channel: {channel}')
+				return await voice.move_to(channel)
+		except NameError:
+			pass
 
-		await channel.connect()
+		log(f'Joining voice channel: {channel}')
+		voice = await channel.connect()
 
 	@commands.command()
 	async def leave(self, ctx):
 		"""Disconnects the bot from voice."""
+		global voice
 		global player_queue
 		player_queue=[]
-		log('Leaving voice channel.')
+		log(f'Leaving voice channel: {ctx.author.voice.channel}')
 		await voice.disconnect()
+		voice = None
 
 	@commands.command()
 	async def move(self, ctx, old: int, new: int):
@@ -507,8 +537,7 @@ class Music(commands.Cog):
 						ytdl_extracted = ytdl.extract_info(url,download=False)
 					except yt_dlp.utils.DownloadError as e:
 						log('Video unavailable.')
-						print(e)
-						await qmessage.edit(embed=embedq('This video is unavailable.'))
+						await qmessage.edit(embed=embedq('Video is unavailable; could not queue.'))
 						return
 					except Exception as e:
 						print(e)
@@ -611,7 +640,7 @@ class Music(commands.Cog):
 	async def ensure_voice(self, ctx):
 		if ctx.voice_client is None:
 			if ctx.author.voice:
-				log('Joining voice channel.')
+				log(f'Joining voice channel: {ctx.author.voice.channel}')
 				global voice
 				voice = await ctx.author.voice.channel.connect()
 			else:

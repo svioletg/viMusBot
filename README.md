@@ -13,7 +13,7 @@ Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you
 I must stress that I'm a hobbyist programmer first and foremost, and this is far from a perfect project - there's probably better options, my coding is fairly messy, etc.; that being aside, feel free to run it yourself, fork the project, or even contribute! While I certainly won't have all the answers, please feel free to submit an issue if you're having trouble using anything.
 
 To run this yourself you'll need:
-- Python 3.10
+- A minimum of Python 3.7 (according to [vermin](https://pypi.org/project/vermin/)), but the latest version is recommended
 - Required Python packages (run `pip install -r requirements.txt`)
 - `ffmpeg` & `ffprobe` installed & added to your PATH
     - If you installed this through linux using `apt-get` or anything similar, you're probably good to go - you can double-check by simply running `ffmpeg` and `ffprobe` in your command prompt or terminal and seeing whether it recognizes the command.
@@ -29,7 +29,7 @@ You can download the repository as a ZIP file directly from the repository page 
 
 1. Running `git clone https://github.com/svioletg/viMusBot.git` will create a `viMusBot` folder within wherever the command was run, there's no need to create a folder for it in advance.
 2. Once cloned you'll have the files necessary to run the bot, excluding the `token.txt`, `spotify_config.json`, and `headers_auth.json` files, which you'll need to create yourself.
-3. With Python 3.10 installed, run `pip --version` and ensure that it reads "(python 3.10)" at the end so that everything installs to the right version.
+3. With Python installed, run `pip --version` and ensure that it reads "(python 3.7)" or above at the end so that everything installs to the right version.
 4. In a command prompt or terminal, enter the viMusBot directory and run `pip install -r requirements.txt`. This should install all of the required packages.
 5. Rename or copy `config_example.yml` to `config.yml`, and change any options you'd like. The default settings should be about right for most cases.
 6. Use `python3 bot.py` to start it up, and everything should be good to go.

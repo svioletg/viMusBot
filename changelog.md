@@ -2,6 +2,29 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.2
+> *2022.12.16*
+
+### Developer
+- `strip_color()` added to the `Palette` class, removes all color formatting from a string
+    - As a result, `log()` only needs one version of `logstring` to work off of
+- Version number is now stored in `version.txt` instead of in `bot.py`, both in case any file needs to reference it, and so the bot could potentially check for updates in the future
+- Config file is now validated after importing all non-local libraries and before importing local files, so that it only has to be validated once and not per each file
+    - These messages are printed instead of being logged, as a result
+
+### Features
+- [Issue #9](https://github.com/svioletg/viMusBot/issues/9): Local `config.yml` will be updated with any new options present in the most recent `config_default.yml`, and pre-existing options' values will be preserved along with them
+- `duration-limit` (number) added to the config
+    - Stops videos/tracks over X hours from being downloaded and queued
+- `inactivity-timeout` (number) added to the config
+    - Disconnects the bot from voice if nothing has been playing for X minutes
+    - Set to 0 to disable this and have the bot stay until manually disconnected
+
+### Fixes
+- Fixed [Issue #6](https://github.com/svioletg/viMusBot/issues/6): Bot does not disconnect after set timeout
+- Fixed [Issue #10](https://github.com/svioletg/viMusBot/issues/10): "join" command does not function if the bot has not previously been in a voice channel
+- The `voice` variable now properly resets after leaving a voice channel
+
 ## 1.6.1
 > *2022.12.09*
 

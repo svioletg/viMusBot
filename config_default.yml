@@ -1,6 +1,12 @@
 --- # Copy this to "config.yml" before modifying!
 
+# Please keep this file so that you can refer back to its comments.
+# Comments will be lost if config.yml updates automatically.
+
 # Booleans may be yes/no, on/off, or true/false
+
+# Automatically updates config.yml with any missing options present in config_default.yml
+auto-update-config: no
 
 # If yes, the bot will use token.txt to start - devtoken.txt otherwise
 public: yes
@@ -26,6 +32,13 @@ force-no-match: no
 # regardless of how close the match is
 use-top-match: yes
 
+# Prevent videos over this limit (in hours) from being queued
+duration-limit: 5
+
+# Leave the voice channel if nothing has been playing for this many minutes
+# Setting this to 0 will disable it entirely and never automatically leave
+inactivity-timeout: 10
+
 # Set various options for output logs
 logging-options:
     # Everything still outputs to vimusbot.log regardless of the options below
@@ -38,8 +51,8 @@ logging-options:
         - "search_ytmusic"
     # Choose your preferred log colors
     colors:
-        no-color: no # Disables all message coloring
         # Run "python3 palette.py --show" to see options
+        no-color: no # Disables all message coloring
         bot.py: "yellow" # For the [bot.py] part
         spoofy.py: "lime" # For the [spoofy.py] part
         warn: "gold" # For non-serious warning messages

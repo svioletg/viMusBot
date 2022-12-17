@@ -6,13 +6,15 @@ past-versions/
 devtoken.txt
 token.txt
 # testing config
-config.ini
+*.ini
 config.yml
+config_old.yml
 # credentials
 spotify_config.json
 headers_auth.json
 # misc testing files
 yttesting.py
+quickstart.sh
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py

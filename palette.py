@@ -41,6 +41,19 @@ class Palette:
 		self.timer = self.colors[colorconfig['timer']]
 		self.func = self.colors[colorconfig['function']]
 
+	def strip_color(self, string):
+		for k, v in vars(self).items():
+			if k=='colors':
+				# Skip the colors dictionary
+				continue
+			elif type(v)==dict:
+				for k2, v2 in v.items():
+					string = string.replace(v2, '')
+			else:
+				string = string.replace(v, '')
+
+		return string
+
 palette = Palette()
 def test():
 	for k, v in vars(palette).items():

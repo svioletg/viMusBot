@@ -29,10 +29,8 @@ def newlog(msg='', last_logtime=time.time(), called_from=''):
 
 	elapsed = time.time()-last_logtime
 	timestamp = datetime.now().strftime('%m-%d-%Y %H:%M:%S')
-	logstring = f'[{timestamp}] [{source}] {called_from}: {msg}  {round(elapsed,3)}s'
-	logfile.write(logstring+'\n')
-
 	logstring = f'{plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
+	logfile.write(plt.strip_color(logstring)+'\n')
 	blacklist_exceptions = [plt.warn, plt.error]
 	if (any(i in logstring for i in blacklist_exceptions) or called_from not in log_blacklist) and config['logging-options']['show-console-logs'][source]:
 		print(logstring)
