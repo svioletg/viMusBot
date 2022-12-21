@@ -1,19 +1,24 @@
-import time
-import sys
-import os
-import spotipy
-import sclib
-import pytube
-import yaml
-import json
-import customlog
 import colorama
 from colorama import Fore, Back, Style
-from palette import Palette
-from fuzzywuzzy import fuzz
+import json
+import os
+import pytube
+import regex as re
+import sclib
+import spotipy
 from spotipy import SpotifyClientCredentials
+import sys
+import time
+import yaml
+
+from fuzzywuzzy import fuzz
 from inspect import currentframe, getframeinfo
 from ytmusicapi import YTMusic
+
+# Local files
+import customlog
+
+from palette import Palette
 
 _here = os.path.basename(__file__)
 
@@ -25,7 +30,11 @@ last_logtime = time.time()
 
 def log(msg):
 	global last_logtime
-	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
+	customlog.newlog(
+		msg=msg,
+		last_logtime=last_logtime,
+		called_from=sys._getframe().f_back.f_code.co_name
+		)
 	last_logtime = time.time()
 
 def logln():
@@ -48,7 +57,10 @@ ytmusic = YTMusic()
 
 # Connect to spotify API
 scred = json.loads(open('spotify_config.json').read())['spotify']
-client_credentials_manager = SpotifyClientCredentials(client_id=scred['client_id'], client_secret=scred['client_secret'])
+client_credentials_manager = SpotifyClientCredentials(
+	client_id=scred['client_id'],
+	client_secret=scred['client_secret']
+	)
 sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
 # Connect to soundcloud API
@@ -101,7 +113,10 @@ def is_matching(reference, ytresult, **kwargs):
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
 	elif mode=='old':
-		matching_title = ref_title.lower() in yt_title.lower() or (ref_title.split(' - ')[0].lower() in yt_title.lower() and ref_title.split(' - ')[1].lower() in yt_title.lower())
+		matching_title = ref_title.lower() in yt_title.lower() or (
+			ref_title.split(' - ')[0].lower() in yt_title.lower() 
+			and ref_title.split(' - ')[1].lower() in yt_title.lower()
+			)
 		matching_artist = ref_artist.lower() in yt_artist.lower()
 		matching_album = ref_album.lower() in yt_album.lower()
 
@@ -111,7 +126,10 @@ def is_matching(reference, ytresult, **kwargs):
 	alternate_found = any(i in yt_title.lower() for i in ['remix', 'cover', 'version'])
 	alternate_check = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
 
-	return (matching_title or ignore_title) and (matching_artist or ignore_artist) and (matching_album or ignore_album) and (alternate_check)
+	return (matching_title or ignore_title) \
+		and (matching_artist or ignore_artist) \
+		and (matching_album or ignore_album) \
+		and (alternate_check)
 
 # Youtube
 def isrc_search_test(playlist):
@@ -153,12 +171,20 @@ def pytube_track_data(pytube_object):
 	}
 	return description_dict
 
-def search_ytmusic_album(title, artist):
+def search_ytmusic_text(query):
+	# For plain-text searching
+	top_song = ytmusic.search(query=query,limit=1,filter='songs')[0]
+	top_video = ytmusic.search(query=query,limit=1,filter='songs')[0]
+	return top_song, top_video
+
+def search_ytmusic_album(title, artist, upc=None):
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.'); return None
 
-	query=f'{title} {artist}'
+	query = f'{title} {artist}'
+	reference = {'title':title, 'artist':artist, 'upc':upc}
+	
 	log('Starting album search...')
-	album_results=ytmusic.search(query=query,limit=5,filter='albums')
+	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	for i in album_results:
 		title_match = fuzz.ratio(title,i['title'])>75
 		artist_match = fuzz.ratio(artist,i['artists'][0]['name'])>75
@@ -169,18 +195,12 @@ def search_ytmusic_album(title, artist):
 	log('No match found.')
 	return None
 
-def search_ytmusic_text(query):
-	# For plain-text searching
-	top_song=ytmusic.search(query=query,limit=1,filter='songs')[0]
-	top_video=ytmusic.search(query=query,limit=1,filter='songs')[0]
-	return top_song, top_video
-
 def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False, **kwargs):
 	global force_no_match
-	unsure=False
+	unsure = False
 
-	query=f'{title} {artist} {album}'
-	reference={'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
+	query = f'{title} {artist} {album}'
+	reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
 	# Trim ytmusic song data down to what's relevant to us
 	def trim_track_data(data, album='', from_pytube=False, extract_from_ytmusic=False):
@@ -246,10 +266,16 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		if force_no_match: return False
 		else: return match!=None
 
+	if is_jp(query):
+		# Assumes first Japanese result is correct, otherwise
+		# it doesn't recognize it since YT Music romanizes/translates titles
+		# See: https://github.com/svioletg/viMusBot/issues/11
+		match = song_results[0]
+
 	for i in song_results[:5]:
 		if is_matching(reference,i,ignore_artist=True):
 			log('Song match found.')
-			match=i
+			match = i
 			break
 
 	if not match_found():
@@ -261,7 +287,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		for i in video_results[:5]:
 			if is_matching(reference,i,ignore_artist=True,ignore_album=True):
 				log('Video match found.')
-				match=i
+				match = i
 				break
 
 	if not match_found():
@@ -316,66 +342,82 @@ def spotify_playlist(url):
 	return newlist
 
 def spotify_track(url):
-	info=sp.track(url)
-	title=info['name']
+	info = sp.track(url)
+	title = info['name']
 	# Only retrieves the first artist name
-	artist=info['artists'][0]['name']
-	album=info['album']['name']
+	artist = info['artists'][0]['name']
+	album = info['album']['name']
 	isrc = info['external_ids']['isrc']
-	return {'title':title, 'artist':artist, 'album':album, 'url':info['external_urls']['spotify'], 'isrc':isrc}
+	return {
+		'title':title,
+		'artist':artist,
+		'album':album,
+		'url':info['external_urls']['spotify'],
+		'isrc':isrc
+		}
 
 def spotify_album(url):
-	info=sp.album(url)
-	return {'title':info['name'], 'artist':info['artists'][0]['name']}
+	info = sp.album(url)
+	return {
+		'title':info['name'], 
+		'artist':info['artists'][0]['name'],
+		'upc':info['external_ids']['upc']
+		}
 
 def analyze_track(url):
-	uri=get_uri(url)
-	title=sp.track(uri)['name']
-	artist=sp.track(uri)['artists'][0]['name']
-	data=sp.audio_features(uri)[0]
+	uri = get_uri(url)
+	title = sp.track(uri)['name']
+	artist = sp.track(uri)['artists'][0]['name']
+	data = sp.audio_features(uri)[0]
 
 	# Nicer formatting
-	data['tempo']=str(int(data['tempo']))+'bpm'
-	data['key']=keytable[data['key']]
-	data['time_signature']=str(data['time_signature'])+'/4'
-	data['loudness']=str(data['loudness'])+'dB'
+	data['tempo'] = str(int(data['tempo']))+'bpm'
+	data['key'] = keytable[data['key']]
+	data['time_signature'] = str(data['time_signature'])+'/4'
+	data['loudness'] = str(data['loudness'])+'dB'
 
 	# Replace ms duration with readable duration
-	ms=data['duration_ms']
+	ms = data['duration_ms']
 	hours = int(ms/(1000*60*60))
 	minutes = int(ms/(1000*60)%60)
 	seconds = int(ms/1000%60)
 
 	# Don't include hours if less than one
-	hours=str(hours)
-	hours+=':'
+	hours = str(hours)
+	hours += ':'
 	if float(hours[:-1])<1:
-		hours=''
+		hours = ''
 	length = f'{hours}{minutes}:{seconds:02d}'
-	data['duration']=length
+	data['duration'] = length
 	data.pop('duration_ms')
 
 	# Ignore technical/non-useful information
-	skip=['type', 'id', 'uri', 'track_href', 'analysis_url', 'mode']
+	skip = ['type', 'id', 'uri', 'track_href', 'analysis_url', 'mode']
 
 	return data, skip
 
+# Other
+def is_jp(text):
+	check = re.compile(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', re.UNICODE)
+	if '***jp***' in check.sub('***jp***',text): return True
+	else: return False
+
 def spyt(url, **kwargs):
-	limit=20
+	limit = 20
 	if 'limit' in kwargs:
-		limit=kwargs['limit']
+		limit = kwargs['limit']
 
 	if '/playlist/' in url:
 		# Deprecated!
 		log(f'{plt.warn}NOTICE: Using deprecated playlist queueing code.')
 		log('Playlist detected.')
-		spotify_list=spotify_playlist(url)
+		spotify_list = spotify_playlist(url)
 		if len(spotify_list) > spotify_playlist_limit:
 			# Abort if playlist is longer than the set cap
 			return 'too_long'
 
-		yt_list=[]
-		failed=[]
+		yt_list = []
+		failed = []
 		for track in spotify_list:
 			log(f'Playlist item {spotify_list.index(track)+1} of {len(spotify_list)}.')
 			# For playlists, each track is searched for when its turn in the queue is reached.
@@ -394,7 +436,7 @@ def spyt(url, **kwargs):
 		return yt_list, failed
 	else:
 		log('Not a playlist.')
-		track=spotify_track(url)
+		track = spotify_track(url)
 		result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
 		if type(result)==tuple and result[0]=='unsure':
 			log('Returning as unsure.')

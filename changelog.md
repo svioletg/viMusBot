@@ -2,6 +2,30 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.3
+> *2022.12.21*
+
+### Developer
+- Various changes to code formatting for readability
+    - Imports are now alphabetical, and imports of local files are separated
+    - Especially long lines of code have been split into multiple lines
+- `bot.py` changes:
+    - `playnext()` renamed to `play_url()`
+    - `next_in_queue()` renamed to `advance_queue()`
+    - `queue_multiple()` renamed to `queue_batch()`
+    - The `-join` command just calls `ensure_voice()` instead of having a duplicate of the joining code, for consistency
+
+### Features
+- Added a `-loop` command ([Issue #12](https://github.com/svioletg/viMusBot/issues/12))
+
+### Other
+- The bot will now assume the first result from a Japanese title search is correct, and will queue it (see [Issue #11](https://github.com/svioletg/viMusBot/issues/11) for details)
+- The following packages are now needed, and have been added to `requirements.txt`:
+    - `regex` version 2022.10.31
+
+### Notes
+I've gone back and added some notes or corrections to older versions' changelogs. Initially I was considering just removing the incorrect text, but I've decided to leave it there and strike it out, adding an explanation below.
+
 ## 1.6.2
 > *2022.12.16*
 
@@ -13,7 +37,8 @@
     - These messages are printed instead of being logged, as a result
 
 ### Features
-- [Issue #9](https://github.com/svioletg/viMusBot/issues/9): Local `config.yml` will be updated with any new options present in the most recent `config_default.yml`, and pre-existing options' values will be preserved along with them
+- Implemented [Issue #9](https://github.com/svioletg/viMusBot/issues/9): Detect whether the config template has changed on startup & merge with existing accordingly
+    - Local `config.yml` will be updated with any new options present in the most recent `config_default.yml`, and pre-existing options' values will be preserved along with them
 - `duration-limit` (number) added to the config
     - Stops videos/tracks over X hours from being downloaded and queued
 - `inactivity-timeout` (number) added to the config
@@ -94,7 +119,8 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 > *2022.11.18* / *[view commit](https://github.com/svioletg/viMusBot/commit/9185f52120ca5738c8a821fb6e360d56ab7a894f)*
 
 ### Improvements
-- Spotify-YouTube song matching will now try to match the ISRC code (or UPC for albums) first before falling back on the text search method, this is slightly faster and usually more accurate
+- Spotify-YouTube song matching will now try to match the ISRC code ~~(or UPC for albums)~~ first before falling back on the text search method, this is slightly faster and usually more accurate
+    - CORRECTION: UPC searching support was *not* added into 1.5.3. Although that was the intention, I had forgotten to add it to the update - and later discovered that searching by UPC doesn't work at all, regardless.
 
 ### Other
 - Command-line arguments are no longer supported, instead `config.ini` has been added with the same options; this effectively replaces `default_args.txt` as well
@@ -192,7 +218,8 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 
 ### Fixes
 - Errors should now be caught automatically, and the bot will now actually use `discord.log` as intended
-- Links that use the [generic] youtube-dl extractor (like direct links to files) now queue correctly, they were failing at the duration check the generic extractor does not retrieve the length of the file
+- ~~Links that use the [generic] youtube-dl extractor (like direct links to files) now queue correctly, they were failing at the duration check the generic extractor does not retrieve the length of the file~~
+    - CORRECTION: This bug still ended up present in this version, and was later properly fixed in version [1.4.0](#140).
 - Downloaded files will delete themselves correctly after finishing or being skipped
 
 ### Improvements
@@ -307,7 +334,7 @@ Fixed bugs or other unintended behavior.
 General improvements to the either the user or developer experience, like making a command simpler to use, reducing the amount of code needed for something, or otherwise making existing functionality more efficient.
 
 #### Other
-Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporarily solution or workaround.
+Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporary solution or workaround.
 
 #### Notes
 Usually unused, any additional notes regarding the release. Listed last, out of alphabetical order.

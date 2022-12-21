@@ -1,22 +1,24 @@
-import os
-import sys
-import yaml
 import inspect
+import os
 import re
+import sys
 import time
+import yaml
+
 from datetime import datetime
+
 from palette import Palette
 
 plt = Palette()
 
 try:
-	os.replace('vimusbot.log','vimusbot-old.log')
+	os.replace('vimusbot.log', 'vimusbot-old.log')
 except FileNotFoundError:
 	pass
 
-logfile = open('vimusbot.log','w')
+logfile = open('vimusbot.log', 'w', encoding='utf-8')
 
-with open('config.yml','r') as f:
+with open('config.yml', 'r') as f:
 	config = yaml.safe_load(f)
 
 log_blacklist = config['logging-options']['ignore-logs-from']

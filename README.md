@@ -4,7 +4,7 @@
 
 ---
 
-A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/discord.py) library, for personal usage.
+A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/discord.py) library, for personal usage. I wasn't happy enough with the options already available, so I decided to try my own take on it.
 
 Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you've experienced a bug or otherwise odd behavior, or have a feature to request, and feel free to comment on existing issues to provide any additional details that may help narrow down the issue or reach a solution. No bug or feature is too large/small to be submitted, this system is best for me to keep track of everything.
 

@@ -1,11 +1,11 @@
-import sys
-import yaml
 import colorama
 from colorama import Fore, Back, Style
+import sys
+import yaml
 
 colorama.init(autoreset=True)
 
-with open('config.yml','r') as f:
+with open('config.yml', 'r') as f:
 	config = yaml.safe_load(f)
 
 colorconfig = config['logging-options']['colors']

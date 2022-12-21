@@ -1,25 +1,25 @@
-import sys
-import os
-import subprocess
-import glob
-import yt_dlp
-import pytube
 import asyncio
-import discord
-from discord.ext import commands
-import time
-import traceback
-import logging
-import customlog
-import random
-import yaml
-import urllib.request
 import colorama
 from colorama import Fore, Back, Style
+import discord
+from discord.ext import commands
+import glob
+import logging
+import os
+import pytube
+import random
+import subprocess
+import sys
+import time
+import traceback
+import urllib.request
+import yaml
+import yt_dlp
+
+from datetime import datetime
+from datetime import timedelta
 from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
-from datetime import timedelta
-from datetime import datetime
 
 # Validate config
 if not os.path.isfile('config_default.yml'):
@@ -44,7 +44,9 @@ user_options = keys_recursive(config)
 
 for i in user_options:
 	if i not in default_options:
-		print(f'{i} is no longer used; it may have been renamed or removed in a recent update. Check the changelog linked above for what might have moved.')
+		print(f'{i} is no longer used; '+
+			'it may have been renamed or removed in a recent update. '+
+			'Check the changelog linked above for what might have moved.')
 
 for i in default_options:
 	if i not in user_options:
@@ -54,18 +56,25 @@ for i in default_options:
 			os.replace('config.yml','config_old.yml')
 			with open('config.yml','w') as f:
 				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-			print('config.yml has been updated with new options, and your previous settings have been preserved.\nconfig_old.yml has been created in case this process has gone wrong.')
+			print('config.yml has been updated with new options, '+
+				'and your previous settings have been preserved. '+
+				'\nconfig_old.yml has been created in case this process has gone wrong.')
 			break
 		else:
-			print('config.yml is missing new options.\nSet auto-update-config to true to update your config automatically, or check the latest default config and add the missing options manually.')
+			print('config.yml is missing new options. '+
+				'\nSet auto-update-config to true to update your config automatically, '+
+				'or check the latest default config and add the missing options manually.')
 			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
 			print('You are missing:\n')
 			for i in list(set(config_default) - set(config)): print(i)
-			print('\nThe auto-update-config option is either missing or set to false, so the script will exit.')
+			print('\nThe auto-update-config option is either missing or set to false, '+
+				'so the script will exit.')
 			exit()
 
 # Import local files after main packages, and after validating config
+import customlog
 import spoofy
+
 from palette import Palette
 
 _here = os.path.basename(__file__)
@@ -141,6 +150,7 @@ def embedq(*args):
 emoji={
 	'cancel':'❌',
 	'confirm':'✅',
+	'repeat':'🔁',
 	'num':[
 	'0️⃣',
 	'1️⃣',
@@ -331,21 +341,9 @@ class Music(commands.Cog):
 	@commands.command()
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
-		global voice
-		if ctx.author.voice == None:
-			await ctx.send('You are not connected to a voice channel.')
-		else:
-			channel = ctx.author.voice.channel
-
-		try:
-			if voice is not None:
-				log(f'Changing to voice channel: {channel}')
-				return await voice.move_to(channel)
-		except NameError:
-			pass
-
-		log(f'Joining voice channel: {channel}')
-		voice = await channel.connect()
+		# This actually just calls ensure_voice below,
+		# this is only defined so that there's a command in Discord for it
+		pass
 
 	@commands.command()
 	async def leave(self, ctx):
@@ -356,6 +354,14 @@ class Music(commands.Cog):
 		log(f'Leaving voice channel: {ctx.author.voice.channel}')
 		await voice.disconnect()
 		voice = None
+
+	@commands.command()
+	async def loop(self, ctx):
+		"""Toggles looping for the current track."""
+		global loop_this
+		# Inverts the boolean
+		loop_this = not loop_this
+		await ctx.send(embed=embedq(f'{get_loop_icon()}Looping is set to {loop_this}.'))
 
 	@commands.command()
 	async def move(self, ctx, old: int, new: int):
@@ -376,15 +382,7 @@ class Music(commands.Cog):
 	@commands.command(aliases=['np'])
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
-		embed=discord.Embed(title=f'Now playing: {nowplaying.title}',description=f'Link: {npurl}',color=0xFFFF00)
-		# Attempt at displaying the current timestamp; shelved for now
-		
-		# timestamp=str(timedelta(seconds=round(time.time()-audio_started-paused_for,0)))
-		# # Remove the hours spot if hours is 0
-		# if timestamp.split(':')[0]=='0': timestamp=timestamp[2:]
-		# length=nowplaying.data['duration_string']
-		# # embed.add_field(f'Duration: {timestamp} / {length}')
-		# embed.add_field(name=f'Duration: {timestamp} / {length}',value='Duration may not be accurate if the bot is experiencing connection issues.')
+		embed=discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command()
@@ -409,8 +407,7 @@ class Music(commands.Cog):
 		global qmessage
 		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
 
-		# Will resume if paused
-		# This is handled in on_command_error()
+		# Will resume if paused, this is handled in on_command_error()
 
 		url = url.split('&list=')[0]
 		async with ctx.typing():
@@ -421,37 +418,25 @@ class Music(commands.Cog):
 				if '/playlist/' in url:
 					log('Spotify playlist detected.')
 					if allow_spotify_playlists:
-						await qmessage.edit(embed=embedq('Trying to queue Spotify playlist; this will take a long time, please wait before trying another command.','This feature is experimental!'))
+						await qmessage.edit(embed=embedq(
+							'Trying to queue Spotify playlist; '+
+							'this will take a long time, please wait before trying another command.',
+							'This feature is experimental!'))
 						objlist = generate_QueueItems(spoofy.spotify_playlist(url))
 						if len(objlist) > spotify_playlist_limit:
 							await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 							return
-						queue_multiple(objlist)
+						queue_batch(objlist)
 						list_name = spoofy.sp.playlist(url)['name']
 						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
 						if not voice.is_playing():
 							log('Voice client is not playing; starting...')
-							await next_in_queue(ctx)
+							await advance_queue(ctx)
 						return
-						### Old, much slower method
-						# spytout = spoofy.spyt(url)
-						# if spytout == 'too_long':
-						# 	await ctx.send(embed=embedq(f'Spotify playlists must have less than {spotify_playlist_limit} tracks.'))
-						# 	return
-						# objlist = generate_QueueItems(spytout[0])
-						# failstring = 'No items failed to queue.'
-						# if len(failstring)!=0:
-						# 	failstring = 'The following items failed to queue:'
-						# 	for i in spytout[1]:
-						# 		failstring+=f'\n{i}'
-						# queue_multiple(objlist)
-						# await ctx.send(embed=embedq(f'Queued {len(objlist)} items.',f'{failstring}'))
-						# if not voice.is_playing():
-						# 	log('Voice client is not playing; joining...')
-						# 	await next_in_queue(ctx, skip=True)
-						# return
 					else:
-						await ctx.send(embed=embedq('Spotify playlist support is disabled.','Contact whoever is hosting your bot if you believe this is a mistake.'))
+						await ctx.send(embed=embedq(
+							'Spotify playlist support is disabled.',
+							'Contact whoever is hosting your bot if you believe this is a mistake.'))
 						return
 
 				log('Checking for album...')
@@ -465,6 +450,7 @@ class Music(commands.Cog):
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
+				# TODO: Change this to use prompt_for_choice()
 				log('Link not detected, searching with query')
 				log(url)
 				options=spoofy.search_ytmusic_text(url)
@@ -522,10 +508,10 @@ class Music(commands.Cog):
 			if any(i in url for i in valid):
 				log('URL is a playlist.')
 				objlist = generate_QueueItems(url)
-				queue_multiple(objlist)
+				queue_batch(objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not voice.is_playing():
-					await next_in_queue(ctx)
+					await advance_queue(ctx)
 					return
 			else:
 				# Runs if the input given was not a playlist
@@ -573,14 +559,13 @@ class Music(commands.Cog):
 				log('Trying to start playing or queueing.')
 				if not voice.is_playing():
 					log('Voice client is not playing; starting...')
-					await playnext(url, ctx)
+					await play_url(url, ctx)
 				else:
 					player_queue.append(QueueItem(url))
 					title=player_queue[-1].title
 					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue)}'))
 					log('Appened to queue.')
 			except Exception as e:
-				print(e)
 				raise e
 
 	@commands.command(aliases=['q'])
@@ -621,7 +606,7 @@ class Music(commands.Cog):
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
 		await ctx.send(embed=embedq('Skipping...'))
-		await next_in_queue(ctx, skip=True)
+		await advance_queue(ctx, skip=True)
 
 	@commands.command()
 	async def stop(self, ctx):
@@ -634,6 +619,7 @@ class Music(commands.Cog):
 		else:
 			await ctx.send(embed=embedq('Nothing is playing.'))
 
+	@join.before_invoke
 	@play.before_invoke
 	@pause.before_invoke
 	@stop.before_invoke
@@ -735,30 +721,31 @@ def generate_QueueItems(playlist):
 			objlist = [QueueItem(i['url'],title=i['title']) for i in playlist_entries['entries']]
 		return objlist
 
-def queue_multiple(batch):
+def queue_batch(batch):
 	# batch must be a list of QueueItem objects
 	global player_queue
 	for i in batch:
 		player_queue.append(i)
 
-nowplaying=None
-npurl=''
-npmessage=None
-lastplayed=None
-lasturl=''
-audio_started=0
-paused_at=0
-paused_for=0
+now_playing = None
+last_played = None
 
-async def playnext(url, ctx):
-	global nowplaying, npurl
+npmessage = None
+
+audio_started = 0
+paused_at = 0
+paused_for = 0
+
+loop_this = False
+
+async def play_url(url, ctx):
+	global now_playing
 	global npmessage
-	global lastplayed, lasturl
+	global last_played
 	global audio_started, paused_at, paused_for
 
 	paused_at, paused_for = 0, 0
-	lastplayed=nowplaying
-	lasturl=npurl
+	last_played = now_playing
 
 	log('Trying to start playing...')
 	# Check if we need to match a Spotify link
@@ -781,58 +768,70 @@ async def playnext(url, ctx):
 				spyt = spyt[0]
 			else:
 				# Otherwise, prompt the user with choice
-				embed=discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+				embed = discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
 				
 				for i in spyt:
-					title=spyt[i]['title']
-					url=spyt[i]['url']
-					artist=spyt[i]['artist']
-					album=spyt[i]['album']
+					title = spyt[i]['title']
+					url = spyt[i]['url']
+					artist = spyt[i]['artist']
+					album = spyt[i]['album']
 					if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
 					else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
 
 				prompt = await ctx.send(embed=embed)
 				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
 				if choice==None:
-					await next_in_queue(ctx)
+					await advance_queue(ctx)
 					return
 				spyt = spyt[choice-1]
 		url = spyt['url']
 
+	# Start the player
 	try:
 		player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
 	except yt_dlp.utils.DownloadError as e:
 		await ctx.send(embed=embedq('This video is unavailable.',url))
-		await next_in_queue(ctx)
+		await advance_queue(ctx)
 		return
 
-	nowplaying=player
-	npurl=url
+	now_playing = player
+	now_playing.weburl = 'https://www.youtube.com/watch?v='+now_playing.ID
 	voice.stop()
-	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(next_in_queue(ctx), bot.loop))
+	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
 	audio_started = time.time()
 
-	if npmessage!=None: await npmessage.delete()
+	if npmessage != None: await npmessage.delete()
+
 	try:
 		await qmessage.delete()
 	except UnboundLocalError:
 		pass
-	embed=discord.Embed(title=f'Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
-	npmessage = await ctx.send(embed=embed)
-	if lastplayed!=None:
-		for i in glob.glob(f'*-#-{lastplayed.ID}-#-*'):
-			# Delete last played file
-			os.remove(i)
-			log(f'Removing: {i}')
 
-async def next_in_queue(ctx, **kwargs):
-	skip=kwargs.get('skip',False)
-	if skip or (player_queue != [] and not voice.is_playing()):
-		if player_queue==[]:
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
+	npmessage = await ctx.send(embed=embed)
+	if last_played != None:
+		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
+			# Delete last played file
+			log(f'Removing: {i}')
+			try:
+				os.remove(i)
+			except PermissionError as e:
+				if loop_this: pass
+				else: print(e); raise e
+
+async def advance_queue(ctx, skip=False):
+	if skip or not voice.is_playing():
+		if player_queue==[] and not loop_this:
 			voice.stop()
 		else:
-			await playnext(player_queue.pop(0).url, ctx)
+			if loop_this and not skip: url = now_playing.weburl
+			else: url = player_queue.pop(0).url
+			await play_url(url, ctx)
 
+# TODO: This could have a better name
+def get_loop_icon():
+	if loop_this: return emoji['repeat']+' '
+	else: return ''
 
 
 # Establish bot user
