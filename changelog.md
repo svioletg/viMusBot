@@ -2,6 +2,15 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.4
+> *2022.12.23*
+
+### Features
+- The bot will now send any errors it encounters as chat messages
+
+### Other
+- As a workaround to [Issue #16](https://github.com/svioletg/viMusBot/issues/16), a small note is now added as a subtitle to the "Trying to queue..." message regarding SoundCloud links sometimes returning a 403 Forbidden error
+
 ## 1.6.3
 > *2022.12.21*
 

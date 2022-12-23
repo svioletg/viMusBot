@@ -14,6 +14,7 @@ I must stress that I'm a hobbyist programmer first and foremost, and this is far
 
 To run this yourself you'll need:
 - A minimum of Python 3.7 (according to [vermin](https://pypi.org/project/vermin/)), but the latest version is recommended
+    - If you're on Windows using the installer, make sure to check the "Add Python 3.x to PATH" box. Linux should do this automatically.
 - Required Python packages (run `pip install -r requirements.txt`)
 - `ffmpeg` & `ffprobe` installed & added to your PATH
     - If you installed this through linux using `apt-get` or anything similar, you're probably good to go - you can double-check by simply running `ffmpeg` and `ffprobe` in your command prompt or terminal and seeing whether it recognizes the command.

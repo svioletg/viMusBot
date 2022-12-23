@@ -302,14 +302,14 @@ class Music(commands.Cog):
 	@commands.command(aliases=['analyse'])
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
-		info=spoofy.spotify_track(spotifyurl)
-		title=info['title']
-		artist=info['artist']
-		result=spoofy.analyze_track(spotifyurl)
-		data=result[0]
-		skip=result[1]
+		info = spoofy.spotify_track(spotifyurl)
+		title = info['title']
+		artist = info['artist']
+		result = spoofy.analyze_track(spotifyurl)
+		data = result[0]
+		skip = result[1]
 		# Assemble embed object
-		embed=discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=0xFFFF00)
+		embed = discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=0xFFFF00)
 		# Put key, time sig, and tempo at the top
 		embed.add_field(name='Key',value=data['key']); data.pop('key')
 		embed.add_field(name='Tempo',value=data['tempo']); data.pop('tempo')
@@ -405,7 +405,14 @@ class Music(commands.Cog):
 		global playctx
 		playctx = ctx
 		global qmessage
-		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
+		if 'soundcloud.com' in url:
+			qmessage = await ctx.send(embed=embedq('Trying to queue...',
+				'Note: It is a known issue that SoundCloud links will sometimes fail to queue.'+
+				'\nIf you receive an error, try it again.'+
+				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'))
+		else:
+			qmessage = await ctx.send(embed=embedq('Trying to queue...'))
+
 
 		# Will resume if paused, this is handled in on_command_error()
 
@@ -875,6 +882,7 @@ async def on_command_error(ctx, error):
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)
 		trace=traceback.format_exception(error)
+		await ctx.send(embed=embedq(error))
 		# A second traceback is created from this command itself, usually not useful
 		log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
