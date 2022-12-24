@@ -1,15 +1,25 @@
 # Changelog
 
-### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
+### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
-## 1.6.5
+## 1.7.0
 > *2022.12.*
 
 ### Developer
-- `player_queue` replaced with the `MediaQueue` class
+- `bot.py` changes:
+    - `player_queue` list replaced with the `MediaQueue` class
+        - Separate queues are now stored per a guild's ID
+        - *All* functions in `MediaQueue` require a discord.py `Context` object and will automatically determine the ID; creating a new queue if one does not exist
+        - `.get(ctx)` must be called after every `player_queue` to affect the list, with the exception of `.clear(ctx)`
+    - `queue_batch()` now requires a `Context` object as the first argument
 
 ### Features
 - Aliases for commands can now be customized through the config
+- Commands can now be blacklisted/disabled through the config
+
+### Fixes
+- Fixed [Issue #17](https://github.com/svioletg/viMusBot/issues/17): Two servers' queues sometimes get mixed up when being used at the same time
+- Fixed a minor issue with the `-nowplaying` command returning what last played despite nothing currently playing
 
 ## 1.6.4
 > *2022.12.23*

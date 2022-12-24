@@ -351,7 +351,7 @@ class Music(commands.Cog):
 	async def clear(self, ctx):
 		"""Clears the entire queue."""
 		global player_queue
-		player_queue=[]
+		player_queue.clear(ctx)
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command(aliases=get_aliases('join'))
@@ -368,7 +368,7 @@ class Music(commands.Cog):
 		"""Disconnects the bot from voice."""
 		global voice
 		global player_queue
-		player_queue=[]
+		player_queue.clear(ctx)
 		log(f'Leaving voice channel: {ctx.author.voice.channel}')
 		await voice.disconnect()
 		voice = None
@@ -387,8 +387,8 @@ class Music(commands.Cog):
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
-			to_move = player_queue[old-1].title
-			player_queue.insert(new-1, player_queue.pop(old-1))
+			to_move = player_queue.get(ctx)[old-1].title
+			player_queue.get(ctx).insert(new-1, player_queue.get(ctx).pop(old-1))
 			await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
 		except IndexError as e:
 			await ctx.send(embed=embedq('The selected number is out of range.'))
@@ -404,9 +404,13 @@ class Music(commands.Cog):
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
 		try:
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
+			if not voice.is_playing() and not voice.is_paused():
+				embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
+			else:
+				embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
 		except AttributeError:
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
+
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('pause'))
@@ -459,7 +463,7 @@ class Music(commands.Cog):
 						if len(objlist) > spotify_playlist_limit:
 							await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 							return
-						queue_batch(objlist)
+						queue_batch(ctx, objlist)
 						list_name = spoofy.sp.playlist(url)['name']
 						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
 						if not voice.is_playing():
@@ -541,7 +545,7 @@ class Music(commands.Cog):
 			if any(i in url for i in valid):
 				log('URL is a playlist.')
 				objlist = generate_QueueItems(url)
-				queue_batch(objlist)
+				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not voice.is_playing():
 					await advance_queue(ctx)
@@ -594,9 +598,9 @@ class Music(commands.Cog):
 					log('Voice client is not playing; starting...')
 					await play_url(url, ctx)
 				else:
-					player_queue[ctx.author.guild.id].append(QueueItem(url))
-					title=player_queue[ctx.author.guild.id][-1].title
-					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue[ctx.author.guild.id])}'))
+					player_queue.get(ctx).append(QueueItem(url))
+					title=player_queue.get(ctx)[-1].title
+					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue.get(ctx))}'))
 					log('Appened to queue.')
 			except Exception as e:
 				raise e
@@ -605,7 +609,7 @@ class Music(commands.Cog):
 	@commands.check(command_enabled)
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
-		if player_queue==[]:
+		if player_queue.get(ctx) == []:
 			await ctx.send(embed=embedq('The queue is empty.'))
 			return
 
@@ -613,13 +617,13 @@ class Music(commands.Cog):
 		n=1
 		start=(10*page)-10
 		end=(10*page)
-		if 10*page>len(player_queue): end=len(player_queue)
-		for i in player_queue[start:end]:
+		if 10*page>len(player_queue.get(ctx)): end=len(player_queue.get(ctx))
+		for i in player_queue.get(ctx)[start:end]:
 			embed.add_field(name=f'#{n+start}. {i.title}',value=i.url,inline=False)
 			n+=1
 
 		try:
-			embed.description = (f'Showing {start+1} to {end} of {len(player_queue)} items. Use -queue [page] to see more.')
+			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
 		except Exception as e:
 			print(e)
 			raise e
@@ -629,13 +633,13 @@ class Music(commands.Cog):
 	@commands.check(command_enabled)
 	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
-		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot-1).title} from the queue.'))
+		await ctx.send(embed=embedq(f'Removed {player_queue.get(ctx).pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=get_aliases('shuffle'))
 	@commands.check(command_enabled)
 	async def shuffle(self, ctx):
 		"""Randomizes the order of the queue."""
-		random.shuffle(player_queue)
+		random.shuffle(player_queue.get(ctx))
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 	@commands.command(aliases=get_aliases('skip'))
@@ -650,7 +654,7 @@ class Music(commands.Cog):
 	async def stop(self, ctx):
 		"""Stops the player and clears the queue."""
 		global player_queue
-		player_queue=[]
+		player_queue.clear(ctx)
 		if voice.is_playing() or voice.is_paused():
 			voice.stop()
 			await ctx.send(embed=embedq('Player has been stopped.'))
@@ -738,9 +742,37 @@ class MediaQueue(object):
 	def __init__(self):
 		self.queues = {}
 
-	def ensure_queue_exists(ctx):
+	# Run in every function to automatically determin
+	# which queue we're working with
+	def ensure_queue_exists(self, ctx):
 		if ctx.author.guild.id not in self.queues:
 			self.queues[ctx.author.guild.id] = []
+
+	def get(self, ctx):
+		self.ensure_queue_exists(ctx)
+		return self.queues[ctx.author.guild.id]
+
+	def clear(self, ctx):
+		self.ensure_queue_exists(ctx)
+		self.queues[ctx.author.guild.id] = []
+
+	# def append(self, ctx, item):
+	# 	self.ensure_queue_exists(ctx)
+	# 	self.queues[ctx.author.guild.id].append(item)
+
+	# def insert(self, ctx, index, item):
+	# 	self.ensure_queue_exists(ctx)
+	# 	self.queues[ctx.author.guild.id].insert(index, item)
+
+	# def pop(self, ctx, index):
+	# 	self.ensure_queue_exists(ctx)
+	# 	self.queues[ctx.author.guild.id].pop(index)
+
+	# def shuffle(self, ctx):
+	# 	self.ensure_queue_exists(ctx)
+	# 	random.shuffle(self.queues[ctx.author.guild.id])
+
+player_queue = MediaQueue()
 
 class QueueItem(object):
 	def __init__(self, url, title=None):
@@ -765,11 +797,11 @@ def generate_QueueItems(playlist):
 			objlist = [QueueItem(i['url'],title=i['title']) for i in playlist_entries['entries']]
 		return objlist
 
-def queue_batch(batch):
+def queue_batch(ctx, batch):
 	# batch must be a list of QueueItem objects
 	global player_queue
 	for i in batch:
-		player_queue.append(i)
+		player_queue.get(ctx).append(i)
 
 now_playing = None
 last_played = None
@@ -865,11 +897,11 @@ async def play_url(url, ctx):
 
 async def advance_queue(ctx, skip=False):
 	if skip or not voice.is_playing():
-		if player_queue==[] and not loop_this:
+		if player_queue.get(ctx) == [] and not loop_this:
 			voice.stop()
 		else:
 			if loop_this and not skip: url = now_playing.weburl
-			else: url = player_queue.pop(0).url
+			else: url = player_queue.get(ctx).pop(0).url
 			await play_url(url, ctx)
 
 # TODO: This could have a better name

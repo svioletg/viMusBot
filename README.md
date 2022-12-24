@@ -12,6 +12,8 @@ Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you
 
 I must stress that I'm a hobbyist programmer first and foremost, and this is far from a perfect project - there's probably better options, my coding is fairly messy, etc.; that being aside, feel free to run it yourself, fork the project, or even contribute! While I certainly won't have all the answers, please feel free to submit an issue if you're having trouble using anything.
 
+**IMPORTANT:** If you're downloading from this repository, *always* download from either the releases page or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
+
 To run this yourself you'll need:
 - A minimum of Python 3.7 (according to [vermin](https://pypi.org/project/vermin/)), but the latest version is recommended
     - If you're on Windows using the installer, make sure to check the "Add Python 3.x to PATH" box. Linux should do this automatically.
