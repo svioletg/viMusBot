@@ -750,27 +750,13 @@ class MediaQueue(object):
 
 	def get(self, ctx):
 		self.ensure_queue_exists(ctx)
+		print(self.queues.keys())
+		print(self.queues[ctx.author.guild.id])
 		return self.queues[ctx.author.guild.id]
 
 	def clear(self, ctx):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = []
-
-	# def append(self, ctx, item):
-	# 	self.ensure_queue_exists(ctx)
-	# 	self.queues[ctx.author.guild.id].append(item)
-
-	# def insert(self, ctx, index, item):
-	# 	self.ensure_queue_exists(ctx)
-	# 	self.queues[ctx.author.guild.id].insert(index, item)
-
-	# def pop(self, ctx, index):
-	# 	self.ensure_queue_exists(ctx)
-	# 	self.queues[ctx.author.guild.id].pop(index)
-
-	# def shuffle(self, ctx):
-	# 	self.ensure_queue_exists(ctx)
-	# 	random.shuffle(self.queues[ctx.author.guild.id])
 
 player_queue = MediaQueue()
 
@@ -892,8 +878,9 @@ async def play_url(url, ctx):
 			try:
 				os.remove(i)
 			except PermissionError as e:
-				if loop_this: pass
-				else: print(e); raise e
+				# Will be raised if we're looping, or if 
+				# another server is playing something; safe to ignore
+				pass
 
 async def advance_queue(ctx, skip=False):
 	if skip or not voice.is_playing():

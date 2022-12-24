@@ -14,8 +14,8 @@
     - `queue_batch()` now requires a `Context` object as the first argument
 
 ### Features
-- Aliases for commands can now be customized through the config
-- Commands can now be blacklisted/disabled through the config
+- Aliases for commands can now be customized through the config ([#14](https://github.com/svioletg/viMusBot/issues/14))
+- Commands can now be blacklisted/disabled through the config ([#15](https://github.com/svioletg/viMusBot/issues/15))
 
 ### Fixes
 - Fixed [Issue #17](https://github.com/svioletg/viMusBot/issues/17): Two servers' queues sometimes get mixed up when being used at the same time
