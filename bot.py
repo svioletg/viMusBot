@@ -124,7 +124,8 @@ dev_prefix = config['prefixes']['developer']
 public = config['public']
 inactivity_timeout = config['inactivity-timeout']
 
-cmd_aliases = config['aliases']
+def command_enabled(ctx):
+	return not ctx.command.name in config['command-blacklist']
 
 def get_aliases(command: str):
 	return config['aliases'].get(command,[])
@@ -239,7 +240,11 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
 # Start bot-related events
 
-# Commands here
+#
+#
+# Define cogs
+#
+#
 
 class General(commands.Cog):
 	def __init__(self, bot):
@@ -270,12 +275,14 @@ class General(commands.Cog):
 					break
 
 	@commands.command(aliases=get_aliases('changelog'))
+	@commands.check(command_enabled)
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
 		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
+	@commands.check(command_enabled)
 	async def ping(self, ctx):
 		"""Test command."""
 		await ctx.send('Pong!')
@@ -284,12 +291,14 @@ class General(commands.Cog):
 		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
 
 	@commands.command(aliases=get_aliases('repository'))
+	@commands.check(command_enabled)
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('todo'))
+	@commands.check(command_enabled)
 	async def todo(self, ctx):
 		"""Returns a list of planned features or bugs to be fixed."""
 		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)
@@ -305,6 +314,7 @@ class Music(commands.Cog):
 
 	# Playing music / Voice-related
 	@commands.command(aliases=get_aliases('analyze'))
+	@commands.check(command_enabled)
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
 		info = spoofy.spotify_track(spotifyurl)
@@ -337,6 +347,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('clear'))
+	@commands.check(command_enabled)
 	async def clear(self, ctx):
 		"""Clears the entire queue."""
 		global player_queue
@@ -344,6 +355,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command(aliases=get_aliases('join'))
+	@commands.check(command_enabled)
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
 		# This actually just calls ensure_voice below,
@@ -351,6 +363,7 @@ class Music(commands.Cog):
 		pass
 
 	@commands.command(aliases=get_aliases('leave'))
+	@commands.check(command_enabled)
 	async def leave(self, ctx):
 		"""Disconnects the bot from voice."""
 		global voice
@@ -361,6 +374,7 @@ class Music(commands.Cog):
 		voice = None
 
 	@commands.command(aliases=get_aliases('loop'))
+	@commands.check(command_enabled)
 	async def loop(self, ctx):
 		"""Toggles looping for the current track."""
 		global loop_this
@@ -369,6 +383,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq(f'{get_loop_icon()}Looping is set to {loop_this}.'))
 
 	@commands.command(aliases=get_aliases('move'))
+	@commands.check(command_enabled)
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
@@ -385,6 +400,7 @@ class Music(commands.Cog):
 			raise e
 
 	@commands.command(aliases=get_aliases('nowplaying'))
+	@commands.check(command_enabled)
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
 		try:
@@ -394,6 +410,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('pause'))
+	@commands.check(command_enabled)
 	async def pause(self, ctx):
 		"""Pauses the player. Can be resumed with -play."""
 		global paused_at
@@ -408,6 +425,7 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('Nothing to pause.'))
 	
 	@commands.command(aliases=get_aliases('play'))
+	@commands.check(command_enabled)
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		global playctx
@@ -584,6 +602,7 @@ class Music(commands.Cog):
 				raise e
 
 	@commands.command(aliases=get_aliases('queue'))
+	@commands.check(command_enabled)
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
 		if player_queue==[]:
@@ -607,23 +626,27 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('remove'))
+	@commands.check(command_enabled)
 	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=get_aliases('shuffle'))
+	@commands.check(command_enabled)
 	async def shuffle(self, ctx):
 		"""Randomizes the order of the queue."""
 		random.shuffle(player_queue)
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 	@commands.command(aliases=get_aliases('skip'))
+	@commands.check(command_enabled)
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
 		await ctx.send(embed=embedq('Skipping...'))
 		await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
+	@commands.check(command_enabled)
 	async def stop(self, ctx):
 		"""Stops the player and clears the queue."""
 		global player_queue
@@ -650,7 +673,7 @@ class Music(commands.Cog):
 
 # 
 # 
-# End command code.
+# End of cog definitions.
 # 
 # 
 
@@ -849,6 +872,7 @@ def get_loop_icon():
 	else: return ''
 
 
+
 # Establish bot user
 intents = discord.Intents.default()
 intents.messages = True
@@ -882,10 +906,12 @@ async def on_command_error(ctx, error):
 				paused_for=time.time()-paused_at
 			else:
 				await ctx.send(embed=embedq('No URL given.'))
-		if ctx.command.name == 'volume':
+		elif ctx.command.name == 'volume':
 			await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
-		if ctx.command.name == 'analyze':
+		elif ctx.command.name == 'analyze':
 			await ctx.send(embed=embedq('A spotify track URL is required.'))
+	elif isinstance(error, discord.ext.commands.CheckFailure):
+		await ctx.send(embed=embedq('This command is disabled for this instance.'))
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)

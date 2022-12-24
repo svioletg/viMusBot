@@ -23,7 +23,6 @@ prefixes:
     developer: "$"
 
 # Allows queueing entire Spotify playlists
-# This currently takes a long time (~1-2 seconds per track) to do, so it's disabled by default
 allow-spotify-playlists: yes
 
 # Limit the amount of tracks Spotify playlists can have before queueing
@@ -47,6 +46,8 @@ inactivity-timeout: 10
 # Customizable command aliases
 # Any commands not listed will only work with their default name
 aliases:
+    analyze:
+        - "analyse"
     join:
         - "j"
     loop:

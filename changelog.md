@@ -2,6 +2,12 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how versioning works for this project.
 
+## 1.6.5
+> *2022.12.*
+
+### Features
+- Aliases for commands can now be customized through the config
+
 ## 1.6.4
 > *2022.12.23*
 
