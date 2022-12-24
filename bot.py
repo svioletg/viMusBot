@@ -565,7 +565,7 @@ class Music(commands.Cog):
 				log('Checking duration...')
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
-					if pytube.YouTube(url).length>duration_limit*60*60:
+					if pytube.YouTube(url).length > duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
@@ -582,7 +582,7 @@ class Music(commands.Cog):
 							ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
 							duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 
-					if duration>duration_limit*60*60:
+					if duration > duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
@@ -594,9 +594,9 @@ class Music(commands.Cog):
 					log('Voice client is not playing; starting...')
 					await play_url(url, ctx)
 				else:
-					player_queue.append(QueueItem(url))
-					title=player_queue[-1].title
-					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue)}'))
+					player_queue[ctx.author.guild.id].append(QueueItem(url))
+					title=player_queue[ctx.author.guild.id][-1].title
+					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue[ctx.author.guild.id])}'))
 					log('Appened to queue.')
 			except Exception as e:
 				raise e
@@ -732,9 +732,15 @@ async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
 	log(f'{plt.warn}NOTICE: Unexpected behavior; prompt returned outside try/except/else')
 	await prompt.delete()
 
-# Queueing system
+# Queue system
 
-player_queue=[]
+class MediaQueue(object):
+	def __init__(self):
+		self.queues = {}
+
+	def ensure_queue_exists(ctx):
+		if ctx.author.guild.id not in self.queues:
+			self.queues[ctx.author.guild.id] = []
 
 class QueueItem(object):
 	def __init__(self, url, title=None):

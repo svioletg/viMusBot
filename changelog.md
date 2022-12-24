@@ -5,6 +5,9 @@
 ## 1.6.5
 > *2022.12.*
 
+### Developer
+- `player_queue` replaced with the `MediaQueue` class
+
 ### Features
 - Aliases for commands can now be customized through the config
 
