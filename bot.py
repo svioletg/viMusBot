@@ -304,7 +304,7 @@ class Music(commands.Cog):
 		self.bot = bot
 
 	# Playing music / Voice-related
-	@commands.command(aliases=['analyse'])
+	@commands.command(aliases=get_aliases('analyze'))
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
 		info = spoofy.spotify_track(spotifyurl)
@@ -336,21 +336,21 @@ class Music(commands.Cog):
 			embed.add_field(name=i.title(),value=value)
 		await ctx.send(embed=embed)
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('clear'))
 	async def clear(self, ctx):
 		"""Clears the entire queue."""
 		global player_queue
 		player_queue=[]
 		await ctx.send(embed=embedq('Queue cleared.'))
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('join'))
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
 		# This actually just calls ensure_voice below,
 		# this is only defined so that there's a command in Discord for it
 		pass
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('leave'))
 	async def leave(self, ctx):
 		"""Disconnects the bot from voice."""
 		global voice
@@ -360,7 +360,7 @@ class Music(commands.Cog):
 		await voice.disconnect()
 		voice = None
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('loop'))
 	async def loop(self, ctx):
 		"""Toggles looping for the current track."""
 		global loop_this
@@ -368,7 +368,7 @@ class Music(commands.Cog):
 		loop_this = not loop_this
 		await ctx.send(embed=embedq(f'{get_loop_icon()}Looping is set to {loop_this}.'))
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('move'))
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
@@ -384,13 +384,16 @@ class Music(commands.Cog):
 			print(e)
 			raise e
 
-	@commands.command(aliases=['np'])
+	@commands.command(aliases=get_aliases('nowplaying'))
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
-		embed=discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
+		try:
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
+		except AttributeError:
+			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('pause'))
 	async def pause(self, ctx):
 		"""Pauses the player. Can be resumed with -play."""
 		global paused_at
@@ -404,7 +407,7 @@ class Music(commands.Cog):
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
 	
-	@commands.command(aliases=['p'])
+	@commands.command(aliases=get_aliases('play'))
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		global playctx
@@ -580,7 +583,7 @@ class Music(commands.Cog):
 			except Exception as e:
 				raise e
 
-	@commands.command(aliases=['q'])
+	@commands.command(aliases=get_aliases('queue'))
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
 		if player_queue==[]:
@@ -603,24 +606,24 @@ class Music(commands.Cog):
 			raise e
 		await ctx.send(embed=embed)
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('remove'))
 	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.pop(spot-1).title} from the queue.'))
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('shuffle'))
 	async def shuffle(self, ctx):
 		"""Randomizes the order of the queue."""
 		random.shuffle(player_queue)
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
-	@commands.command(aliases=['s'])
+	@commands.command(aliases=get_aliases('skip'))
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
 		await ctx.send(embed=embedq('Skipping...'))
 		await advance_queue(ctx, skip=True)
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('stop'))
 	async def stop(self, ctx):
 		"""Stops the player and clears the queue."""
 		global player_queue
