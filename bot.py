@@ -110,6 +110,8 @@ def logln():
 log(f'v{version}')
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
+log('Starting...')
+
 # Parse config from YAML
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
@@ -122,7 +124,10 @@ dev_prefix = config['prefixes']['developer']
 public = config['public']
 inactivity_timeout = config['inactivity-timeout']
 
-log('Starting...')
+cmd_aliases = config['aliases']
+
+def get_aliases(command: str):
+	return config['aliases'].get(command,[])
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
@@ -264,13 +269,13 @@ class General(commands.Cog):
 					voice = None
 					break
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('changelog'))
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
 		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
-	@commands.command()
+	@commands.command(aliases=get_aliases('ping'))
 	async def ping(self, ctx):
 		"""Test command."""
 		await ctx.send('Pong!')
@@ -278,13 +283,13 @@ class General(commands.Cog):
 		await ctx.send(embed=embed)
 		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
 
-	@commands.command(aliases=['repo', 'github', 'gh'])
+	@commands.command(aliases=get_aliases('repository'))
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
-	@commands.command(aliases=['bugs'])
+	@commands.command(aliases=get_aliases('todo'))
 	async def todo(self, ctx):
 		"""Returns a list of planned features or bugs to be fixed."""
 		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)

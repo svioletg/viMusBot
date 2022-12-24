@@ -1,9 +1,14 @@
 --- # Copy this to "config.yml" before modifying!
+#####
 
-# Please keep this file so that you can refer back to its comments.
-# Comments will be lost if config.yml updates automatically.
+# Please keep this file so that you can refer back to its comments
+# Comments will be lost if config.yml updates automatically
 
 # Booleans may be yes/no, on/off, or true/false
+
+# None of these changes will go into effect until the bot is restarted
+
+#####
 
 # Automatically updates config.yml with any missing options present in config_default.yml
 auto-update-config: no
@@ -38,6 +43,32 @@ duration-limit: 5
 # Leave the voice channel if nothing has been playing for this many minutes
 # Setting this to 0 will disable it entirely and never automatically leave
 inactivity-timeout: 10
+
+# Customizable command aliases
+# Any commands not listed will only work with their default name
+aliases:
+    join:
+        - "j"
+    loop:
+        - "l"
+    move:
+        - "m"
+    nowplaying:
+        - "np"
+    play:
+        - "p"
+    queue:
+        - "q"
+    repository:
+        - "repo"
+        - "github"
+        - "gh"
+    skip:
+        - "s"
+
+# Any commands listed here will be disabled from use
+command-blacklist:
+    -
 
 # Set various options for output logs
 logging-options:
