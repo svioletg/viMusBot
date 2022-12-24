@@ -26,6 +26,8 @@ The bot will require at least these permissions:
 
 ![Required Bot Permissions](https://cdn.discordapp.com/attachments/327195739346173962/1039979708219129966/image.png)
 
+Make sure that "Server Members Intent" and "Message Content Intent" are ticked **on** in the Bot tab.
+
 You can download the repository as a ZIP file directly from the repository page and you'll be set, but I would recommend installing `git` for easier updating; use `apt-get install git` or equivalent on Linux, or [download it here](https://git-scm.com/download/win) for Windows.
 
 1. Running `git clone https://github.com/svioletg/viMusBot.git` will create a `viMusBot` folder within wherever the command was run, there's no need to create a folder for it in advance.
