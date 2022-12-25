@@ -8,11 +8,20 @@ A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/disco
 
 Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you've experienced a bug or otherwise odd behavior, or have a feature to request, and feel free to comment on existing issues to provide any additional details that may help narrow down the issue or reach a solution. No bug or feature is too large/small to be submitted, this system is best for me to keep track of everything.
 
-## Usage
+## Important: Before Using
+### Do Not Use `dev`
+If you're downloading from this repository, *always* download from either the releases page or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
+
+### Use On One Server
+When I say "an **instance** of the bot" or anything similar, what I'm referring to is *one* `bot.py` script that is currently running, in a single window or `screen` (the command-line tool `screen`, not a monitor screen).
+
+While it's of course fine to have your instance in multiple servers, it should be noted that using it to play music in more than one server at a time *will* cause problems, and it is heavily recommended to only play music through it on one server at any given moment.
+
+I'm aiming to fix this eventually, progress is being tracked in [Issue #17](https://github.com/svioletg/viMusBot/issues/17) if you'd like to see any updates, but for the time being if you really need to have the bot actively playing on multiple servers, the best idea would be to run mutiple separate instances.
+
+## How To Use
 
 I must stress that I'm a hobbyist programmer first and foremost, and this is far from a perfect project - there's probably better options, my coding is fairly messy, etc.; that being aside, feel free to run it yourself, fork the project, or even contribute! While I certainly won't have all the answers, please feel free to submit an issue if you're having trouble using anything.
-
-**IMPORTANT:** If you're downloading from this repository, *always* download from either the releases page or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
 
 To run this yourself you'll need:
 - A minimum of Python 3.7 (according to [vermin](https://pypi.org/project/vermin/)), but the latest version is recommended
