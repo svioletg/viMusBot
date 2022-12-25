@@ -15,7 +15,6 @@ headers_auth.json
 # misc testing files
 yttesting.py
 quickstart.sh
-new-release.bat
 *.pickle
 # backups of files in case i need to roll back after a big change
 bot_*.py
@@ -24,3 +23,6 @@ spoofy_*.py
 *.log
 *.webm
 *.mp3
+# other
+versioningconvention.txt
+new-release.bat
