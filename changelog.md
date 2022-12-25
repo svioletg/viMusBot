@@ -2,8 +2,8 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
-## 1.7.0
-> *2022.12.*
+## 1.6.5
+> *2022.12.24*
 
 ### Developer
 - `bot.py` changes:
@@ -18,8 +18,12 @@
 - Commands can now be blacklisted/disabled through the config ([#15](https://github.com/svioletg/viMusBot/issues/15))
 
 ### Fixes
-- Fixed [Issue #17](https://github.com/svioletg/viMusBot/issues/17): Two servers' queues sometimes get mixed up when being used at the same time
 - Fixed a minor issue with the `-nowplaying` command returning what last played despite nothing currently playing
+
+### Notes
+The switch to using a `MediaQueue` class with separated queues for guilds was meant as a solution to [Issue #17](https://github.com/svioletg/viMusBot/issues/17), however that issue became much larger in scope than I had thought.
+
+As such, I'm keeping these changes as a head start on that since they don't seem to negatively effect functionality, while I will deal with fixing the larger issue in its entirety later down the line.
 
 ## 1.6.4
 > *2022.12.23*

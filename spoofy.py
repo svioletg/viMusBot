@@ -56,7 +56,8 @@ if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 ytmusic = YTMusic()
 
 # Connect to spotify API
-scred = json.loads(open('spotify_config.json').read())['spotify']
+with open('spotify_config.json', 'r') as f:
+	scred = json.loads(f.read())['spotify']
 client_credentials_manager = SpotifyClientCredentials(
 	client_id=scred['client_id'],
 	client_secret=scred['client_secret']
