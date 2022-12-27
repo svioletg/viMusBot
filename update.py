@@ -12,6 +12,8 @@ from palette import Palette
 colorama.init(autoreset=True)
 plt = Palette()
 
+print('Checking...')
+
 response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 latest = response.json()
 latest_tag = latest['tag_name']
@@ -40,11 +42,25 @@ with ZipFile(latest_zip, 'r') as zipf:
 	source_dir = zipf.namelist()[0]
 	zipf.extractall('.')
 
-print('Moving...')
-files = os.listdir()
-
+print('Copying...')
+files = os.listdir(source_dir)
 for f in files:
-	shutil.move(os.path.join(source_dir, f), './')
+	try:
+		shutil.copy(os.path.join(source_dir, f), './')
+	except PermissionError as e:
+		if f != '.github':
+			# Skipping .github is fine, log any other
+			# unexpected file errors
+			print(e)
+			print(f'Skipping {f}...')
+		else:
+			pass
 
-print('Deleting zip...')
+print('Cleaning up...')
 os.remove(latest_zip)
+shutil.rmtree(source_dir)
+
+with open('version.txt', 'r') as f:
+	new_version = f.read()
+	print('Done!')
+	print(f'You are now on {plt.lime}v{new_version}{plt.reset}.')

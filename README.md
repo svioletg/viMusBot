@@ -10,7 +10,7 @@ Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you
 
 ## Important: Before Using
 ### Do Not Use `dev`
-If you're downloading from this repository, *always* download from either the releases page or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
+If you're downloading from this repository, *always* download from either the releases page (recommended) or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
 
 ### Use On One Server
 When I say "an **instance** of the bot" or anything similar, what I'm referring to is *one* `bot.py` script that is currently running, in a single window or `screen` (the command-line tool `screen`, not a monitor screen).
