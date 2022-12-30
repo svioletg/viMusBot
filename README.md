@@ -2,7 +2,9 @@
 
 # This README is part of the dev branch! These instructions are likely not accurate! Click [here](https://github.com/svioletg/viMusBot/tree/master) to switch to the master branch.
 
-### Changelog is now located [here](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
+### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
+
+### See progress on bug fixes and new features here: [viMusBot 1.x](https://github.com/users/svioletg/projects/1/views/1)
 
 ---
 
@@ -41,7 +43,8 @@ I've tried to make the following as thorough as I can, but if you don't mind som
 3. Follow [these instructions](https://ytmusicapi.readthedocs.io/en/latest/setup.html) to generate your `headers_auth.json` file.
 4. Ensure you've selected the right intents and permissions (see **Bot Token & Permissions** below), and paste your bot's token into `token.txt`.
 5. Duplicate `config_default.yml` and rename the copy as `config.yml` - the bot will only use the latter for its options. Edit it how you like.
-6. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
+6. If FFmpeg and FFprobe aren't installed on your system, either install it through your package manager of choice or download the binaries and drop them in the viMusBot folder.
+7. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
 
 ---
 

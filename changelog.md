@@ -2,8 +2,18 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.7.0
+> *2023. / dev.28*
+
+### Developer
+- The `ytmusicapi` library is no longer required or used
+- `spoofy.py` has had a lot of its functions rewritten and restructured to use `pytube` alone
+
+### Features
+- A new setup "wizard" has been created to aid the process of setting up the bot for the first time, for users less experienced with the command line
+
 ## 1.6.5
-> *2022.12.24*
+> *2022.12.24 / dev.27*
 
 ### Developer
 - `bot.py` changes:
@@ -26,7 +36,7 @@ The switch to using a `MediaQueue` class with separated queues for guilds was me
 As such, I'm keeping these changes as a head start on that since they don't seem to negatively effect functionality, while I will deal with fixing the larger issue in its entirety later down the line.
 
 ## 1.6.4
-> *2022.12.23*
+> *2022.12.23 / dev.26*
 
 ### Features
 - The bot will now send any errors it encounters as chat messages
@@ -35,7 +45,7 @@ As such, I'm keeping these changes as a head start on that since they don't seem
 - As a workaround to [Issue #16](https://github.com/svioletg/viMusBot/issues/16), a small note is now added as a subtitle to the "Trying to queue..." message regarding SoundCloud links sometimes returning a 403 Forbidden error
 
 ## 1.6.3
-> *2022.12.21*
+> *2022.12.21 / dev.25*
 
 ### Developer
 - Various changes to code formatting for readability
@@ -59,7 +69,7 @@ As such, I'm keeping these changes as a head start on that since they don't seem
 I've gone back and added some notes or corrections to older versions' changelogs. Initially I was considering just removing the incorrect text, but I've decided to leave it there and strike it out, adding an explanation below.
 
 ## 1.6.2
-> *2022.12.16*
+> *2022.12.16 / dev.24*
 
 ### Developer
 - `strip_color()` added to the `Palette` class, removes all color formatting from a string
@@ -83,7 +93,7 @@ I've gone back and added some notes or corrections to older versions' changelogs
 - The `voice` variable now properly resets after leaving a voice channel
 
 ## 1.6.1
-> *2022.12.09*
+> *2022.12.09 / dev.23*
 
 ### Developer
 - Video duration is now checked *after* checking its availability
@@ -109,7 +119,7 @@ I had intended to include more in this update, but I've been sick and too low on
 In the future, your config file will be automatically merged & updated with the latest config_default.yml; this current method of warning the user is just do mitigate issues until that's set in place.
 
 ## 1.6.0
-> *2022.11.29*
+> *2022.11.29 / dev.22*
 
 ### Remember to replace your INI file with the new YAML template!
 
@@ -135,7 +145,7 @@ In the future, your config file will be automatically merged & updated with the 
 I've stopped including the commit link so that each update doesn't require two separate commits for it. You can find a version's latest commit by searching through all of them and finding the last commit before one with a new version number.
 
 ## 1.5.4
-> *2022.11.22* / *[view commit](https://github.com/svioletg/viMusBot/commit/96ad0dd19870b0462293c2e6a458922730a5a01d)*
+> *2022.11.22 / dev.21*
 
 ### Other
 - Added an option to limit how long Spotify playlists can be for queueing (40 by default, see notes)
@@ -148,7 +158,7 @@ It was discovered that queueing a Spotify playlist longer than roughly 40 tracks
 This would likely be fixed by having a faster method of queueing up Spotify tracks, but with pyspotify not functioning these days, it's going to be a long time until I find a solution.
 
 ## 1.5.3
-> *2022.11.18* / *[view commit](https://github.com/svioletg/viMusBot/commit/9185f52120ca5738c8a821fb6e360d56ab7a894f)*
+> *2022.11.18 / dev.20*
 
 ### Improvements
 - Spotify-YouTube song matching will now try to match the ISRC code ~~(or UPC for albums)~~ first before falling back on the text search method, this is slightly faster and usually more accurate
@@ -160,7 +170,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
     - **Note:** This is still very slow, as it takes around 1-2 seconds per track, which can build up very fast on large playlists. I am searching for a way to speed up the process, but it will likely be a while
 
 ## 1.5.2
-> *2022.11.12* / *[view commit](https://github.com/svioletg/viMusBot/commit/91c7109a77c8700a72d3e8b9c3ed334bbb039d88)*
+> *2022.11.12 / dev.19*
 
 ### Developer
 - `default_args.txt` created, entering a list of arguments into this file will automatically add them to the command anytime you run the bot; use the `nodefault` argument to ignore this file
@@ -175,13 +185,13 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
     - `is_matching()` takes new optional arguments for determing the threshold of fuzzy matching; `threshold` sets one threshold for title, artist, and album, or you can specify `title_threshold` etc.
 
 ## 1.5.1
-> *2022.11.11* / *[view commit](https://github.com/svioletg/viMusBot/commit/a92909b4047fbbb9e91a85d4c3001af40e1dbe06)*
+> *2022.11.11 / dev.18*
 
 ### Fixes
 - Fixed broken SoundCloud link queueing
 
 ## 1.5.0
-> *2022.11.10* / *[view commit](https://github.com/svioletg/viMusBot/commit/e2f0e17618eb00427b2263e189b72c556235f582)*
+> *2022.11.10 / dev.17*
 
 ### Developer
 - Added the `help` command-line argument
@@ -219,7 +229,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - Spotify playlist support has been removed until a faster solution is found
 
 ## 1.4.0
-> *2022.11.05* / *[view commit](https://github.com/svioletg/viMusBot/commit/d71fc727627f0f785f4538fea30d9c377a29c92c)*
+> *2022.11.05 / dev.16*
 
 ### Developer
 - `print_logs` can be set to false by passing "quiet" as a command-line argument
@@ -243,7 +253,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - Spotify/YouTube matching logic: The first YouTube search checks for a matching album instead of a matching artist, checking the artist was causing problems when the artist name on YouTube Music was not the same as on Spotify
 
 ## 1.3.7
-> *2022.11.05* / *[view commit](https://github.com/svioletg/viMusBot/commit/530cda2d9cd53d244a2801d556e12028847a873e)*
+> *2022.11.05 / dev.15*
 
 ### Developer
 - `debug` has been renamed to `print_logs` to be more accurate
@@ -258,7 +268,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - Spotify/YouTube matching logic: Checking for remixes will now include covers
 
 ## 1.3.6
-> *2022.11.04* / *[view commit](https://github.com/svioletg/viMusBot/commit/09d6597a1fd80abb32a939e76bf3bef0b15b5e8c)*
+> *2022.11.04 / dev.14*
 
 ### Developer
 - Moved `force_no_match` further up in `spoofy.py`'s code so that it warns the user at startup
@@ -274,7 +284,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - The `-remove` was added long ago but never worked due to an oversight on my end, it works properly now
 
 ## 1.3.5
-> *2022.10.31* / *[view commit](https://github.com/svioletg/viMusBot/commit/3b52e4fbbe48f663893b3613c98c53faedb388dc)*
+> *2022.10.31 / dev.13*
 
 ### Developer
 - Created `bot_stable.py` and `spoofy_stable.py`, which are the last-pushed versions of `bot.py` and `spoofy.py` respectively, to keep the bot running without interruptions from development. `bot.py` and `spoofy.py` will use a different token meant for development use, and are copied over to the "stable" files once ready to commit. These files are not included in the repository, as they would just be duplicates.
@@ -289,7 +299,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - Using `-queue` when the player queue is empty now sends its own message.
 
 ## 1.3.4
-> *2022.10.30* / *[view commit](https://github.com/svioletg/viMusBot/commit/85b5edc141a66416416633812f80326c19783215)*
+> *2022.10.30 / dev.12*
 
 ### Developer
 - `colorama` is now being used for better readability in logs
@@ -308,19 +318,19 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - When building YouTube results message (after `unsure` has been returned from `spoofy.spyt()`), the bot will no longer check every video's availability before adding it to the list of options, speeding up the process significantly; it will still check for availability when queueing the video, however
 
 ## 1.3.3
-> *2022.10.29* / *[view commit](https://github.com/svioletg/viMusBot/commit/02d4ba3e45bebb97115f3ede7e1377482ca92931)*
+> *2022.10.29 / dev.11*
 
 ### Fixes
 - Fixed broken Spotify queueing; `if` statement at [`spoofy.py`:224](https://github.com/svioletg/viMusBot/blob/1141ce31113920ecdf2591d65f58e5780d9b273d/spoofy.py#L224) was written incorrectly, and `valid` was used instead of `url` at [`bot.py`:348](https://github.com/svioletg/viMusBot/blob/1141ce31113920ecdf2591d65f58e5780d9b273d/bot.py#L348)
 
 ## 1.3.2
-> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/1141ce31113920ecdf2591d65f58e5780d9b273d)*
+> *2022.10.28 / dev.10*
 
 ### Fixes
 - Fixed Bandcamp albums, SoundCloud albums, and SoundCloud playlists not being queued properly (I believe this was also affecting YouTube playlists)
 
 ## 1.3.1
-> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/08ba730fafb1165de2d6fb82752c71d0ac70dd2d)*
+> *2022.10.28 / dev.9*
 
 ### Fixes
 - Automatic file removal now includes .mp3 files
@@ -329,7 +339,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - Bot will remove old files from Youtube DL on startup
 
 ## 1.3.0
-> *2022.10.28* / *[view commit](https://github.com/svioletg/viMusBot/commit/1b8b3caee4aaf6ad65733b34963b16069a3bb5c6)*
+> *2022.10.28 / dev.8*
 
 ### Features
 - Added support for YouTube & Spotify playlists, as well as Spotify albums
@@ -337,6 +347,29 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 ### Improvements
 - Improved Spotify-YouTube song matching logic
 - The bot now clears the queue after disconnecting via `-leave`
+
+*The following versions were not originally released with a changelog, but are included for clarity's sake.*
+
+## 1.2.2
+> *2022.10.27 / dev.7*
+
+## 1.2.1
+> *2022.10.27 / dev.6*
+
+## 1.2.0
+> *2022.10.26 / dev.5*
+
+## 1.1.2
+> *2022.10.25 / dev.4*
+
+## 1.1.1
+> *2022.10.25 / dev.3*
+
+## 1.1.0
+> *2022.10.25 / dev.2*
+
+## 1.0.0
+> *2022.10.24 / dev.1*
 
 ---
 
@@ -348,6 +381,8 @@ Versions are numbered as X.Y.Z, where:
 - Z is the **minor version**, for things like bugfixes or minor improvements to the code
 
 Version numbers do *not* roll over into the next highest spot, e.g if the last update was `1.0.9`, the next update would not be `1.1.0` - it would be labelled as `1.0.10`.
+
+Each version has a date below it, which is when it was made public. Next to the date is a `dev` number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number.
 
 ## Categories
 

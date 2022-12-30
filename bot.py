@@ -76,6 +76,7 @@ import customlog
 import spoofy
 
 from palette import Palette
+import update
 
 _here = os.path.basename(__file__)
 
@@ -107,7 +108,16 @@ def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'v{version}')
+log(f'You are on ver. {version}')
+
+update_check = update.check()
+
+if not update_check[0]:
+	log(f'{plt.warn}There is a new release available.')
+	current_tag = update_check[1]['current']
+	latest_tag = update_check[1]['latest']
+	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
+
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
 log('Starting...')

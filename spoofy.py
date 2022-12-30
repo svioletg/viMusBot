@@ -84,11 +84,10 @@ keytable = {
 }
 
 # Define matching logic
-def is_matching(reference, ytresult, **kwargs):
+def is_matching(reference, ytresult, mode='fuzz'):
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
 	# 'old' = checking for strings in other strings, how matching was done beforehand
-	mode = kwargs.get('mode','fuzz')
 	if mode not in ['fuzz', 'old']: log(f'{mode} is not a valid mode.'); return
 
 	# overrides the fuzzy matching threshold, default is 75%
@@ -203,35 +202,21 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	query = f'{title} {artist} {album}'
 	reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
-	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data, album='', from_pytube=False, extract_from_ytmusic=False):
-		if from_pytube:
-			# ytmusicapi has a get_song function, but it doesn't retrieve
-			# things like artist, album, etc.
-			if extract_from_ytmusic:
-				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
-			else:
-				data = pytube_track_data(data)
-			try:
-				album = data['album']['name']
-			except KeyError as e:
-				log(e)
-				pass
-		if 'duration' in data: duration = data['duration']
-		elif 'length' in data: duration = data['length']
+	# Trim song data down to what's relevant to us
+	def trim_track_data(data, album=''):
+		data = pytube_track_data(data)
 		relevant = {
 			'title': data['title'],
 			'artist': data['artists'][0]['name'],
 			'url': 'https://www.youtube.com/watch?v='+data['videoId'],
 			'album': album,
-			'duration': duration,
+			'duration': data['length'],
 		}
 		return relevant
 
 	# Start search
-	if isrc!=None:
+	if isrc != None:
 		log(f'Searching for ISRC: {isrc}')
-		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
 		for i in isrc_matches:
 			# Exit loop if we're forcing the prompt
@@ -244,13 +229,13 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		log('No ISRC match found, falling back on text search.')
 
 	log(f'Trying query \"{query}\" with a limit of {limit}')
-	song_results=ytmusic.search(query=query,limit=limit,filter='songs')
-	video_results=ytmusic.search(query=query,limit=limit,filter='videos')
+	song_results = pytube.Search(f'{query} "Topic"').results
+	video_results = pytube.Search(f'{query}').results
 	# Remove videos over a certain length
 	for i in song_results:
-		if int(i['duration_seconds'])>duration_limit*60*60: song_results.pop(song_results.index(i))
+		if int(i.length) > duration_limit*60*60: song_results.pop(song_results.index(i))
 	for i in video_results:
-		if int(i['duration_seconds'])>duration_limit*60*60: video_results.pop(video_results.index(i))
+		if int(i.length) > duration_limit*60*60: video_results.pop(video_results.index(i))
 
 	fast_search = kwargs.get('fast_search',False)
 	if fast_search:
@@ -269,7 +254,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 
 	if is_jp(query):
 		# Assumes first Japanese result is correct, otherwise
-		# it doesn't recognize it since YT Music romanizes/translates titles
+		# it doesn't recognize it since YouTube romanizes/translates titles
 		# See: https://github.com/svioletg/viMusBot/issues/11
 		match = song_results[0]
 
@@ -283,7 +268,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		log('Not found; checking for close match...')
 		# Check user-uploaded videos
 		for i in video_results:
-			if int(i['duration_seconds'])>duration_limit*60*60: video_results.pop(video_results.index(i))
+			if int(i.length) > duration_limit*60*60: video_results.pop(video_results.index(i))
 		# If no close match is found, pass to the user
 		for i in video_results[:5]:
 			if is_matching(reference,i,ignore_artist=True,ignore_album=True):
@@ -296,7 +281,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		unsure=True
 
 	# Make new dict with more relevant information
-	results={}
+	results = {}
 	# Determine what to queue
 	if match_found():
 		# Return match
@@ -309,11 +294,11 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		position = 0
 		for result in song_results[:song_choices]:
 			results[position] = trim_track_data(result,album=result['album']['name'])
-			position+=1
+			position += 1
 
 		for result in video_results[:video_choices]:
 			results[position] = trim_track_data(result)
-			position+=1
+			position += 1
 
 		# Ask for confirmation if no exact match found
 		if unsure:
