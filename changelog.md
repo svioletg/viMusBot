@@ -8,6 +8,9 @@
 ### Developer
 - The `ytmusicapi` library is no longer required or used
 - `spoofy.py` has had a lot of its functions rewritten and restructured to use `pytube` alone
+    - Anywhere that `['artists'][0]['name']` was used in reference YT Music data was replaced with `['artist']` as `trim_track_data()` returns this isntead in its dictionary
+        - Similarly, `['album']['name']` is now just `['album']`
+    - `search_ytmusic()`: `song_results` and `video_results` are trimmed down to their first five items since getting the length from the `pytube.YouTube` object seems to be slow
 
 ### Features
 - A new setup "wizard" has been created to aid the process of setting up the bot for the first time, for users less experienced with the command line
@@ -375,6 +378,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 
 ## Versioning Info
 
+### Public Release Versions
 Versions are numbered as X.Y.Z, where:
 - X is the **project version**, which should always remain at 1 unless the project is re-written almost entirely
 - Y is the **major version**, for all-new functionality or other large changes
@@ -382,7 +386,23 @@ Versions are numbered as X.Y.Z, where:
 
 Version numbers do *not* roll over into the next highest spot, e.g if the last update was `1.0.9`, the next update would not be `1.1.0` - it would be labelled as `1.0.10`.
 
-Each version has a date below it, which is when it was made public. Next to the date is a `dev` number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number.
+Each version has a date below it, which is when it was made public. Next to the date is a dev number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number.
+
+### Hotfix Versions
+On the rare occassion that the latest update must be amended straight away, without waiting for the next update in development to be finished, a "hotfix" for the last version will be released. Hotfix versions will append a letter in alphabetical order to the end of the version, so if 1.6.2 for example needed a hotfix, the new release would be 1.6.2a.
+The non-hotfixed version (in this example, 1.6.2) would then be removed from the releases page, as well. Any following hotfixes would be 1.6.2b, 1.6.2c, 1.6.2d, etc., and previous hotfixes would continue to be removed so that only the fixed version remains.
+This is largely to avoid having to change the dev number during development of a new major or minor version.
+
+### Development Versions
+The `dev` branch contains code that is actively being worked on for the next coming update, and due to the frequency of these updates in contrast to public releases, it uses a different numbering system.
+Development versions are numbered as dev.X.Y, where:
+- X is the total number of updates, plus one (previously mentioned as the dev number)
+- Y is the Nth commit that involves any changed Python code
+    - It is not updated if any files other than `*.py` are updated, such as README.md, changelog.md, or fixing typos or other errors in configuration
+
+For example, take "dev.28.4":
+- The last public release before starting this version was 1.6.5, the 27th release since 1.0.0. Thus, during development the next update will be 28, with a public version being decided at release.
+- This would've been the 4th commit containing changed Python code
 
 ## Categories
 

@@ -4,6 +4,7 @@ from colorama import Fore, Back, Style
 import discord
 from discord.ext import commands
 import glob
+import importlib
 import logging
 import os
 import pytube
@@ -283,6 +284,15 @@ class General(commands.Cog):
 				if not voice.is_connected():
 					voice = None
 					break
+
+	@commands.command()
+	@commands.check(command_enabled)
+	async def reload(self, ctx):
+		# Separated from the others for debug purposes
+		global spoofy
+		if not public:
+			spoofy = importlib.reload(spoofy)
+			log('Reloaded spoofy.py.')
 
 	@commands.command(aliases=get_aliases('changelog'))
 	@commands.check(command_enabled)
@@ -760,8 +770,6 @@ class MediaQueue(object):
 
 	def get(self, ctx):
 		self.ensure_queue_exists(ctx)
-		print(self.queues.keys())
-		print(self.queues[ctx.author.guild.id])
 		return self.queues[ctx.author.guild.id]
 
 	def clear(self, ctx):
