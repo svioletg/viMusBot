@@ -500,7 +500,7 @@ class Music(commands.Cog):
 				if '/album/' in url:
 					log('Spotify album detected.')
 					album_info = spoofy.spotify_album(url)
-					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
+					url = spoofy.search_youtube_album(album_info['title'], album_info['artist'])
 					if url==None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
@@ -510,13 +510,13 @@ class Music(commands.Cog):
 				# TODO: Change this to use prompt_for_choice()
 				log('Link not detected, searching with query')
 				log(url)
-				options=spoofy.search_ytmusic_text(url)
+				options = spoofy.search_youtube_text(url)
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
 				top_video_title = options[1]['title']
 				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
-				if top_song_url==top_video_url:
-					url=top_song_url
+				if top_song_url == top_video_url:
+					url = top_song_url
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
 					embed.add_field(name=f'Top song result: {top_song_title}',value=top_song_url,inline=False)
@@ -573,19 +573,6 @@ class Music(commands.Cog):
 			else:
 				# Runs if the input given was not a playlist
 				log('URL is not a playlist.')
-				log('Checking availability...')
-				# Make sure the video exists, store the result so we don't have to make two requests
-				if 'open.spotify.com' not in url:
-					try:
-						ytdl_extracted = ytdl.extract_info(url,download=False)
-					except yt_dlp.utils.DownloadError as e:
-						log('Video unavailable.')
-						await qmessage.edit(embed=embedq('Video is unavailable; could not queue.'))
-						return
-					except Exception as e:
-						print(e)
-						await qmessage.edit(embed=embedq('An unexpected error occurred.'))
-						return
 				log('Checking duration...')
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
@@ -597,6 +584,7 @@ class Music(commands.Cog):
 					if 'open.spotify.com' in url:
 						duration = spoofy.sp.track(url)['duration_ms']/1000
 					else:
+						ytdl_extracted = ytdl.extract_info(url,download=False)
 						try:
 							duration = ytdl_extracted['duration']
 						# 'duration' is not retrieved from the generic extractor used for direct links

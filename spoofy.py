@@ -52,9 +52,6 @@ duration_limit = config['duration-limit']
 # Useful to point this out if left on accidentally
 if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
-# Connect to youtube music API
-ytmusic = YTMusic()
-
 # Connect to spotify API
 with open('spotify_config.json', 'r') as f:
 	scred = json.loads(f.read())['spotify']
@@ -111,15 +108,15 @@ def is_matching(reference, ytresult, mode='fuzz', **kwargs):
 	check = re.compile(r'\(feat\..*\)')
 	yt_title = check.sub('',yt_title)
 
-	if mode=='fuzz':
+	if mode == 'fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
-	elif mode=='old':
+	elif mode == 'old':
 		matching_title = ref_title.lower() in yt_title.lower() or (
 			ref_title.split(' - ')[0].lower() in yt_title.lower() 
 			and ref_title.split(' - ')[1].lower() in yt_title.lower()
-			)
+		)
 		matching_artist = ref_artist.lower() in yt_artist.lower()
 		matching_album = ref_album.lower() in yt_album.lower()
 
@@ -173,13 +170,13 @@ def pytube_track_data(pytube_object):
 	}
 	return description_dict
 
-def search_ytmusic_text(query):
+def search_youtube_text(query):
 	# For plain-text searching
-	top_song = ytmusic.search(query=query,limit=1,filter='songs')[0]
-	top_video = ytmusic.search(query=query,limit=1,filter='songs')[0]
-	return top_song, top_video
+	top_song = pytube.Search(f'{query} "Topic"').results[0]
+	top_video = pytube.Search(f'{query}').results[0]
+	return pytube_track_data(top_song), pytube_track_data(top_video)
 
-def search_ytmusic_album(title, artist, upc=None):
+def search_youtube_album(title, artist, upc=None):
 	if force_no_match: log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist}'
@@ -197,7 +194,7 @@ def search_ytmusic_album(title, artist, upc=None):
 	log('No match found.')
 	return None
 
-def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False, **kwargs):
+def search_youtube(title, artist, album, isrc=None, limit=10, fast_search=False, **kwargs):
 	global force_no_match
 	unsure = False
 
@@ -423,7 +420,7 @@ def spyt(url, **kwargs):
 			# For playlists, each track is searched for when its turn in the queue is reached.
 			# This will pass along the title and spotify url
 			try:
-				ytmatch = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,fast_search=True,**kwargs)
+				ytmatch = search_youtube(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,fast_search=True,**kwargs)
 				if type(ytmatch) == tuple:
 					failed.append(track['title'])
 				elif type(ytmatch) == dict:
@@ -437,7 +434,7 @@ def spyt(url, **kwargs):
 	else:
 		log('Not a playlist.')
 		track = spotify_track(url)
-		result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
+		result = search_youtube(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
 		if type(result)==tuple and result[0]=='unsure':
 			log('Returning as unsure.')
 			return result
