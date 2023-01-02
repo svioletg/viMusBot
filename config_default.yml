@@ -69,7 +69,9 @@ aliases:
 
 # Any commands listed here will be disabled from use
 command-blacklist:
-    -
+    # -reload re-imports the spoofy.py file used by the script
+    # This is for testing and should be left disabled otherwise
+    - "reload"
 
 # Set various options for output logs
 logging-options:

@@ -108,6 +108,9 @@ def is_matching(reference, ytresult, mode='fuzz', **kwargs):
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
+	check = re.compile(r'\(feat\..*\)')
+	yt_title = check.sub('',yt_title)
+
 	if mode=='fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
@@ -140,7 +143,6 @@ def isrc_search_test(playlist):
 	log('STARTING')
 	for i in tracks:
 		isrc = i['isrc']
-		# For whatever reason, pytube seems to be more accurate here
 		isrc_match = pytube.Search(isrc).results
 		for match in isrc_match:
 			print(Fore.CYAN+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
@@ -207,10 +209,8 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		data = pytube_track_data(data)
 
 		if 'Provided to YouTube by' in data['description']:
-			print('1')
 			album = data['album']['name']
 		else:
-			print('2')
 			album = ''
 
 		relevant = {
@@ -273,10 +273,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		match = song_results[0]
 
 	for i in song_results:
-		old=i
 		i = trim_track_data(i)
-		if i['album']=='': print({plt.magenta}+i); print({plt.gold}+old)
-		print(i)
 		if is_matching(reference, i, ignore_artist=True):
 			log('Song match found.')
 			match = i

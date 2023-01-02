@@ -7,13 +7,19 @@
 
 ### Developer
 - The `ytmusicapi` library is no longer required or used
-- `spoofy.py` has had a lot of its functions rewritten and restructured to use `pytube` alone
-    - Anywhere that `['artists'][0]['name']` was used in reference YT Music data was replaced with `['artist']` as `trim_track_data()` returns this isntead in its dictionary
+- `spoofy.py` changes:
+    - Anywhere that `['artists'][0]['name']` was used in reference YT Music data was replaced with `['artist']` as `trim_track_data()` returns this instead in its dictionary
         - Similarly, `['album']['name']` is now just `['album']`
     - `search_ytmusic()`: `song_results` and `video_results` are trimmed down to their first five items since getting the length from the `pytube.YouTube` object seems to be slow
+    - `is_matching()` will remove any "(feat. Artist)" text from titles, Spotify does not add this and so it was causing anything with featured artists in the title to fail the match
+- The bot now has a `-reload` command that will re-import `spoofy.py`, for quicker debugging and testing
+    - This is disabled in the default config provided
 
 ### Features
 - A new setup "wizard" has been created to aid the process of setting up the bot for the first time, for users less experienced with the command line
+
+### Fixes
+- Removed a couple `print()` instances meant for debugging and accidentally left in the release
 
 ## 1.6.5
 > *2022.12.24 / dev.27*
@@ -386,7 +392,7 @@ Versions are numbered as X.Y.Z, where:
 
 Version numbers do *not* roll over into the next highest spot, e.g if the last update was `1.0.9`, the next update would not be `1.1.0` - it would be labelled as `1.0.10`.
 
-Each version has a date below it, which is when it was made public. Next to the date is a dev number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number.
+Each version has a date below it, which is when it was made public. Next to the date is a dev number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number. [Hotfix versions](#hotfix-versions) do not count towards this number.
 
 ### Hotfix Versions
 On the rare occassion that the latest update must be amended straight away, without waiting for the next update in development to be finished, a "hotfix" for the last version will be released. Hotfix versions will append a letter in alphabetical order to the end of the version, so if 1.6.2 for example needed a hotfix, the new release would be 1.6.2a.

@@ -101,9 +101,9 @@ This bot will require some information in order for the YouTube Music API and Sp
 ![bot permissions](https://cdn.discordapp.com/attachments/327195739346173962/1039979708219129966/image.png)
 7. Make sure these settings are saved, and you're now done with this section. To generate an invite link, go to "OAuth2" on the left side menu, then select "URL Generator". Tick the "bot" box in **Scopes**, and then enable the same permissions you did above.
 
-### Spotify & YouTube Music Credentials
+### Spotify API
 
-In order for the bot to use the Spotify Web API and look up track, album, and playlist info - which is used to then find a YouTube equivalent match so that Spotify links may be used to queue songs - you will need to provide credentials from your Spotify account. You will need a Spotify account in order for this to work, both Free and Premium accounts will function the same in this case.
+In order for the bot to use the Spotify Web API and look up track, album, and playlist info - which is used to then find a YouTube equivalent match so that Spotify links may be used to queue songs - we need to authenticate to it with a client ID and secret, which we'll acquire now.
 
 1. Go to your [Developer Dashboard](https://developer.spotify.com/dashboard/applications) and log in with your Spotify account.
 2. Select "Create An App", enter a title and description (doesn't matter what, neither will be used or seen by the bot), and click "Show Client Secret" when taken to the app's overview page.

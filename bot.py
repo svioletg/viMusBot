@@ -109,7 +109,7 @@ def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'You are on ver. {version}')
+log(f'[{version}]')
 
 update_check = update.check()
 
@@ -787,7 +787,7 @@ class QueueItem(object):
 
 def generate_QueueItems(playlist):
 	objlist = []
-	if type(playlist)==list:
+	if type(playlist) == list:
 		objlist = [QueueItem(i['url'],title=i['title']) for i in playlist]
 		return objlist
 	else:
@@ -860,7 +860,7 @@ async def play_url(url, ctx):
 
 				prompt = await ctx.send(embed=embed)
 				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
-				if choice==None:
+				if choice == None:
 					await advance_queue(ctx)
 					return
 				spyt = spyt[choice-1]
