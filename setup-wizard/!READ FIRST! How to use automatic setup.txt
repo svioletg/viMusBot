@@ -1,9 +1,0 @@
-Install the latest version of Python from this page: https://www.python.org/downloads/
-
-This script will automatically download the required files and help set up some configuration for you, but Python is required for it to run in the first place.
-
-When you start the installer, make sure to check ON the box at the bottom, that says "Add Python 3.x to your PATH" (replace 3.x with whatever version you have).
-
-Once Python has finished installing, if you'd like to avoid using the command line you can double-click "vmbsetup.bat" if you're on Windows, or "vmbsetup.sh" if you're on Linux or Mac.
-
-Otherwise, you can open a command prompt or terminal, navigate to this directory, and run "python3 vmbsetup.py" to begin.

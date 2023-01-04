@@ -1,5 +1,9 @@
 print('Loading...')
 
+# Import sys out of order to print the Python version, for troubleshooting
+import sys
+print('python '+sys.version)
+
 import asyncio
 import colorama
 from colorama import Fore, Back, Style

@@ -30,7 +30,7 @@ I've tried to make the following as thorough as I can, but if you don't mind som
 ---
 
 1. Get the source files from the [latest release](https://github.com/svioletg/viMusBot/releases/latest), extract them where you want.
-2. Create `spotify_config.json`, `headers_auth.json`, and `token.txt`. Create an app with the Spotify Web API and enter your Client ID and Client Secret in the following format:
+2. Create `spotify_config.json` and `token.txt`. Create an app with the Spotify Web API and enter your Client ID and Client Secret in the following format:
 ```
 {
     "spotify":
@@ -40,11 +40,10 @@ I've tried to make the following as thorough as I can, but if you don't mind som
     }
 }
 ```
-3. Follow [these instructions](https://ytmusicapi.readthedocs.io/en/latest/setup.html) to generate your `headers_auth.json` file.
-4. Ensure you've selected the right intents and permissions (see **Bot Token & Permissions** below), and paste your bot's token into `token.txt`.
-5. Duplicate `config_default.yml` and rename the copy as `config.yml` - the bot will only use the latter for its options. Edit it how you like.
-6. If FFmpeg and FFprobe aren't installed on your system, either install it through your package manager of choice or download the binaries and drop them in the viMusBot folder.
-7. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
+3. Ensure you've selected the right intents and permissions (see **Bot Token & Permissions** below), and paste your bot's token into `token.txt`.
+4. Duplicate `config_default.yml` and rename the copy as `config.yml` - the bot will only use the latter for its options. Edit it how you like.
+5. If FFmpeg and FFprobe aren't installed on your system, either install it through your package manager of choice or download the binaries and drop them in the viMusBot folder.
+6. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
 
 ---
 
@@ -71,7 +70,6 @@ If you're installing on Linux, you should be able to run `apt install python3` a
     - If this does not work, try `python3 -m pip install -r requirements.txt`
 
 4. Create the following new documents inside your folder:
-    - `headers_auth.json`
     - `spotify_config.json`
     - `token.txt`
 
@@ -84,7 +82,7 @@ From this point, skip to [Getting Your Credentials](#getting-your-credentials) t
 
 ### Getting Your Credentials
 
-This bot will require some information in order for the YouTube Music API and Spotify API features to function, along with a token for bot to run on Discord. The latter will be covered first.
+This bot will require some information in order for the Spotify API features to function, along with a token for bot to run on Discord. The latter will be covered first.
 
 ### Bot Token & Permissions
 

@@ -1,0 +1,2 @@
+import inquirer
+print('Starting...')
