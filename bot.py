@@ -1,3 +1,5 @@
+print('Loading...')
+
 import asyncio
 import colorama
 from colorama import Fore, Back, Style
@@ -500,7 +502,7 @@ class Music(commands.Cog):
 				if '/album/' in url:
 					log('Spotify album detected.')
 					album_info = spoofy.spotify_album(url)
-					url = spoofy.search_youtube_album(album_info['title'], album_info['artist'])
+					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
 					if url==None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
@@ -510,7 +512,7 @@ class Music(commands.Cog):
 				# TODO: Change this to use prompt_for_choice()
 				log('Link not detected, searching with query')
 				log(url)
-				options = spoofy.search_youtube_text(url)
+				options = spoofy.search_ytmusic_text(url)
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
 				top_video_title = options[1]['title']

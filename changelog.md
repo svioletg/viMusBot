@@ -6,14 +6,6 @@
 > *2023. / dev.28*
 
 ### Developer
-- The `ytmusicapi` library is no longer required or used
-- `spoofy.py` changes:
-    - `search_ytmusic()` renamed to `search_youtube()`
-    - `search_ytmusic_text()` renamed to `search_youtube_text()`
-    - `search_ytmusic_album()` renamed to `search_youtube_album()`
-    - Anywhere that `['artists'][0]['name']` was used in reference YT Music data was replaced with `['artist']` as `trim_track_data()` returns this instead in its dictionary
-        - Similarly, `['album']['name']` is now just `['album']`
-    - `search_ytmusic()`: `song_results` and `video_results` are trimmed down to their first five items since getting the length from the `pytube.YouTube` object seems to be slow
 - `bot.py` changes:
     - `-reload` command added that will re-import `spoofy.py` for quicker debugging and testing
         - This is disabled in the default config provided
@@ -24,7 +16,17 @@
 
 ### Fixes
 - Removed a couple `print()` instances meant for debugging and accidentally left in the release
+
+
+
+
+
+<!-- CHECK THIS!! -->
 - Tracks with featured artists have different titles on Spotify and YouTube so the match would always fail, this is now fixed
+
+
+
+
 
 ## 1.6.5
 > *2022.12.24 / dev.27*
@@ -222,9 +224,9 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
     - `spotify_album()` created
     - `soundcloud_playlist()` created
 - Library/requirement changes:
-    - `soundcloud-api` is now required (see [here](https://github.com/3jackdaws/soundcloud-lib))
-    - `fuzzywuzzy` is now required
-    - `python-Levenshtein` is now required
+    - [+] `soundcloud-api` is now required (see [here](https://github.com/3jackdaws/soundcloud-lib))
+    - [+] `fuzzywuzzy` is now required
+    - [+] `python-Levenshtein` is now required
 
 ### Fixes
 - Fixed `-move` not printing the right video title

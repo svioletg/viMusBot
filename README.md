@@ -25,7 +25,7 @@ I'm aiming to fix this eventually, progress is being tracked in [Issue #17](http
 
 ## How To Use
 
-I've tried to make the following as thorough as I can, but if you don't mind some googling, here's the short version:
+I've tried to make the following as thorough as I can, but if you don't mind some googling or are more familiar with the command line, here's the short version:
 
 ---
 
@@ -59,8 +59,6 @@ There are two ways to start using the bot. If you're generally familiar with usi
 If you're installing on Linux, you should be able to run `apt install python3` and be set. Substitute `apt` if you're using a different package manager.
 
 ### Standard Setup
-
-- A `headers_auth.json` file for ytmusicapi; see [here](https://ytmusicapi.readthedocs.io/en/latest/setup.html) for how to create it
 
 1. Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest) of this repository, look in the "Assets" section, and download "Source code" in either .zip or .tar.gz format; extract it wherever you like. Inside should be a "viMusBot" folder, which in turn contains all of the files you'll run the bot with.
 
