@@ -14,7 +14,7 @@ Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you
 
 ## Important: Before Using
 ### Do Not Use `dev`
-If you're downloading from this repository, *always* download from either the releases page (recommended) or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
+If you're downloading from this repository, *always* download from either the [releases page](https://github.com/svioletg/viMusBot/releases/latest) (recommended) or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
 
 ### Use On One Server
 When I say "an **instance** of the bot" or anything similar, what I'm referring to is *one* `bot.py` script that is currently running, in a single window or `screen` (the command-line tool `screen`, not a monitor screen).
@@ -25,7 +25,9 @@ I'm aiming to fix this eventually, progress is being tracked in [Issue #17](http
 
 ## How To Use
 
-I've tried to make the following as thorough as I can, but if you don't mind some googling or are more familiar with the command line, here's the short version:
+If you're not familiar with using the command line or Python, [get Python here](https://www.python.org/downloads/) and skip to [Using The Wizard](#using-the-wizard) for a more guided setup.
+
+I've tried to make this section as thorough as I can, but if you don't mind some googling or are more familiar with the command line, here's the short version:
 
 ---
 
@@ -59,6 +61,8 @@ If you're installing on Linux, you should be able to run `apt install python3` a
 
 ### Standard Setup
 
+Ensure that the latest version of Python has been installed and added to your PATH.
+
 1. Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest) of this repository, look in the "Assets" section, and download "Source code" in either .zip or .tar.gz format; extract it wherever you like. Inside should be a "viMusBot" folder, which in turn contains all of the files you'll run the bot with.
 
 2. Download both FFmpeg and FFprobe and drop them into the extracted folder - it should have `bot.py` and `spoofy.py` along with some others inside of it.
@@ -80,7 +84,7 @@ From this point, skip to [Getting Your Credentials](#getting-your-credentials) t
 
 ### Using The Wizard
 
-Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest), and download the `vmb-wizard.py` file, and save it anywhere - the bot will not be setup in its directory, rather it will ask you where to download the files to.
+Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest), download the `vmb-wizard.py` file, and save it anywhere - the bot will not be setup in its directory, rather it will ask you where to download the files to.
 
 Installing Python should have installed the Python Launcher for the version you have; assuming this is the case, you can simply double-click the file and it will open a console of its own.
 

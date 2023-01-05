@@ -12,6 +12,8 @@ import webbrowser
 
 from zipfile import ZipFile
 
+# ACQUIRE FFMPEG AUTOMATICALLY
+
 print('Starting...\n')
 
 ostype = platform.system()
@@ -69,6 +71,18 @@ for f in files:
 print('Cleaning up...')
 os.remove(latest_zip)
 shutil.rmtree(source_dir)
+
+print('Getting FFmpeg...')
+# TODO: this downloads the source code, check the JSON to see where the
+# releases are stored like the gpl folders
+if ostype == 'Windows':
+	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
+	ffmpeg = response.json()
+	urllib.request.urlretrieve(ffmpeg['zipball_url'], 'ffmpeg.zip')
+eif ostype == 'Linux':
+	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
+	ffmpeg = response.json()
+	urllib.request.urlretrieve(ffmpeg['zipball_url'], 'ffmpeg.zip')
 
 print('\nDone! In order for the bot to work, this script will now'+
 	'\nguide you through setting up your bot token, and Spotify API credentials.')
