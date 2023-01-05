@@ -4,6 +4,7 @@ import inquirer
 import os
 import requests
 import shutil
+import sys
 import urllib.request
 from zipfile import ZipFile
 
@@ -20,10 +21,16 @@ def check():
 	with open('version.txt', 'r') as f:
 		current = f.read()
 
-	return current == latest_tag, {'current':current, 'latest':latest_tag}
+	return current == latest_tag, {'current':current, 'latest':latest}
 
 def main():
 	print('Checking...')
+
+	verison_check = check()
+	is_latest = verison_check[0]
+	current = verison_check[1]['current']
+	latest = verison_check[1]['latest']
+	latest_tag = latest['tag_name']
 
 	if check()[0]:
 		print(f'{plt.yellow}{current}{plt.reset}=={plt.blue}{latest_tag}')
@@ -68,3 +75,6 @@ def main():
 		new_version = f.read()
 		print('Done!')
 		print(f'You are now on {plt.lime}v{new_version}{plt.reset}.')
+
+if __name__ == '__main__':
+	main()
