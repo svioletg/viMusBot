@@ -110,6 +110,9 @@ def is_matching(reference, ytresult, mode='fuzz', **kwargs) -> bool:
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
+	check = re.compile(r'\(feat\..*\)')
+	yt_title = check.sub('',yt_title)
+
 	if mode=='fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold

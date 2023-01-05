@@ -10,23 +10,14 @@
     - `-reload` command added that will re-import `spoofy.py` for quicker debugging and testing
         - This is disabled in the default config provided
     - No longer checks for availability before queueing since it was unnecessarily slowing things down, if a video is unavailable it'll just be skipped in the queue or throw an error beforehand
+- `palette.py` no longer checks for a `--show` argument, instead will use `__name__` to detect if its being run as a script or not
 
 ### Features
 - A new setup "wizard" has been created to aid the process of setting up the bot for the first time, for users less experienced with the command line
 
 ### Fixes
 - Removed a couple `print()` instances meant for debugging and accidentally left in the release
-
-
-
-
-
-<!-- CHECK THIS!! -->
 - Tracks with featured artists have different titles on Spotify and YouTube so the match would always fail, this is now fixed
-
-
-
-
 
 ## 1.6.5
 > *2022.12.24 / dev.27*

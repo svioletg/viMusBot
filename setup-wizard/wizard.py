@@ -1,11 +1,14 @@
 import inquirer
+import json
 import os
 import platform
 import requests
 import shutil
+import subprocess
 import tkinter
 import tkinter.filedialog
 import urllib.request
+import webbrowser
 
 from zipfile import ZipFile
 
@@ -19,8 +22,8 @@ root.withdraw()
 print('Welcome to the viMusBot setup wizard.'+
 	'\nThis script will guide you through configuring what you need to run the bot,'+
 	'\nand will automatically acquire the necessary files.')
+input('Press ENTER to continue.')
 print('\nPlease select where you\'d like viMusBot to be setup in.')
-input('Press ENTER to open the selection prompt.')
 
 while True:
 	setup_dir = tkinter.filedialog.askdirectory(parent=root, title='Choose where to setup viMusBot')
@@ -66,3 +69,57 @@ for f in files:
 print('Cleaning up...')
 os.remove(latest_zip)
 shutil.rmtree(source_dir)
+
+print('\nDone! In order for the bot to work, this script will now'+
+	'\nguide you through setting up your bot token, and Spotify API credentials.')
+print('Please refer to this section of the readme...'+
+	'\nhttps://github.com/svioletg/viMusBot/#getting-your-credentials'+
+	'...if you do not know where to get this information from.')
+q = input('\nType "open" to open this URL in your default browser, or press ENTER to continue.\n')
+if q == 'open':
+	webbrowser.open('https://github.com/svioletg/viMusBot/#getting-your-credentials')
+
+print('Follow the instructions linked above.'+
+	'\nSince you are using this wizard, you may ignore any instructions about'+
+	'\ncreating files, as you will simply input them here.\n')
+
+bot_token = input('Bot token: ')
+print(f'Creating token.txt...')
+with open('token.txt', 'w') as f:
+	f.write(bot_token)
+
+spotify_creds = {'spotify':{}}
+spotify_creds['spotify']['client_id'] = input('(Spotify) Client ID: ')
+spotify_creds['spotify']['client_secret'] = input('(Spotify) Client Secret: ')
+print(f'Creating spotify_config.json...')
+with open('spotify_config.json', 'w') as f:
+	json.dump(spotify_creds, f)
+
+print('\nThe script will not attempt to install any required Python packages.')
+print('This will be done using the "py -m pip install -r requirements.txt" command.')
+print('\nIf for whatever reason this will not work for you, you can skip this step.')
+print('If you don\'t know what this means, it is likely best to proceed.')
+q = [inquirer.List(
+	'confirm',
+	message=f'Automatically install requirements?',
+	choices=['Yes', 'No']
+	)]
+answer = inquirer.prompt(q)
+if answer['confirm'] == 'Yes':
+	print('Installing required packages...')
+	subprocess.run(['py', '-m', 'pip', 'install', '-r', 'requirements.txt'])
+else:
+	print('Skipping requirements for now.')
+
+print('\nDone!')
+print('Creating config.yml...')
+shutil.copy('config_default.yml', 'config.yml')
+
+print('\nIn the folder you specified earlier, there should now be a "config.yml" file.')
+print('This contains various settings and preferences for how the bot functions,'+
+	'\nand it is recommended to look through them in case you\'d like to change something.')
+print('The file can be opened in any text editor, although a program like Notepad++ is suggested.')
+print(f'\nThe bot should now be ready to go in {setup_dir}')
+print('Run "bot.py" in a console or double-click it to start the bot.')
+
+input('\nPress ENTER to exit the setup wizard.')

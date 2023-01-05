@@ -66,5 +66,5 @@ def test():
 		else:
 			print(v+k)
 
-if '--show' in sys.argv:
+if __name__ == '__main__':
 	test()

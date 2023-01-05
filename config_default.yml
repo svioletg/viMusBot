@@ -85,7 +85,7 @@ logging-options:
         - "search_ytmusic"
     # Choose your preferred log colors
     colors:
-        # Run "python3 palette.py --show" to see options
+        # Run "palette.py" to see a list of choices
         no-color: no # Disables all message coloring
         bot.py: "yellow" # For the [bot.py] part
         spoofy.py: "lime" # For the [spoofy.py] part

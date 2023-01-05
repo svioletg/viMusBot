@@ -45,9 +45,9 @@ I've tried to make the following as thorough as I can, but if you don't mind som
 5. If FFmpeg and FFprobe aren't installed on your system, either install it through your package manager of choice or download the binaries and drop them in the viMusBot folder.
 6. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
 
----
-
 For a more in-depth tutorial, continue below.
+
+---
 
 There are two ways to start using the bot. If you're generally familiar with using the command prompt or terminal for your OS, follow the [**Standard Setup**](#standard-setup) section below. Alternatively, I've provided a script in this project to automatically obtain and walk you through most of the files and information you'll need; in which case, follow the [**Using The Wizard**](#using-the-wizard) section.
 
@@ -79,6 +79,18 @@ If you're installing on Linux, you should be able to run `apt install python3` a
 From this point, skip to [Getting Your Credentials](#getting-your-credentials) to finish setting up.
 
 ### Using The Wizard
+
+Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest), and download the `vmb-wizard.py` file, and save it anywhere - the bot will not be setup in its directory, rather it will ask you where to download the files to.
+
+Installing Python should have installed the Python Launcher for the version you have; assuming this is the case, you can simply double-click the file and it will open a console of its own.
+
+Follow the instructions on screen. You may want to do the steps below for getting your credentials first, just to have them on hand. If you're using the wizard, you may ignore any instructions regarding creating files, as it will do this for you.
+
+Once the setup has finished, the bot will be ready to use in the directory you selected, and you only need to double-click the `bot.py` file to start it.
+
+Setup will have created a `config.yml` file for you - the default settings should be fine in most cases, but I do suggest you look through it just in case you'd like to change some things. You can edit this file in any text editor, although something like Notepad++ will make it a little easier to navigate.
+
+> *NOTE: If the bot detects any new changes in the default config file, after updating for example, it will merge your settings with the new options. This will remove things like comments and extra formatting, so it is reocmmended to keep `config_default.yml` to refer back to if you need help on what a particular option does.*
 
 ### Getting Your Credentials
 

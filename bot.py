@@ -122,8 +122,9 @@ update_check = update.check()
 if not update_check[0]:
 	log(f'{plt.warn}There is a new release available.')
 	current_tag = update_check[1]['current']
-	latest_tag = update_check[1]['latest']
+	latest_tag = update_check[1]['latest']['tag_name']
 	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
+	log('Use "update.py" to update.')
 
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
