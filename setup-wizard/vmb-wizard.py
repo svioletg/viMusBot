@@ -38,7 +38,8 @@ while True:
 	answer = inquirer.prompt(q)
 	if answer['confirm'] == 'Yes': break
 
-# Start downloading
+# Get latest viMusBot release
+
 print('Getting the latest version...')
 response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 latest = response.json()
@@ -73,38 +74,46 @@ print('Cleaning up...')
 os.remove(latest_zip)
 shutil.rmtree(source_dir)
 
+# FFmpeg & FFprobe
+
 print('Getting FFmpeg...')
-# TODO: this downloads the source code, check the JSON to see where the
-# releases are stored like the gpl folders
 ffmpeg_url = None
-if ostype == 'Windows':
+if ostype == 'Darwin':
+	# MacOS
+	# There's builds available for mac but no way to get
+	# the latest release automatically like with the github
+	# repository for Windows, and because I'm not able
+	# to test this on Mac enough to be confident it'll work
+	print('Automatic FFmpeg & FFprobe retrieval is currently unsupported for MacOS.')
+	print('FFmpeg will not be automatically acquired,'+
+		'\nbut setup can proceed regardless.')
+	input('Press ENTER to continue.')
+elif ostype == 'Linux':
+	print('Since you appear to be running Linux, it is best to '+
+		'\ninstall FFmpeg by opening a terminal, and running...'+
+		'\nsudo apt-get install ffmpeg'+
+		'\n...or the equivalent for your distro\'s package manager.')
+elif ostype == 'Windows':
 	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
 	ffmpeg = response.json()
 	for i in ffmpeg['assets']:
 		if 'ffmpeg-master-latest-win64-gpl.zip' in i['browser_download_url']:
 			ffmpeg_url = i
-elif ostype == 'Linux':
-	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
-	ffmpeg = response.json()
-	for i in ffmpeg['assets']:
-		if 'ffmpeg-master-latest-linux64-gpl.tar.xz' in i['browser_download_url']:
-			ffmpeg_url = i
 
-if ffmpeg_url == None:
-	print('\n[!] Could not find an asset matching the system version.')
-	print('FFmpeg was not able to be retrieved.')
-	print('It will be required for the bot to function, however setup can continue.')
-	input('Press ENTER to continue.')
-else:
-	match = re.search(r'.*(\..*$)', ffmpeg_url)
-	if match == None:
-		print('\n[!] Regex match for file extension failed.')
+	if ffmpeg_url == None:
+		print('\n[!] Could not find an asset matching the system version.')
 		print('FFmpeg was not able to be retrieved.')
 		print('It will be required for the bot to function, however setup can continue.')
 		input('Press ENTER to continue.')
-	extension = match[1]
-	if extension == '.xz': extension = '.tar.xz'
-	urllib.request.urlretrieve(ffmpeg_url, f'ffmpeg.{extension}')
+	else:
+		urllib.request.urlretrieve(ffmpeg_url, 'ffmpeg.zip')
+else:
+	print('[!] Type of OS could not be determined.')
+	print('FFmpeg will not be automatically acquired,'+
+		'\nbut setup can proceed regardless.')
+	input('Press ENTER to continue.')
+
+# Token, spotify config
 
 print('\nDone! In order for the bot to work, this script will now'+
 	'\nguide you through setting up your bot token, and Spotify API credentials.')
@@ -130,6 +139,8 @@ spotify_creds['spotify']['client_secret'] = input('(Spotify) Client Secret: ')
 print(f'Creating spotify_config.json...')
 with open('spotify_config.json', 'w') as f:
 	json.dump(spotify_creds, f)
+
+# Python Packages
 
 print('\nThe script will not attempt to install any required Python packages.')
 print('This will be done using the "py -m pip install -r requirements.txt" command.')
