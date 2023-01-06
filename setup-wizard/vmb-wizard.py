@@ -2,6 +2,7 @@ import inquirer
 import json
 import os
 import platform
+import re
 import requests
 import shutil
 import subprocess
@@ -75,14 +76,35 @@ shutil.rmtree(source_dir)
 print('Getting FFmpeg...')
 # TODO: this downloads the source code, check the JSON to see where the
 # releases are stored like the gpl folders
+ffmpeg_url = None
 if ostype == 'Windows':
 	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
 	ffmpeg = response.json()
-	urllib.request.urlretrieve(ffmpeg['zipball_url'], 'ffmpeg.zip')
-eif ostype == 'Linux':
+	for i in ffmpeg['assets']:
+		if 'ffmpeg-master-latest-win64-gpl.zip' in i['browser_download_url']:
+			ffmpeg_url = i
+elif ostype == 'Linux':
 	response = requests.get("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest")
 	ffmpeg = response.json()
-	urllib.request.urlretrieve(ffmpeg['zipball_url'], 'ffmpeg.zip')
+	for i in ffmpeg['assets']:
+		if 'ffmpeg-master-latest-linux64-gpl.tar.xz' in i['browser_download_url']:
+			ffmpeg_url = i
+
+if ffmpeg_url == None:
+	print('\n[!] Could not find an asset matching the system version.')
+	print('FFmpeg was not able to be retrieved.')
+	print('It will be required for the bot to function, however setup can continue.')
+	input('Press ENTER to continue.')
+else:
+	match = re.search(r'.*(\..*$)', ffmpeg_url)
+	if match == None:
+		print('\n[!] Regex match for file extension failed.')
+		print('FFmpeg was not able to be retrieved.')
+		print('It will be required for the bot to function, however setup can continue.')
+		input('Press ENTER to continue.')
+	extension = match[1]
+	if extension == '.xz': extension = '.tar.xz'
+	urllib.request.urlretrieve(ffmpeg_url, f'ffmpeg.{extension}')
 
 print('\nDone! In order for the bot to work, this script will now'+
 	'\nguide you through setting up your bot token, and Spotify API credentials.')
