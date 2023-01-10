@@ -123,7 +123,9 @@ In order for the bot to use the Spotify Web API and look up track, album, and pl
 
 1. Go to your [Developer Dashboard](https://developer.spotify.com/dashboard/applications) and log in with your Spotify account.
 2. Select "Create An App", enter a title and description (doesn't matter what, neither will be used or seen by the bot), and click "Show Client Secret" when taken to the app's overview page.
+
 ![spotify secret button](https://cdn.discordapp.com/attachments/327195739346173962/1058207796497219595/image.png)
+
 3. **If you're using the setup wizard, it will ask you for this information.** Otherwise, create `spotify_config.json` in your bot's folder, and paste in the following text...
 ```
 {
