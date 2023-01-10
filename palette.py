@@ -65,6 +65,7 @@ def test():
 				print(f'{v2}{k}[\'{k2}\']')
 		else:
 			print(v+k)
+	input('Press ENTER to continue.')
 
 if __name__ == '__main__':
 	test()

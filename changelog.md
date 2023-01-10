@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.7.0
-> *2023. / dev.28*
+> *2023.01 / dev.28*
 
 ### Developer
 - `bot.py` changes:
@@ -14,6 +14,7 @@
 
 ### Features
 - A new setup "wizard" has been created to aid the process of setting up the bot for the first time, for users less experienced with the command line
+- The bot will now check for updates when being run; it can then be automatically updated by running `update.py`
 
 ### Fixes
 - Removed a couple `print()` instances meant for debugging and accidentally left in the release
@@ -403,9 +404,10 @@ Development versions are numbered as dev.X.Y, where:
 - X is the total number of updates, plus one (previously mentioned as the dev number)
 - Y is the Nth commit that involves any changed Python code
     - It is not updated if any files other than `*.py` are updated, such as README.md, changelog.md, or fixing typos or other errors in configuration
+    - Y is never 0
 
 For example, take "dev.28.4":
-- The last public release before starting this version was 1.6.5, the 27th release since 1.0.0. Thus, during development the next update will be 28, with a public version being decided at release.
+- The last public release before starting this version would be 1.6.5, the 27th release since 1.0.0. Thus, during development the next update will be 28, with a public version being decided at release.
 - This would've been the 4th commit containing changed Python code
 
 ## Categories
@@ -432,4 +434,4 @@ Usually unused, any additional notes regarding the release. Listed last, out of 
 
 ---
 
-This changelog was started at 1.3.0, thus only versions then onwards appear. I've decided not to write changelogs for previous versions as to not risk forgetting anything.
+This changelog was started at 1.3.0, so versions prior do not have a proper changelog accompanying them. I've added their dates based off of commits, at least.

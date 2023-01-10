@@ -82,6 +82,8 @@ Ensure that the latest version of Python has been installed and added to your PA
 
 From this point, skip to [Getting Your Credentials](#getting-your-credentials) to finish setting up.
 
+---
+
 ### Using The Wizard
 
 Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest), download the `vmb-wizard.py` file, and save it anywhere - the bot will not be setup in its directory, rather it will ask you where to download the files to.
@@ -96,6 +98,8 @@ Setup will have created a `config.yml` file for you - the default settings shoul
 
 > *NOTE: If the bot detects any new changes in the default config file, after updating for example, it will merge your settings with the new options. This will remove things like comments and extra formatting, so it is reocmmended to keep `config_default.yml` to refer back to if you need help on what a particular option does.*
 
+---
+
 ### Getting Your Credentials
 
 This bot will require some information in order for the Spotify API features to function, along with a token for bot to run on Discord. The latter will be covered first.
@@ -105,7 +109,7 @@ This bot will require some information in order for the Spotify API features to 
 1. Go to https://discord.com/developers/applications and log in.
 2. Click the blue "New Application" button in the top right. Enter any name you want, and create the app. You should then be taken to a new dashboard for it.
 3. From the left side menu, go to the "Bot" tab, and then select "Add Bot" on the right. Set its username to whatever you want it to display as, and select an icon if you wish. This is not required, and if no icon is selected, it will simply display as a default Discord icon.
-4. Click "Reset Token", and then when you see a token appear, click "Copy". Open up `token.txt` and paste this string into it, and save the file. Unless you reset your token again, you will not need to change this in the future.
+4. Click "Reset Token", and then when you see a token appear, click "Copy". **If you're using the setup wizard, skip to step 5 here.** Open up `token.txt` and paste this string into it, and save the file. Unless you reset your token again, you will not need to change this in the future.
     - Note: Whether to leave the "Public Bot" toggle on or off is up to you. If it's off, only you will ever be able to invite it to servers. Otherwise, anyone with an invite link may do so.
 5. Scroll down to **Privileged Gateway Intents**, and turn *on* the **Server Members Intent** and **Message Content Intent** switches, seen below.
 ![intent switches](https://cdn.discordapp.com/attachments/327195739346173962/1058205536769806376/image.png)
@@ -120,7 +124,7 @@ In order for the bot to use the Spotify Web API and look up track, album, and pl
 1. Go to your [Developer Dashboard](https://developer.spotify.com/dashboard/applications) and log in with your Spotify account.
 2. Select "Create An App", enter a title and description (doesn't matter what, neither will be used or seen by the bot), and click "Show Client Secret" when taken to the app's overview page.
 ![spotify secret button](https://cdn.discordapp.com/attachments/327195739346173962/1058207796497219595/image.png)
-3. Open `spotify_config.json`, paste in the following text...
+3. **If you're using the setup wizard, it will ask you for this information.** Otherwise, create `spotify_config.json` in your bot's folder, and paste in the following text...
 ```
 {
     "spotify":
@@ -131,3 +135,7 @@ In order for the bot to use the Spotify Web API and look up track, album, and pl
 }
 ```
 ...and replace `YOUR_ID` with the string seen next to "Client ID", and `YOUR_SECRET` with the string seen next to "Client Secret". Make sure they are both surrounded by quotation marks like above.
+
+---
+
+With all the above done, you should be ready to go! If you have any questions or need clarification, feel free to ask by submitting a new issue.

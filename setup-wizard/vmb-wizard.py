@@ -26,6 +26,7 @@ print('Welcome to the viMusBot setup wizard.'+
 	'\nThis script will guide you through configuring what you need to run the bot,'+
 	'\nand will automatically acquire the necessary files.')
 input('Press ENTER to continue.')
+
 print('\nPlease select where you\'d like viMusBot to be setup in.')
 
 while True:
@@ -76,7 +77,7 @@ shutil.rmtree(source_dir)
 
 # FFmpeg & FFprobe
 
-print('Getting FFmpeg...')
+print('\nGetting FFmpeg...')
 ffmpeg_url = None
 if ostype == 'Darwin':
 	# MacOS
@@ -98,7 +99,7 @@ elif ostype == 'Windows':
 	ffmpeg = response.json()
 	for i in ffmpeg['assets']:
 		if 'ffmpeg-master-latest-win64-gpl.zip' in i['browser_download_url']:
-			ffmpeg_url = i
+			ffmpeg_url = i['browser_download_url']
 
 	if ffmpeg_url == None:
 		print('\n[!] Could not find an asset matching the system version.')
@@ -107,6 +108,18 @@ elif ostype == 'Windows':
 		input('Press ENTER to continue.')
 	else:
 		urllib.request.urlretrieve(ffmpeg_url, 'ffmpeg.zip')
+		print('Extracting...')
+		with ZipFile('ffmpeg.zip', 'r') as zipf:
+			source_dir = zipf.namelist()[0]
+			zipf.extractall('.')
+
+		print('Copying...')
+		shutil.copy(source_dir+'bin/ffmpeg.exe', './')
+		shutil.copy(source_dir+'bin/ffprobe.exe', './')
+
+		print('Cleaning up...')
+		os.remove('ffmpeg.zip')
+		shutil.rmtree(source_dir)
 else:
 	print('[!] Type of OS could not be determined.')
 	print('FFmpeg will not be automatically acquired,'+
@@ -115,11 +128,12 @@ else:
 
 # Token, spotify config
 
-print('\nDone! In order for the bot to work, this script will now'+
+print('\n\n*****\n\nDone! In order for the bot to work, this script will now'+
 	'\nguide you through setting up your bot token, and Spotify API credentials.')
 print('Please refer to this section of the readme...'+
 	'\nhttps://github.com/svioletg/viMusBot/#getting-your-credentials'+
-	'...if you do not know where to get this information from.')
+	'\n...if you do not know where to get this information from.')
+
 q = input('\nType "open" to open this URL in your default browser, or press ENTER to continue.\n')
 if q == 'open':
 	webbrowser.open('https://github.com/svioletg/viMusBot/#getting-your-credentials')
@@ -142,7 +156,7 @@ with open('spotify_config.json', 'w') as f:
 
 # Python Packages
 
-print('\nThe script will not attempt to install any required Python packages.')
+print('\nThe script will now attempt to install any required Python packages.')
 print('This will be done using the "py -m pip install -r requirements.txt" command.')
 print('\nIf for whatever reason this will not work for you, you can skip this step.')
 print('If you don\'t know what this means, it is likely best to proceed.')
@@ -166,7 +180,10 @@ print('\nIn the folder you specified earlier, there should now be a "config.yml"
 print('This contains various settings and preferences for how the bot functions,'+
 	'\nand it is recommended to look through them in case you\'d like to change something.')
 print('The file can be opened in any text editor, although a program like Notepad++ is suggested.')
+
 print(f'\nThe bot should now be ready to go in {setup_dir}')
 print('Run "bot.py" in a console or double-click it to start the bot.')
+print('\nWhen running the bot, it will notify you if there is an update.')
+print('You can update the bot automatically by running "update.py".')
 
 input('\nPress ENTER to exit the setup wizard.')
