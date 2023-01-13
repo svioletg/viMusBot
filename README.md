@@ -1,7 +1,5 @@
 # viMusBot
 
-# This README is part of the dev branch! These instructions are likely not accurate! Click [here](https://github.com/svioletg/viMusBot/tree/master) to switch to the master branch.
-
 ### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
 
 ### See progress on bug fixes and new features here: [viMusBot 1.x](https://github.com/users/svioletg/projects/1/views/1)
