@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.7.0
-> *2023.01 / dev.28*
+> *2023.01.13 / dev.28*
 
 ### Developer
 - `bot.py` changes:
