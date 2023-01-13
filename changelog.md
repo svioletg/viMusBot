@@ -395,6 +395,7 @@ Each version has a date below it, which is when it was made public. Next to the 
 
 ### Hotfix Versions
 On the rare occassion that the latest update must be amended straight away, without waiting for the next update in development to be finished, a "hotfix" for the last version will be released. Hotfix versions will append a letter in alphabetical order to the end of the version, so if 1.6.2 for example needed a hotfix, the new release would be 1.6.2a.
+
 The non-hotfixed version (in this example, 1.6.2) would then be removed from the releases page, as well. Any following hotfixes would be 1.6.2b, 1.6.2c, 1.6.2d, etc., and previous hotfixes would continue to be removed so that only the fixed version remains.
 This is largely to avoid having to change the dev number during development of a new major or minor version.
 
