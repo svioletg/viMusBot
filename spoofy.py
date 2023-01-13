@@ -52,6 +52,8 @@ duration_limit = config['duration-limit']
 # Useful to point this out if left on accidentally
 if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
+# API Objects
+
 # Connect to youtube music API
 ytmusic = YTMusic()
 
@@ -84,11 +86,10 @@ keytable = {
 }
 
 # Define matching logic
-def is_matching(reference, ytresult, **kwargs):
+def is_matching(reference, ytresult, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
 	# 'old' = checking for strings in other strings, how matching was done beforehand
-	mode = kwargs.get('mode','fuzz')
 	if mode not in ['fuzz', 'old']: log(f'{mode} is not a valid mode.'); return
 
 	# overrides the fuzzy matching threshold, default is 75%
@@ -108,6 +109,9 @@ def is_matching(reference, ytresult, **kwargs):
 	except KeyError:
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
+
+	check = re.compile(r'\(feat\..*\)')
+	yt_title = check.sub('',yt_title)
 
 	if mode=='fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
@@ -154,7 +158,7 @@ def isrc_search_test(playlist):
 				log(f'{plt.error} {tracks.index(i)+1}/{len(tracks)}: Not cleared. {isrc}')
 	log(f'{yes} successes / {no} fails')
 
-def pytube_track_data(pytube_object):
+def pytube_track_data(pytube_object) -> dict:
 	description_list = pytube_object.description.split('\n')
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
@@ -172,7 +176,7 @@ def pytube_track_data(pytube_object):
 	}
 	return description_dict
 
-def search_ytmusic_text(query):
+def search_ytmusic_text(query) -> tuple:
 	# For plain-text searching
 	top_song = ytmusic.search(query=query,limit=1,filter='songs')[0]
 	top_video = ytmusic.search(query=query,limit=1,filter='songs')[0]
@@ -229,7 +233,7 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		return relevant
 
 	# Start search
-	if isrc!=None:
+	if isrc != None:
 		log(f'Searching for ISRC: {isrc}')
 		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
@@ -244,8 +248,8 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		log('No ISRC match found, falling back on text search.')
 
 	log(f'Trying query \"{query}\" with a limit of {limit}')
-	song_results=ytmusic.search(query=query,limit=limit,filter='songs')
-	video_results=ytmusic.search(query=query,limit=limit,filter='videos')
+	song_results = ytmusic.search(query=query,limit=limit,filter='songs')
+	video_results = ytmusic.search(query=query,limit=limit,filter='videos')
 	# Remove videos over a certain length
 	for i in song_results:
 		if int(i['duration_seconds'])>duration_limit*60*60: song_results.pop(song_results.index(i))
@@ -262,10 +266,10 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 	if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 	# Check for matches
-	match=None
+	match = None
 	def match_found():
 		if force_no_match: return False
-		else: return match!=None
+		else: return match != None
 
 	if is_jp(query):
 		# Assumes first Japanese result is correct, otherwise
@@ -293,10 +297,10 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 
 	if not match_found():
 		log('No match. Setting unsure to True.')
-		unsure=True
+		unsure = True
 
 	# Make new dict with more relevant information
-	results={}
+	results = {}
 	# Determine what to queue
 	if match_found():
 		# Return match
@@ -309,11 +313,11 @@ def search_ytmusic(title, artist, album, isrc=None, limit=10, fast_search=False,
 		position = 0
 		for result in song_results[:song_choices]:
 			results[position] = trim_track_data(result,album=result['album']['name'])
-			position+=1
+			position += 1
 
 		for result in video_results[:video_choices]:
 			results[position] = trim_track_data(result)
-			position+=1
+			position += 1
 
 		# Ask for confirmation if no exact match found
 		if unsure:
@@ -326,10 +330,10 @@ def soundcloud_playlist(url):
 	return [obj for obj in playlist]
 
 # Spotify
-def get_uri(url):
+def get_uri(url) -> str:
 	return url.split("/")[-1].split("?")[0]
 
-def spotify_playlist(url):
+def spotify_playlist(url) -> list:
 	tracks = sp.playlist(url)['tracks']['items']
 	newlist = []
 	for i in tracks:
@@ -342,7 +346,7 @@ def spotify_playlist(url):
 		})
 	return newlist
 
-def spotify_track(url):
+def spotify_track(url) -> dict:
 	info = sp.track(url)
 	title = info['name']
 	# Only retrieves the first artist name
@@ -355,9 +359,9 @@ def spotify_track(url):
 		'album':album,
 		'url':info['external_urls']['spotify'],
 		'isrc':isrc
-		}
+	}
 
-def spotify_album(url):
+def spotify_album(url) -> dict:
 	info = sp.album(url)
 	return {
 		'title':info['name'], 
@@ -365,7 +369,7 @@ def spotify_album(url):
 		'upc':info['external_ids']['upc']
 		}
 
-def analyze_track(url):
+def analyze_track(url) -> tuple:
 	uri = get_uri(url)
 	title = sp.track(uri)['name']
 	artist = sp.track(uri)['artists'][0]['name']
@@ -398,7 +402,7 @@ def analyze_track(url):
 	return data, skip
 
 # Other
-def is_jp(text):
+def is_jp(text) -> bool:
 	check = re.compile(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', re.UNICODE)
 	if '***jp***' in check.sub('***jp***',text): return True
 	else: return False
@@ -439,7 +443,7 @@ def spyt(url, **kwargs):
 		log('Not a playlist.')
 		track = spotify_track(url)
 		result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
-		if type(result)==tuple and result[0]=='unsure':
+		if type(result) == tuple and result[0] == 'unsure':
 			log('Returning as unsure.')
 			return result
 		return result

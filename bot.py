@@ -1,9 +1,16 @@
+print('Loading...')
+
+# Import sys out of order to print the Python version, for troubleshooting
+import sys
+print('python '+sys.version)
+
 import asyncio
 import colorama
 from colorama import Fore, Back, Style
 import discord
 from discord.ext import commands
 import glob
+import importlib
 import logging
 import os
 import pytube
@@ -76,6 +83,7 @@ import customlog
 import spoofy
 
 from palette import Palette
+import update
 
 _here = os.path.basename(__file__)
 
@@ -107,7 +115,17 @@ def logln():
 	cf = currentframe()
 	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'v{version}')
+log(f'[{version}]')
+
+update_check = update.check()
+
+if not update_check[0]:
+	log(f'{plt.warn}There is a new release available.')
+	current_tag = update_check[1]['current']
+	latest_tag = update_check[1]['latest']['tag_name']
+	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
+	log('Use "update.py" to update.')
+
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
 log('Starting...')
@@ -273,6 +291,15 @@ class General(commands.Cog):
 				if not voice.is_connected():
 					voice = None
 					break
+
+	@commands.command()
+	@commands.check(command_enabled)
+	async def reload(self, ctx):
+		# Separated from the others for debug purposes
+		global spoofy
+		if not public:
+			spoofy = importlib.reload(spoofy)
+			log('Reloaded spoofy.py.')
 
 	@commands.command(aliases=get_aliases('changelog'))
 	@commands.check(command_enabled)
@@ -490,13 +517,13 @@ class Music(commands.Cog):
 				# TODO: Change this to use prompt_for_choice()
 				log('Link not detected, searching with query')
 				log(url)
-				options=spoofy.search_ytmusic_text(url)
+				options = spoofy.search_ytmusic_text(url)
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
 				top_video_title = options[1]['title']
 				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
-				if top_song_url==top_video_url:
-					url=top_song_url
+				if top_song_url == top_video_url:
+					url = top_song_url
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
 					embed.add_field(name=f'Top song result: {top_song_title}',value=top_song_url,inline=False)
@@ -553,19 +580,6 @@ class Music(commands.Cog):
 			else:
 				# Runs if the input given was not a playlist
 				log('URL is not a playlist.')
-				log('Checking availability...')
-				# Make sure the video exists, store the result so we don't have to make two requests
-				if 'open.spotify.com' not in url:
-					try:
-						ytdl_extracted = ytdl.extract_info(url,download=False)
-					except yt_dlp.utils.DownloadError as e:
-						log('Video unavailable.')
-						await qmessage.edit(embed=embedq('Video is unavailable; could not queue.'))
-						return
-					except Exception as e:
-						print(e)
-						await qmessage.edit(embed=embedq('An unexpected error occurred.'))
-						return
 				log('Checking duration...')
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
@@ -577,6 +591,7 @@ class Music(commands.Cog):
 					if 'open.spotify.com' in url:
 						duration = spoofy.sp.track(url)['duration_ms']/1000
 					else:
+						ytdl_extracted = ytdl.extract_info(url,download=False)
 						try:
 							duration = ytdl_extracted['duration']
 						# 'duration' is not retrieved from the generic extractor used for direct links
@@ -750,8 +765,6 @@ class MediaQueue(object):
 
 	def get(self, ctx):
 		self.ensure_queue_exists(ctx)
-		print(self.queues.keys())
-		print(self.queues[ctx.author.guild.id])
 		return self.queues[ctx.author.guild.id]
 
 	def clear(self, ctx):
@@ -769,7 +782,7 @@ class QueueItem(object):
 
 def generate_QueueItems(playlist):
 	objlist = []
-	if type(playlist)==list:
+	if type(playlist) == list:
 		objlist = [QueueItem(i['url'],title=i['title']) for i in playlist]
 		return objlist
 	else:
@@ -842,7 +855,7 @@ async def play_url(url, ctx):
 
 				prompt = await ctx.send(embed=embed)
 				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
-				if choice==None:
+				if choice == None:
 					await advance_queue(ctx)
 					return
 				spyt = spyt[choice-1]
