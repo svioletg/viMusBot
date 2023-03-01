@@ -4,6 +4,7 @@ print('Loading...')
 import sys
 print('python '+sys.version)
 
+import aioconsole
 import asyncio
 import colorama
 from colorama import Fore, Back, Style
@@ -113,7 +114,7 @@ def log(msg):
 
 def logln():
 	cf = currentframe()
-	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
+	print('@ LINE ', cf.f_back.f_lineno)
 
 log(f'[{version}]')
 
@@ -757,7 +758,7 @@ class MediaQueue(object):
 	def __init__(self):
 		self.queues = {}
 
-	# Run in every function to automatically determin
+	# Run in every function to automatically determine
 	# which queue we're working with
 	def ensure_queue_exists(self, ctx):
 		if ctx.author.guild.id not in self.queues:
@@ -900,8 +901,10 @@ async def advance_queue(ctx, skip=False):
 		if player_queue.get(ctx) == [] and not loop_this:
 			voice.stop()
 		else:
-			if loop_this and not skip: url = now_playing.weburl
-			else: url = player_queue.get(ctx).pop(0).url
+			if loop_this and not skip:
+				url = now_playing.weburl
+			else:
+				url = player_queue.get(ctx).pop(0).url
 			await play_url(url, ctx)
 
 # TODO: This could have a better name
@@ -954,7 +957,7 @@ async def on_command_error(ctx, error):
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)
 		trace=traceback.format_exception(error)
-		await ctx.send(embed=embedq(error))
+		await ctx.send(embed=embedq(error, 'If this issue persists, please check https://github.com/svioletg/viMusBot/issues and submit a new issue if your problem is not listed.'))
 		# A second traceback is created from this command itself, usually not useful
 		log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
@@ -962,6 +965,14 @@ async def on_command_error(ctx, error):
 async def on_ready():
 	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
 	print('------')
+
+# Get input from terminal while running script
+async def get_outside_input():
+	while True:
+		line = await aioconsole.ainput('')
+		if line in ["stop", "exit", "quit"]:
+			await voice.disconnect()
+			exit()
 
 # Retrieve bot token
 if public: f='token.txt'
@@ -973,10 +984,11 @@ except FileNotFoundError:
 	print(f'{f} does not exist; exiting.')
 	exit()
 
+# Begin main thread
 async def main():
 	async with bot:
 		await bot.add_cog(General(bot))
 		await bot.add_cog(Music(bot))
-		await bot.start(token)
+		await asyncio.gather(bot.start(token), get_outside_input())
 
 asyncio.run(main())

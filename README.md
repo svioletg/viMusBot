@@ -1,5 +1,8 @@
 # viMusBot
 
+# You are on the `dev` branch. Switch to the `master` branch here:
+# https://github.com/svioletg/viMusBot/tree/master
+
 ### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
 
 ### See progress on bug fixes and new features here: [viMusBot 1.x](https://github.com/users/svioletg/projects/1/views/1)

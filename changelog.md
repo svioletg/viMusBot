@@ -2,6 +2,20 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.0
+> *2023.x.x / dev.29*
+
+### Developer
+
+### Features
+- You can now input commands into the terminal that `bot.py` is running in; accepted commands are:
+    - `exit`, `quit`, `stop`
+        - Disconnects the bot from its current voice channel, and stops the script altogether
+    - `cancel dl`
+        - Cancels any active downloads from yt-dlp
+
+### Fixes
+
 ## 1.7.0
 > *2023.01.13 / dev.28*
 
@@ -398,6 +412,8 @@ On the rare occassion that the latest update must be amended straight away, with
 
 The non-hotfixed version (in this example, 1.6.2) would then be removed from the releases page, as well. Any following hotfixes would be 1.6.2b, 1.6.2c, 1.6.2d, etc., and previous hotfixes would continue to be removed so that only the fixed version remains.
 This is largely to avoid having to change the dev number during development of a new major or minor version.
+
+Hotfix changelogs are only included on the relevant release page for that version.
 
 ### Development Versions
 The `dev` branch contains code that is actively being worked on for the next coming update, and due to the frequency of these updates in contrast to public releases, it uses a different numbering system.

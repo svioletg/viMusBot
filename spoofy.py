@@ -37,10 +37,6 @@ def log(msg):
 		)
 	last_logtime = time.time()
 
-def logln():
-	cf = currentframe()
-	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
-
 # Parse config from YAML
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
