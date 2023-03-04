@@ -13,6 +13,12 @@ A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/disco
 
 Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you've experienced a bug or otherwise odd behavior, or have a feature to request, and feel free to comment on existing issues to provide any additional details that may help narrow down the issue or reach a solution. No bug or feature is too large/small to be submitted, this system is best for me to keep track of everything.
 
+---
+
+If you want to be notified of updates & have a GitHub account, you can click "Watch" on this repository, and then select "Custom" -> "Releases" -> "Apply".
+
+---
+
 ## Important: Before Using
 ### Do Not Use `dev`
 If you're downloading from this repository, *always* download from either the [releases page](https://github.com/svioletg/viMusBot/releases/latest) (recommended) or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.

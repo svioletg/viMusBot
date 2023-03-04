@@ -8,11 +8,6 @@
 ### Developer
 
 ### Features
-- You can now input commands into the terminal that `bot.py` is running in; accepted commands are:
-    - `exit`, `quit`, `stop`
-        - Disconnects the bot from its current voice channel, and stops the script altogether
-    - `cancel dl`
-        - Cancels any active downloads from yt-dlp
 
 ### Fixes
 

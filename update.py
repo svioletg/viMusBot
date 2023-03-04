@@ -1,14 +1,22 @@
 import colorama
-from colorama import Fore, Back, Style
-import inquirer
 import os
 import requests
 import shutil
 import sys
+import tkinter
+import tkinter.filedialog
 import urllib.request
 from zipfile import ZipFile
 
 from palette import Palette
+
+# Just so I can test this in another directory
+if '--test' in sys.argv:
+	root = tkinter.Tk()
+	root.withdraw()
+	target_dir = tkinter.filedialog.askdirectory(parent=root, title='Choose where to setup viMusBot')
+else:
+	target_dir = '.'
 
 colorama.init(autoreset=True)
 plt = Palette()
@@ -43,7 +51,7 @@ def main():
 	confirm = input('Would you like to update now? (y/n) ')
 	if confirm == 'n': print('Exiting.'); exit()
 
-	latest_zip = f'viMusBot-{latest_tag}.zip'
+	latest_zip = f'{target_dir}/viMusBot-{latest_tag}.zip'
 
 	print('Retrieving: '+latest['zipball_url'])
 	urllib.request.urlretrieve(latest['zipball_url'], latest_zip)

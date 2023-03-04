@@ -1,6 +1,5 @@
 import colorama
 from colorama import Fore, Back, Style
-import sys
 import yaml
 
 colorama.init(autoreset=True)

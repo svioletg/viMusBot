@@ -4,7 +4,6 @@ print('Loading...')
 import sys
 print('python '+sys.version)
 
-import aioconsole
 import asyncio
 import colorama
 from colorama import Fore, Back, Style
@@ -111,6 +110,10 @@ def log(msg):
 	global last_logtime
 	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
 	last_logtime = time.time()
+
+def log_traceback(error):
+	trace=traceback.format_exception(error)
+	log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
 def logln():
 	cf = currentframe()
@@ -436,7 +439,7 @@ class Music(commands.Cog):
 				embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 			else:
 				embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
-		except AttributeError:
+		except NameError:
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
@@ -963,16 +966,9 @@ async def on_command_error(ctx, error):
 
 @bot.event
 async def on_ready():
-	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-	print('------')
-
-# Get input from terminal while running script
-async def get_outside_input():
-	while True:
-		line = await aioconsole.ainput('')
-		if line in ["stop", "exit", "quit"]:
-			await voice.disconnect()
-			exit()
+	log(f'Logged in as {bot.user} (ID: {bot.user.id})')
+	print('-----')
+	log('Ready!')
 
 # Retrieve bot token
 if public: f='token.txt'
@@ -989,6 +985,6 @@ async def main():
 	async with bot:
 		await bot.add_cog(General(bot))
 		await bot.add_cog(Music(bot))
-		await asyncio.gather(bot.start(token), get_outside_input())
+		await bot.start(token)
 
 asyncio.run(main())
