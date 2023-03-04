@@ -363,7 +363,7 @@ def spotify_album(url) -> dict:
 		'title':info['name'], 
 		'artist':info['artists'][0]['name'],
 		'upc':info['external_ids']['upc']
-		}
+	}
 
 def analyze_track(url) -> tuple:
 	uri = get_uri(url)

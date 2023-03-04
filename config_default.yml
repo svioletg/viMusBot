@@ -6,18 +6,22 @@
 
 # Booleans may be yes/no, on/off, or true/false
 
-# None of these changes will go into effect until the bot is restarted
+# Config is loaded once when `bot.py` is run, so changes made here won't go into
+# effect until after it is restarted
 
 #####
 
 # Automatically updates config.yml with any missing options present in config_default.yml
 auto-update-config: no
 
-# If yes, the bot will use token.txt to start - devtoken.txt otherwise
+# Should be yes/on/true almost always
+# Currently only decides which prefix to use (true = public, false = developer) 
 public: yes
 
+# Path to the text file containing the bot's token
+token-file: "token.txt"
+
 # Set your command prefix here
-# "public" for if public is on, "developer" if its off
 prefixes:
     public: "-"
     developer: "$"

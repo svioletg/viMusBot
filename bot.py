@@ -49,6 +49,7 @@ def keys_recursive(d):
 default_options = keys_recursive(config_default)
 user_options = keys_recursive(config)
 
+# Check for missing/updated config keys
 for i in user_options:
 	if i not in default_options:
 		print(f'{i} is no longer used; '+
@@ -148,6 +149,7 @@ public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
 public = config['public']
 inactivity_timeout = config['inactivity-timeout']
+token_file_path = config['token-file']
 
 def command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
@@ -157,19 +159,18 @@ def get_aliases(command: str):
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
-toremove=[f for f_ in [glob.glob(e) for e in ('*.webm', '*.mp3')] for f in f_]
+toremove = [f for f_ in [glob.glob(e) for e in ('*.webm', '*.mp3')] for f in f_]
 for i in toremove:
 	log(i)
 	os.remove(i)
 del toremove
-log('Done.')
 
-# Shortcut for title-only embeds; "embed quick"
-def embedq(*args):
-	if len(args)==1:
-		return discord.Embed(title=args[0],color=0xFFFF00)
-	if len(args)==2:
-		return discord.Embed(title=args[0],description=args[1],color=0xFFFF00)
+def embedq(*args) -> discord.Embed:
+	"""Shortcut for making new embeds"""
+	if len(args) == 1:
+		return discord.Embed(title=args[0], color=0xFFFF00)
+	elif len(args) == 2:
+		return discord.Embed(title=args[0], description=args[1], color=0xFFFF00)
 	else:
 		log('Invalid number of arguments passed to embedq()')
 		return None
@@ -304,9 +305,8 @@ class General(commands.Cog):
 	async def reload(self, ctx):
 		# Separated from the others for debug purposes
 		global spoofy
-		if not public:
-			spoofy = importlib.reload(spoofy)
-			log('Reloaded spoofy.py.')
+		spoofy = importlib.reload(spoofy)
+		log('Reloaded spoofy.py.')
 	
 	@commands.command()
 	@commands.check(command_enabled)
@@ -472,19 +472,21 @@ class Music(commands.Cog):
 	@commands.check(command_enabled)
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
+		# Will resume if paused, this is handled in on_command_error()
 		global playctx
 		playctx = ctx
 		global qmessage
 		if 'soundcloud.com' in url:
-			qmessage = await ctx.send(embed=embedq('Trying to queue...',
+			qmessage = await ctx.send(
+				embed=embedq(
+				'Trying to queue...',
 				'Note: It is a known issue that SoundCloud links will sometimes fail to queue.'+
 				'\nIf you receive an error, try it again.'+
-				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'))
+				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'
+				)
+			)
 		else:
 			qmessage = await ctx.send(embed=embedq('Trying to queue...'))
-
-
-		# Will resume if paused, this is handled in on_command_error()
 
 		url = url.split('&list=')[0]
 		async with ctx.typing():
@@ -512,8 +514,10 @@ class Music(commands.Cog):
 						return
 					else:
 						await ctx.send(embed=embedq(
-							'Spotify playlist support is disabled.',
-							'Contact whoever is hosting your bot if you believe this is a mistake.'))
+							'Spotify playlists are currently disabled in this bot\'s configuration.',
+							'Contact whoever is hosting your bot if you believe this is a mistake.'
+							)
+						)
 						return
 
 				log('Checking for album...')
@@ -521,64 +525,30 @@ class Music(commands.Cog):
 					log('Spotify album detected.')
 					album_info = spoofy.spotify_album(url)
 					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
-					if url==None:
+					if url == None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
-				# TODO: Change this to use prompt_for_choice()
-				log('Link not detected, searching with query')
-				log(url)
+				log('Link not detected, searching by text')
+				log(f'Searching: "{url}"')
 				options = spoofy.search_ytmusic_text(url)
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
 				top_video_title = options[1]['title']
 				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
-				if top_song_url == top_video_url:
+				if False and top_song_url == top_video_url:
 					url = top_song_url
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
-					embed.add_field(name=f'Top song result: {top_song_title}',value=top_song_url,inline=False)
-					embed.add_field(name=f'Top video result: {top_video_title}',value=top_video_url,inline=False)
+					embed.add_field(name=f'Top song result: {top_song_title}', value=top_song_url, inline=False)
+					embed.add_field(name=f'Top video result: {top_video_title}', value=top_video_url, inline=False)
 					prompt = await ctx.send(embed=embed)
-					log('Adding reactions.')
-					await prompt.add_reaction(emoji['num'][1])
-					await prompt.add_reaction(emoji['num'][2])
-					await prompt.add_reaction(emoji['cancel'])
-					def check(reaction, user):
-						log('Reaction check is being called.')
-						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
-	
-					log('Checking for reaction...')
-					# 
-					try:
-						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
-					except asyncio.TimeoutError as e:
-						log('Timeout reached.')
-						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
+					choice = await prompt_for_choice(ctx, qmessage, prompt, 2)
+					if choice == None:
 						return
-					except Exception as e:
-						log('An error occurred.')
-						print(e)
-						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
-						return
-					else:
-						# If a valid reaction was received.
-						log('Received a valid reaction.')
-						if str(reaction)==emoji['cancel']:
-							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
-							await prompt.delete()
-							return
-						else:
-							choice=emoji['num'].index(str(reaction))
-							log(choice)
-							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
-					url='https://www.youtube.com/watch?v='+options[choice-1]['videoId']
+					url = 'https://www.youtube.com/watch?v='+options[choice-1]['videoId']
 
 			# Determines if the input was a playlist
 			valid = ['playlist?list=','/sets/','/album/']
@@ -710,17 +680,22 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
-async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
-	# msg = The message *before* the choice menu (prompt) to be edited based on the outcome
+async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
+	"""Adds reactions to a given Message (prompt) and returns the outcome
+	
+	msg -- Message to be edited based on the outcome
+
+	prompt -- Message to add the reaction choices to
+	"""
 	# Get reaction menu ready
 	log('Adding reactions.')
 
 	if choices > len(emoji['num']): log('Choices out of range for emoji number list.'); return
 
-	for i in list(range(0,choices)):
-		await prompt.add_reaction(emoji['num'][i+1])
+	for i in list(range(0, choices)):
+		await prompt_msg.add_reaction(emoji['num'][i+1])
 
-	await prompt.add_reaction(emoji['cancel'])
+	await prompt_msg.add_reaction(emoji['cancel'])
 
 	def check(reaction, user):
 		log('Reaction check is being called.')
@@ -733,16 +708,16 @@ async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
 	except asyncio.TimeoutError as e:
 		log('Timeout reached.')
 		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-		await msg.edit(embed=embed)
-		await prompt.delete()
-		return None
+		await status_msg.edit(embed=embed)
+		await prompt_msg.delete()
+		return
 	except Exception as e:
 		log('An error occurred.')
 		print(e)
 		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-		await msg.edit(embed=embed)
-		await prompt.delete()
-		return None
+		await status_msg.edit(embed=embed)
+		await prompt_msg.delete()
+		return
 	else:
 		# If a valid reaction was received.
 		log('Received a valid reaction.')
@@ -750,19 +725,16 @@ async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
 		if str(reaction)==emoji['cancel']:
 			log('Selection cancelled.')
 			embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-			await msg.edit(embed=embed)
-			await prompt.delete()
-			return None
+			await status_msg.edit(embed=embed)
+			await prompt_msg.delete()
+			return
 		else:
-			choice=emoji['num'].index(str(reaction))
+			choice = emoji['num'].index(str(reaction))
 			log(f'{choice} selected.')
 			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-			await msg.edit(embed=embed)
-			await prompt.delete()
+			await status_msg.edit(embed=embed)
+			await prompt_msg.delete()
 			return choice
-	# Theoretically the code shouldn't reach this point
-	log(f'{plt.warn}NOTICE: Unexpected behavior; prompt returned outside try/except/else')
-	await prompt.delete()
 
 # Queue system
 
@@ -840,17 +812,17 @@ async def play_url(url, ctx):
 	if 'open.spotify.com' in url:
 		log('Trying to match Spotify track...')
 		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!'))
-		spyt=spoofy.spyt(url)
+		spyt = spoofy.spyt(url)
 
 		log('Checking if unsure...')
-		if type(spyt)==tuple and spyt[0]=='unsure':
+		if type(spyt) == tuple and spyt[0] == 'unsure':
 			# This indicates no match was found
 			log('spyt returned unsure.')
 			# Remove the warning, no longer needed
-			spyt=spyt[1]
+			spyt = spyt[1]
 			# Shorten to {limit} results
-			limit=5
-			spyt=dict(list(spyt.items())[:limit])
+			limit = 5
+			spyt = dict(list(spyt.items())[:limit])
 			if use_top_match:
 				# Use first result if that's set in config
 				spyt = spyt[0]
@@ -980,8 +952,10 @@ async def on_ready():
 	log('Ready!')
 
 # Retrieve bot token
-if public: f='token.txt'
-else: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
+f = token_file_path
+log(f'Retrieving token from {plt.blue}{token_file_path}')
+
+if not public: log(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
 	token = open(f).read()

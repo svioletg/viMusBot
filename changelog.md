@@ -6,8 +6,13 @@
 > *2023.x.x / dev.29*
 
 ### Developer
+- `public` no longer determines the token file, and is now only used to select which command prefix to use
 
 ### Features
+- `token-file` (string; file name or path) added to the config
+    - Specifies which file `bot.py` will check for the bot's token
+    - `public` no longer determines this file
+- `palette.py` now displays each available color on the same line, separated by a space
 
 ### Fixes
 
