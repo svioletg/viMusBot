@@ -24,10 +24,10 @@ plt = Palette()
 def check():
 	response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 	latest = response.json()
-	latest_tag = latest['tag_name']
+	latest_tag = latest['tag_name'].strip()
 
 	with open('version.txt', 'r') as f:
-		current = f.read()
+		current = f.read().strip()
 
 	return current == latest_tag, {'current':current, 'latest':latest}
 

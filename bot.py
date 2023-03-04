@@ -90,7 +90,7 @@ _here = os.path.basename(__file__)
 # For personal reference
 # Represents the version of the overall project, not just this file
 with open('version.txt','r') as f:
-	version = f.read()
+	version = f.read().strip()
 
 ### TODO
 TODO = {
@@ -119,16 +119,19 @@ def logln():
 	cf = currentframe()
 	print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'[{version}]')
+log(f'Running on version {version}.')
 
 update_check = update.check()
 
-if not update_check[0]:
+# Check for an outdated version.txt
+if update_check[0] == False and update_check[1]:
 	log(f'{plt.warn}There is a new release available.')
 	current_tag = update_check[1]['current']
 	latest_tag = update_check[1]['latest']['tag_name']
 	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
 	log('Use "update.py" to update.')
+else:
+	log(f'{plt.lime}You are up to date.')
 
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
@@ -304,6 +307,12 @@ class General(commands.Cog):
 		if not public:
 			spoofy = importlib.reload(spoofy)
 			log('Reloaded spoofy.py.')
+	
+	@commands.command()
+	@commands.check(command_enabled)
+	async def stream(self, ctx):
+		print(voice.source)
+		print(dir(voice.source))
 
 	@commands.command(aliases=get_aliases('changelog'))
 	@commands.check(command_enabled)
