@@ -6,6 +6,7 @@ import re
 import requests
 import shutil
 import subprocess
+import sys
 import tkinter
 import tkinter.filedialog
 import urllib.request
@@ -168,7 +169,7 @@ q = [inquirer.List(
 answer = inquirer.prompt(q)
 if answer['confirm'] == 'Yes':
 	print('Installing required packages...')
-	subprocess.run(['py', '-m', 'pip', 'install', '-r', 'requirements.txt'])
+	subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
 else:
 	print('Skipping requirements for now.')
 

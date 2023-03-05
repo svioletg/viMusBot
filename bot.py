@@ -34,12 +34,12 @@ if not os.path.isfile('config_default.yml'):
 	print('config_default.yml not found; downloading...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
 
+with open('config_default.yml','r') as f:
+	config_default = yaml.safe_load(f)
+
 if not os.path.isfile('config.yml'):
 	print('config.yml does not exist. It will be created as a duplicate of config_default.yml')
 	shutil.copyfile('config_default.yml', 'config.yml')
-
-with open('config_default.yml','r') as f:
-	config_default = yaml.safe_load(f)
 
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
@@ -99,10 +99,6 @@ _here = os.path.basename(__file__)
 with open('version.txt','r') as f:
 	version = f.read().strip()
 
-### TODO
-TODO = {
-}
-
 # Start discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
@@ -158,10 +154,11 @@ public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
 inactivity_timeout = config['inactivity-timeout']
 
-vote_to_skip = config['vote-to-skip']
-skip_votes_needed = config['vote-to-skip']['skip-requirement']
+vote_to_skip = config['vote-to-skip']['enabled']
+skip_votes_percentage = config['vote-to-skip']['threshold']
+skip_votes_needed = 0
 
-skip_votes = 0
+skip_votes = []
 
 def command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
@@ -284,6 +281,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
 #
 #
 
+voice = None
+
 class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
@@ -295,7 +294,6 @@ class General(commands.Cog):
 		global voice
 		if not member.id == self.bot.user.id:
 			return
-
 		elif before.channel is None:
 			if inactivity_timeout == 0:
 				return
@@ -347,16 +345,6 @@ class General(commands.Cog):
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
-		await ctx.send(embed=embed)
-
-	@commands.command(aliases=get_aliases('todo'))
-	@commands.check(command_enabled)
-	async def todo(self, ctx):
-		"""Returns a list of planned features or bugs to be fixed."""
-		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)
-		for i in TODO:
-			embed.add_field(name=i,value=TODO[i])
-
 		await ctx.send(embed=embed)
 
 
@@ -455,13 +443,14 @@ class Music(commands.Cog):
 	@commands.check(command_enabled)
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
-		try:
-			if not voice.is_playing() and not voice.is_paused():
-				embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
-			else:
-				embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
-		except NameError:
+		if voice == None:
+			await ctx.send(embed=embedq('Not connected to a voice channel.'))
+			return
+
+		if not voice.is_playing() and not voice.is_paused():
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
+		else:
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
@@ -506,31 +495,27 @@ class Music(commands.Cog):
 			if 'open.spotify.com' in url:
 				log('Spotify URL was received from play command.')
 				log('Checking for playlist...')
-				if '/playlist/' in url:
+				if '/playlist/' in url and allow_spotify_playlists:
 					log('Spotify playlist detected.')
-					if allow_spotify_playlists:
-						await qmessage.edit(embed=embedq(
-							'Trying to queue Spotify playlist; '+
-							'this will take a long time, please wait before trying another command.',
-							'This feature is experimental!'))
-						objlist = generate_QueueItems(spoofy.spotify_playlist(url))
-						if len(objlist) > spotify_playlist_limit:
-							await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
-							return
-						queue_batch(ctx, objlist)
-						list_name = spoofy.sp.playlist(url)['name']
-						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
-						if not voice.is_playing():
-							log('Voice client is not playing; starting...')
-							await advance_queue(ctx)
+					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
+					objlist = generate_QueueItems(spoofy.spotify_playlist(url))
+					if len(objlist) > spotify_playlist_limit:
+						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
-					else:
-						await ctx.send(embed=embedq(
-							'Spotify playlists are currently disabled in this bot\'s configuration.',
-							'Contact whoever is hosting your bot if you believe this is a mistake.'
-							)
+					queue_batch(ctx, objlist)
+					list_name = spoofy.sp.playlist(url)['name']
+					await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
+					if not voice.is_playing():
+						log('Voice client is not playing; starting...')
+						await advance_queue(ctx)
+					return
+				elif not allow_spotify_playlists:
+					await ctx.send(embed=embedq(
+						'Spotify playlists are currently disabled in this bot\'s configuration.',
+						'Contact whoever is hosting your bot if you believe this is a mistake.'
 						)
-						return
+					)
+					return
 
 				log('Checking for album...')
 				if '/album/' in url:
@@ -660,14 +645,28 @@ class Music(commands.Cog):
 	@commands.command(aliases=get_aliases('skip'))
 	@commands.check(command_enabled)
 	async def skip(self, ctx):
-		"""Skips the currently playing video."""
+		"""Skips the currently playing media."""
+		if voice == None:
+			await ctx.send(embed=embedq('Not connected to a voice channel.'))
+			return
+		elif not voice.is_playing() or voice.is_paused():
+			await ctx.send(embed=embedq('Nothing to skip.'))
+			return
+
+		# Update number skip votes required based on members joined in voice channel
+		global skip_votes
+		global skip_votes_needed
+		skip_votes_needed = int((len(voice.channel.members)) * (skip_votes_percentage/100))
+
 		if not vote_to_skip:
 			await ctx.send(embed=embedq('Skipping...'))
 			await advance_queue(ctx, skip=True)
 		else:
-			skip_votes += 1
-			# await ctx.send()
-			if skip_votes == skip_votes_needed:
+			if ctx.author not in skip_votes:
+				skip_votes.append(ctx.author)
+			print(skip_votes)
+			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
+			if len(skip_votes) == skip_votes_needed:
 				await ctx.send(embed=embedq('Skipping...'))
 				await advance_queue(ctx, skip=True)
 
@@ -822,11 +821,14 @@ paused_for = 0
 
 loop_this = False
 
-async def play_url(url, ctx):
+async def play_url(url: str, ctx):
 	global now_playing
 	global npmessage
 	global last_played
 	global audio_started, paused_at, paused_for
+	global skip_votes
+
+	skip_votes = []
 
 	paused_at, paused_for = 0, 0
 	last_played = now_playing
@@ -916,11 +918,9 @@ async def advance_queue(ctx, skip=False):
 			await play_url(url, ctx)
 
 # TODO: This could have a better name
-def get_loop_icon():
+def get_loop_icon() -> str:
 	if loop_this: return emoji['repeat']+' '
 	else: return ''
-
-
 
 # Establish bot user
 intents = discord.Intents.default()
@@ -979,7 +979,8 @@ async def on_ready():
 f = token_file_path
 log(f'Retrieving token from {plt.blue}{token_file_path}')
 
-if not public: log(f'{plt.warn}NOTICE: Starting in dev mode.')
+if not public:
+	log(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
 	token = open(f).read()

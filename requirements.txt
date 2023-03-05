@@ -10,5 +10,5 @@ PyYAML == 6.0
 soundcloud_lib == 0.5.4
 spotipy == 2.22.1
 regex == 2022.10.31
-yt_dlp == 2022.10.4
+yt_dlp == 2023.03.03
 ytmusicapi == 0.24.0

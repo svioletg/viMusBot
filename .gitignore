@@ -28,6 +28,7 @@ spoofy_*.py
 # other
 build/
 dist/
+venv/
 *.spec
 versioningconvention.txt
 new-release.bat

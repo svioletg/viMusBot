@@ -6,15 +6,23 @@
 > *2023.x.x / dev.29*
 
 ### Developer
-- `public` no longer determines the token file, and is now only used to select which command prefix to use
+- in `bot.py`
+    - `public` no longer determines the token file, and is now only used to select which command prefix to use
+    - `TODO` dictionary removed, hasn't been used for a long time
 
 ### Features
 - `token-file` (string; file name or path) added to the config
     - Specifies which file `bot.py` will check for the bot's token
     - `public` no longer determines this file
+- `vote-to-skip` section added to the config
+    - `enabled` (boolean) added; toggles whether skipping will be done by vote or instantly
+    - `threshold` (number) added; percentage of users connected to a voice channel needed to skip (only include the number, not the percentage sign - doing so will break the YAML)
 - `palette.py` now displays each available color on the same line, separated by a space
 
 ### Fixes
+
+### Other
+- `-todo` command removed
 
 ## 1.7.0
 > *2023.01.13 / dev.28*
