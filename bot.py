@@ -15,6 +15,7 @@ import logging
 import os
 import pytube
 import random
+import shutil
 import subprocess
 import sys
 import time
@@ -30,7 +31,12 @@ from pretty_help import DefaultMenu, PrettyHelp
 
 # Validate config
 if not os.path.isfile('config_default.yml'):
+	print('config_default.yml not found; downloading...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+
+if not os.path.isfile('config.yml'):
+	print('config.yml does not exist. It will be created as a duplicate of config_default.yml')
+	shutil.copyfile('config_default.yml', 'config.yml')
 
 with open('config_default.yml','r') as f:
 	config_default = yaml.safe_load(f)
@@ -43,7 +49,7 @@ def keys_recursive(d):
 	for k, v in d.items():
 		vals.append(k)
 		if isinstance(v, dict):
-			vals=vals+keys_recursive(v)
+			vals = vals+keys_recursive(v)
 	return vals
 
 default_options = keys_recursive(config_default)
@@ -145,11 +151,17 @@ with open('config.yml','r') as f:
 allow_spotify_playlists = config['allow-spotify-playlists']
 spotify_playlist_limit = config['spotify-playlist-limit']
 use_top_match = config['use-top-match']
+
+public = config['public']
+token_file_path = config['token-file']
 public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
-public = config['public']
 inactivity_timeout = config['inactivity-timeout']
-token_file_path = config['token-file']
+
+vote_to_skip = config['vote-to-skip']
+skip_votes_needed = config['vote-to-skip']['skip-requirement']
+
+skip_votes = 0
 
 def command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
@@ -533,17 +545,22 @@ class Music(commands.Cog):
 			if 'https://' not in ctx.message.content:
 				log('Link not detected, searching by text')
 				log(f'Searching: "{url}"')
+
 				options = spoofy.search_ytmusic_text(url)
+
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
+
 				top_video_title = options[1]['title']
 				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
-				if False and top_song_url == top_video_url:
+
+				if top_song_url == top_video_url:
 					url = top_song_url
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
 					embed.add_field(name=f'Top song result: {top_song_title}', value=top_song_url, inline=False)
 					embed.add_field(name=f'Top video result: {top_video_title}', value=top_video_url, inline=False)
+
 					prompt = await ctx.send(embed=embed)
 					choice = await prompt_for_choice(ctx, qmessage, prompt, 2)
 					if choice == None:
@@ -644,8 +661,15 @@ class Music(commands.Cog):
 	@commands.check(command_enabled)
 	async def skip(self, ctx):
 		"""Skips the currently playing video."""
-		await ctx.send(embed=embedq('Skipping...'))
-		await advance_queue(ctx, skip=True)
+		if not vote_to_skip:
+			await ctx.send(embed=embedq('Skipping...'))
+			await advance_queue(ctx, skip=True)
+		else:
+			skip_votes += 1
+			# await ctx.send()
+			if skip_votes == skip_votes_needed:
+				await ctx.send(embed=embedq('Skipping...'))
+				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
 	@commands.check(command_enabled)

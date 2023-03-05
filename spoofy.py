@@ -6,7 +6,7 @@ import pytube
 import regex as re
 import sclib
 import spotipy
-from spotipy import SpotifyClientCredentials
+from spotipy.oauth2 import SpotifyClientCredentials
 import sys
 import time
 import yaml
@@ -34,7 +34,7 @@ def log(msg):
 		msg=msg,
 		last_logtime=last_logtime,
 		called_from=sys._getframe().f_back.f_code.co_name
-		)
+	)
 	last_logtime = time.time()
 
 # Parse config from YAML
@@ -46,7 +46,8 @@ spotify_playlist_limit = config['spotify-playlist-limit']
 duration_limit = config['duration-limit']
 
 # Useful to point this out if left on accidentally
-if force_no_match: log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+if force_no_match:
+	log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 # API Objects
 
@@ -59,7 +60,7 @@ with open('spotify_config.json', 'r') as f:
 client_credentials_manager = SpotifyClientCredentials(
 	client_id=scred['client_id'],
 	client_secret=scred['client_secret']
-	)
+)
 sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
 # Connect to soundcloud API

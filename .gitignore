@@ -16,7 +16,7 @@ headers_auth.json
 yttesting.py
 quickstart.sh
 *.pickle
-.vscode
+.vscode/
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py
@@ -26,5 +26,8 @@ spoofy_*.py
 *.mp3
 *.part
 # other
+build/
+dist/
+*.spec
 versioningconvention.txt
 new-release.bat
