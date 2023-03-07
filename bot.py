@@ -57,36 +57,36 @@ default_options = keys_recursive(config_default)
 user_options = keys_recursive(config)
 
 # Check for missing/updated config keys
-for i in user_options:
-	if i not in default_options:
-		print(f'{i} is no longer used; '+
-			'it may have been renamed or removed in a recent update. '+
-			'Check the changelog linked above for what might have moved.')
+# for i in user_options:
+# 	if i not in default_options:
+# 		print(f'"{i}" is no longer used; '+
+# 			'it may have been renamed or removed in a recent update. '+
+# 			'Check the changelog linked above for what might have moved.')
 
-for i in default_options:
-	if i not in user_options:
-		if config.get('auto-update-config', False):
-			print('config.yml is missing new options; merging...')
-			new_config = {**config_default, **config}
-			os.replace('config.yml','config_old.yml')
-			with open('config.yml','w') as f:
-				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-			print('config.yml has been updated with new options, '+
-				'and your previous settings have been preserved. '+
-				'\nconfig_old.yml has been created in case this process has gone wrong.')
-			break
-		else:
-			print('config.yml is missing new options. '+
-				'\nSet auto-update-config to true to update your config automatically, '+
-				'or check the latest default config and add the missing options manually.')
-			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
-			print('You are missing:\n')
-			print([i.keys() for i in config_default if type(i)==dict])
-			print([i.keys() for i in config if type(i)==dict])
-			for i in list(set(config_default) - set(config)): print(i)
-			print('\nThe auto-update-config option is either missing or set to false, '+
-				'so the script will exit.')
-			exit()
+# for i in default_options:
+# 	if i not in user_options:
+# 		if config.get('auto-update-config', False):
+# 			print('config.yml is missing new options; merging...')
+# 			new_config = config_default | config
+# 			os.replace('config.yml','config_old.yml')
+# 			with open('config.yml','w') as f:
+# 				yaml.dump(new_config, f, default_flow_style=False, indent=4)
+# 			print('config.yml has been updated with new options, '+
+# 				'and your previous settings have been preserved. '+
+# 				'\nconfig_old.yml has been created in case this process has gone wrong.')
+# 			break
+# 		else:
+# 			print('config.yml is missing new options. '+
+# 				'\nSet auto-update-config to true to update your config automatically, '+
+# 				'or check the latest default config and add the missing options manually.')
+# 			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
+# 			print('You are missing:\n')
+# 			print([i.keys() for i in config_default if type(i)==dict])
+# 			print([i.keys() for i in config if type(i)==dict])
+# 			for i in list(set(config_default) - set(config)): print(i)
+# 			print('\nThe auto-update-config option is either missing or set to false, '+
+# 				'so the script will exit.')
+# 			exit()
 
 # Import local files after main packages, and after validating config
 import customlog
@@ -184,15 +184,12 @@ def embedq(*args) -> discord.Embed:
 		return discord.Embed(title=args[0], color=0xFFFF00)
 	elif len(args) == 2:
 		return discord.Embed(title=args[0], description=args[1], color=0xFFFF00)
-	else:
-		log('Invalid number of arguments passed to embedq()')
-		return None
 
 # Based on and adapted from:
 # https://github.com/Rapptz/discord.py/blob/v2.0.1/examples/basic_voice.py
 
 # For easier emoji usage
-emoji={
+emoji = {
 	'cancel':'❌',
 	'confirm':'✅',
 	'repeat':'🔁',
@@ -236,7 +233,7 @@ duration_limit = 5 # in hours
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 def title_from_url(url):
-	log(f'Fetching title of \'{url}\'...')
+	log(f'Fetching title of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
 		return pytube.YouTube(url).title
 	elif 'soundcloud.com' in url:
@@ -497,10 +494,10 @@ class Music(commands.Cog):
 		async with ctx.typing():
 			# Locate youtube equivalent if spotify link given
 			if 'open.spotify.com' in url:
-				log('Spotify URL was received from play command.')
-				log('Checking for playlist...')
+				log('Spotify URL was received from play command.', verbose=True)
+				log('Checking for playlist...', verbose=True)
 				if '/playlist/' in url and allow_spotify_playlists:
-					log('Spotify playlist detected.')
+					log('Spotify playlist detected.', verbose=True)
 					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
 					objlist = generate_QueueItems(spoofy.spotify_playlist(url))
 					if len(objlist) > spotify_playlist_limit:
@@ -521,9 +518,9 @@ class Music(commands.Cog):
 					)
 					return
 
-				log('Checking for album...')
+				log('Checking for album...', verbose=True)
 				if '/album/' in url:
-					log('Spotify album detected.')
+					log('Spotify album detected.', verbose=True)
 					album_info = spoofy.spotify_album(url)
 					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
 					if url == None:
@@ -532,7 +529,7 @@ class Music(commands.Cog):
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
-				log('Link not detected, searching by text')
+				log('Link not detected, searching by text', verbose=True)
 				log(f'Searching: "{url}"')
 
 				options = spoofy.search_ytmusic_text(url)
@@ -559,7 +556,7 @@ class Music(commands.Cog):
 			# Determines if the input was a playlist
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
-				log('URL is a playlist.')
+				log('URL is a playlist.', verbose=True)
 				objlist = generate_QueueItems(url)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
@@ -568,8 +565,8 @@ class Music(commands.Cog):
 					return
 			else:
 				# Runs if the input given was not a playlist
-				log('URL is not a playlist.')
-				log('Checking duration...')
+				log('URL is not a playlist.', verbose=True)
+				log('Checking duration...', verbose=True)
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
 					if pytube.YouTube(url).length > duration_limit*60*60:
@@ -597,7 +594,7 @@ class Music(commands.Cog):
 
 			# Start the player if we can use the url itself
 			try:
-				log('Trying to start playing or queueing.')
+				log('Trying to start playing or queueing.', verbose=True)
 				if not voice.is_playing():
 					log('Voice client is not playing; starting...')
 					await play_url(url, ctx)
@@ -715,7 +712,7 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 	prompt -- Message to add the reaction choices to
 	"""
 	# Get reaction menu ready
-	log('Adding reactions.')
+	log('Adding reactions.', verbose=True)
 
 	if choices > len(emoji['num']): log('Choices out of range for emoji number list.'); return
 
@@ -725,39 +722,38 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 	await prompt_msg.add_reaction(emoji['cancel'])
 
 	def check(reaction, user):
-		log('Reaction check is being called.')
+		log('Reaction check is being called.', verbose=True)
 		return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
 
-	log('Checking for reaction...')
+	log('Checking for reaction...', verbose=True)
 
 	try:
 		reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
 	except asyncio.TimeoutError as e:
-		log('Timeout reached.')
+		log('Choice prompt timeout reached.')
 		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
 		await status_msg.edit(embed=embed)
 		await prompt_msg.delete()
 		return
 	except Exception as e:
-		log('An error occurred.')
-		print(e)
+		log_traceback(e)
 		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
 		await status_msg.edit(embed=embed)
 		await prompt_msg.delete()
 		return
 	else:
 		# If a valid reaction was received.
-		log('Received a valid reaction.')
+		log('Received a valid reaction.', verbose=True)
 
 		if str(reaction)==emoji['cancel']:
-			log('Selection cancelled.')
+			log('Selection cancelled.', verbose=True)
 			embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
 			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return
 		else:
 			choice = emoji['num'].index(str(reaction))
-			log(f'{choice} selected.')
+			log(f'{choice} selected.', verbose=True)
 			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
 			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
@@ -844,10 +840,10 @@ async def play_url(url: str, ctx):
 		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!'))
 		spyt = spoofy.spyt(url)
 
-		log('Checking if unsure...')
+		log('Checking if unsure...', verbose=True)
 		if type(spyt) == tuple and spyt[0] == 'unsure':
 			# This indicates no match was found
-			log('spyt returned unsure.')
+			log('spyt returned unsure.', verbose=True)
 			# Remove the warning, no longer needed
 			spyt = spyt[1]
 			# Shorten to {limit} results

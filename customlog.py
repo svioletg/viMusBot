@@ -36,7 +36,7 @@ def newlog(msg='', last_logtime=time.time(), called_from='', verbose=False):
 	blacklist_exceptions = [plt.warn, plt.error]
 	if not config['logging-options']['show-console-logs'][source]:
 		print(1); return
-	elif not (any(i in logstring for i in blacklist_exceptions) or called_from in log_blacklist):
+	elif (called_from in log_blacklist and any(i in logstring for i in blacklist_exceptions)):
 		print(2); return
 	elif verbose and not config['logging-options']['show-verbose-logs']:
 		print(3); return

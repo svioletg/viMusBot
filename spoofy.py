@@ -181,21 +181,22 @@ def search_ytmusic_text(query: str) -> tuple:
 	return top_song, top_video
 
 def search_ytmusic_album(title: str, artist: str, upc: str=None) -> str|None:
-	if force_no_match: log(f'{plt.warn}force_no_match is set to True.'); return None
+	if force_no_match:
+		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist}'
 	reference = {'title':title, 'artist':artist, 'upc':upc}
 	
-	log('Starting album search...')
+	log('Starting album search...', verbose=True)
 	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	for i in album_results:
 		title_match = fuzz.ratio(title,i['title'])>75
 		artist_match = fuzz.ratio(artist,i['artists'][0]['name'])>75
 		if title_match and artist_match:
-			log('Match found.')
+			log('Match found.', verbose=True)
 			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(i['browseId'])['audioPlaylistId']
 	# This will only run if no match has been found
-	log('No match found.')
+	log('No match found.', verbose=True)
 	return None
 
 def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10, fast_search=False, **kwargs):
@@ -232,12 +233,12 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# Start search
 	if isrc != None and not force_no_match:
-		log(f'Searching for ISRC: {isrc}')
+		log(f'Searching for ISRC: {isrc}', verbose=True)
 		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
-				log('Found an ISRC match.')
+				log('Found an ISRC match.', verbose=True)
 				return trim_track_data(i,from_pytube=True)
 			
 		log('No ISRC match found, falling back on text search.')
@@ -252,8 +253,8 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	fast_search = kwargs.get('fast_search',False)
 	if fast_search:
-		log('fast_search is True.')
-		log('Returning match.')
+		log('fast_search is True.', verbose=True)
+		log('Returning match.', verbose=True)
 		return trim_track_data(song_results[0])
 
 	log('Checking for exact match...')
@@ -288,7 +289,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 				break
 	
 	if not match_found():
-		log('No match. Setting unsure to True.')
+		log('No match. Setting unsure to True.', verbose=True)
 		unsure = True
 
 	# Make new dict with more relevant information
@@ -296,10 +297,10 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	# Determine what to queue
 	if match_found():
 		# Return match
-		log('Returning match.')
+		log('Returning match.', verbose=True)
 		return trim_track_data(match)
 	else:
-		log('Creating results dictionary...')
+		log('Creating results dictionary...', verbose=True)
 		song_choices = 2
 		video_choices = 2
 		position = 0
@@ -319,11 +320,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 # SoundCloud
 def soundcloud_playlist(url: str) -> list:
 	playlist = sc.resolve(url).tracks
-	print(playlist)
-	# TODO: Does this need to be a comprehension?
-	r = [obj for obj in playlist]
-	print(r)
-	return r
+	return playlist
 
 # Spotify
 def get_uri(url: str) -> str:
