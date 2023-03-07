@@ -15,6 +15,7 @@ import logging
 import os
 import pytube
 import random
+import regex as re
 import shutil
 import subprocess
 import sys
@@ -64,7 +65,7 @@ for i in user_options:
 
 for i in default_options:
 	if i not in user_options:
-		if config.get('auto-update-config',False):
+		if config.get('auto-update-config', False):
 			print('config.yml is missing new options; merging...')
 			new_config = {**config_default, **config}
 			os.replace('config.yml','config_old.yml')
@@ -80,6 +81,8 @@ for i in default_options:
 				'or check the latest default config and add the missing options manually.')
 			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
 			print('You are missing:\n')
+			print([i.keys() for i in config_default if type(i)==dict])
+			print([i.keys() for i in config if type(i)==dict])
 			for i in list(set(config_default) - set(config)): print(i)
 			print('\nThe auto-update-config option is either missing or set to false, '+
 				'so the script will exit.')
@@ -103,22 +106,22 @@ with open('version.txt','r') as f:
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
-# Personal debug logging
+# Start bot logging
 colorama.init(autoreset=True)
 plt = Palette()
 
 last_logtime = time.time()
 
-def log(msg):
+def log(msg: str, verbose=False):
 	global last_logtime
-	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
+	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
 	last_logtime = time.time()
 
-def log_traceback(error):
+def log_traceback(error: BaseException):
 	trace=traceback.format_exception(error)
 	log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
-def logln():
+def log_line():
 	cf = currentframe()
 	print('@ LINE ', cf.f_back.f_lineno)
 
@@ -153,6 +156,7 @@ token_file_path = config['token-file']
 public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
 inactivity_timeout = config['inactivity-timeout']
+cleanup_extensions = config['auto-remove']
 
 vote_to_skip = config['vote-to-skip']['enabled']
 skip_votes_percentage = config['vote-to-skip']['threshold']
@@ -160,7 +164,7 @@ skip_votes_needed = 0
 
 skip_votes = []
 
-def command_enabled(ctx):
+def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
 
 def get_aliases(command: str):
@@ -168,11 +172,11 @@ def get_aliases(command: str):
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
-toremove = [f for f_ in [glob.glob(e) for e in ('*.webm', '*.mp3')] for f in f_]
-for i in toremove:
-	log(i)
+files = glob.glob('*.*')
+to_remove = [f for f in files if re.search(r'(\..*$)',f)[0] in cleanup_extensions]
+for i in to_remove:
 	os.remove(i)
-del toremove
+del files, to_remove
 
 def embedq(*args) -> discord.Embed:
 	"""Shortcut for making new embeds"""
@@ -311,7 +315,7 @@ class General(commands.Cog):
 					break
 
 	@commands.command()
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def reload(self, ctx):
 		# Separated from the others for debug purposes
 		global spoofy
@@ -319,20 +323,20 @@ class General(commands.Cog):
 		log('Reloaded spoofy.py.')
 	
 	@commands.command()
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def stream(self, ctx):
 		print(voice.source)
 		print(dir(voice.source))
 
 	@commands.command(aliases=get_aliases('changelog'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
 		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def ping(self, ctx):
 		"""Test command."""
 		await ctx.send('Pong!')
@@ -341,7 +345,7 @@ class General(commands.Cog):
 		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
 
 	@commands.command(aliases=get_aliases('repository'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
@@ -354,7 +358,7 @@ class Music(commands.Cog):
 
 	# Playing music / Voice-related
 	@commands.command(aliases=get_aliases('analyze'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
 		info = spoofy.spotify_track(spotifyurl)
@@ -387,7 +391,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('clear'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def clear(self, ctx):
 		"""Clears the entire queue."""
 		global player_queue
@@ -395,7 +399,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command(aliases=get_aliases('join'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
 		# This actually just calls ensure_voice below,
@@ -403,7 +407,7 @@ class Music(commands.Cog):
 		pass
 
 	@commands.command(aliases=get_aliases('leave'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def leave(self, ctx):
 		"""Disconnects the bot from voice."""
 		global voice
@@ -414,7 +418,7 @@ class Music(commands.Cog):
 		voice = None
 
 	@commands.command(aliases=get_aliases('loop'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def loop(self, ctx):
 		"""Toggles looping for the current track."""
 		global loop_this
@@ -423,7 +427,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq(f'{get_loop_icon()}Looping is set to {loop_this}.'))
 
 	@commands.command(aliases=get_aliases('move'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
@@ -440,7 +444,7 @@ class Music(commands.Cog):
 			raise e
 
 	@commands.command(aliases=get_aliases('nowplaying'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
 		if voice == None:
@@ -455,7 +459,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('pause'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def pause(self, ctx):
 		"""Pauses the player. Can be resumed with -play."""
 		global paused_at
@@ -470,7 +474,7 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('Nothing to pause.'))
 	
 	@commands.command(aliases=get_aliases('play'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		# Will resume if paused, this is handled in on_command_error()
@@ -606,7 +610,7 @@ class Music(commands.Cog):
 				raise e
 
 	@commands.command(aliases=get_aliases('queue'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
 		if player_queue.get(ctx) == []:
@@ -630,20 +634,20 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('remove'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.get(ctx).pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=get_aliases('shuffle'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def shuffle(self, ctx):
 		"""Randomizes the order of the queue."""
 		random.shuffle(player_queue.get(ctx))
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 	@commands.command(aliases=get_aliases('skip'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def skip(self, ctx):
 		"""Skips the currently playing media."""
 		if voice == None:
@@ -671,7 +675,7 @@ class Music(commands.Cog):
 				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def stop(self, ctx):
 		"""Stops the player and clears the queue."""
 		global player_queue

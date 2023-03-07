@@ -33,11 +33,21 @@ prefixes:
     public: "-"
     developer: "$"
 
+# List of file extensions the bot will detect and delete on startup; must start with a "."
+auto-remove:
+    - ".part"
+    - ".mp3"
+    - ".wav"
+    - ".ogg"
+    - ".m4a"
+    - ".mp4"
+    - ".webm"
+
 # Allows queueing entire Spotify playlists
 allow-spotify-playlists: yes
 
 # Limit the amount of tracks Spotify playlists can have before queueing
-spotify-playlist-limit: 40
+spotify-playlist-limit: 50
 
 # Forces Spotify links to not find an automatic YouTube match,
 # and will always trigger the choice menu
@@ -91,6 +101,9 @@ logging-options:
     show-console-logs:
         bot.py: yes
         spoofy.py: yes
+    # Certain logs are tagged as "verbose"; these are messages that are useful for debugging, but may be seen as screen clutter for most users
+    # This toggles whether they will be displayed in the command line (verbose logs are sent to vimusbot.log regardless of this setting)
+    show-verbose-logs: yes
     # Ignore logs from specific functions (blue text in logs, by default)
     ignore-logs-from:
         - "search_ytmusic"

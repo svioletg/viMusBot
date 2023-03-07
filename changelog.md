@@ -6,11 +6,21 @@
 > *2023.x.x / dev.29*
 
 ### Developer
+- Various code improvements & edits
+    - Almost every function should have types declared for their arguments, and a `->` operator to indicate its return type
+    - Old, unused code entirely removed
+    - Certain sections were changed to improve readability and clarity
 - in `bot.py`
     - `public` no longer determines the token file, and is now only used to select which command prefix to use
     - `TODO` dictionary removed, hasn't been used for a long time
 
 ### Features
+- `auto-remove` (list of strings) added to the config
+    - Determines which file extensions to automatically include in the on-startup file cleanup
+    - Includes most common media formats by default
+
+> Note: Media files not in use by the bot are normally deleted once the queue advances, however some can by left behind occassionally; thus, on startup, the bot will remove any stray files like this
+
 - `token-file` (string; file name or path) added to the config
     - Specifies which file `bot.py` will check for the bot's token
     - `public` no longer determines this file
@@ -20,6 +30,7 @@
 - `palette.py` now displays each available color on the same line, separated by a space
 
 ### Fixes
+- Fixed [Issue #25](https://github.com/svioletg/viMusBot/issues/25): Bot thinks its outdated despite the version numbers matching
 
 ### Other
 - `-todo` command removed
