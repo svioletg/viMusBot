@@ -28,14 +28,14 @@ plt = Palette()
 
 last_logtime = time.time()
 
-def log(msg):
+def log(msg: str, verbose=False):
 	global last_logtime
-	customlog.newlog(
-		msg=msg,
-		last_logtime=last_logtime,
-		called_from=sys._getframe().f_back.f_code.co_name
-	)
+	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
 	last_logtime = time.time()
+
+def log_line():
+	cf = currentframe()
+	print('@ LINE ', cf.f_back.f_lineno)
 
 # Parse config from YAML
 with open('config.yml','r') as f:
@@ -396,14 +396,13 @@ def analyze_track(url: str) -> tuple:
 
 # Other
 def is_jp(text: str) -> bool:
-	check = re.compile(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', re.UNICODE)
-	if '***jp***' in check.sub('***jp***',text): return True
-	else: return False
+	# TODO: Test
+	return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text)
 
-def spyt(url: str, limit=20) -> dict|tuple:
+def spyt(url: str, limit=20, **kwargs) -> dict|tuple:
 	"""Matches a Spotify URL with its closest match from YouTube or YTMusic"""
 	track = spotify_track(url)
-	result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'],limit=limit,**kwargs)
+	result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'], limit=limit, **kwargs)
 	if type(result) == tuple and result[0] == 'unsure':
 		log('Returning as unsure.')
 		return result

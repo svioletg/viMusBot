@@ -35,10 +35,10 @@ def newlog(msg='', last_logtime=time.time(), called_from='', verbose=False):
 	logfile.write(plt.strip_color(logstring)+'\n')
 	blacklist_exceptions = [plt.warn, plt.error]
 	if not config['logging-options']['show-console-logs'][source]:
-		print(1); return
+		return
 	elif (called_from in log_blacklist and any(i in logstring for i in blacklist_exceptions)):
-		print(2); return
+		return
 	elif verbose and not config['logging-options']['show-verbose-logs']:
-		print(3); return
+		return
 	else:
 		print(logstring)

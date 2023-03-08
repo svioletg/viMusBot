@@ -9,6 +9,7 @@ token.txt
 *.ini
 config.yml
 config_old.yml
+configtest.yml
 # credentials
 spotify_config.json
 headers_auth.json

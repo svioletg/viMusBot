@@ -16,7 +16,7 @@
 
 ### Features
 - `auto-remove` (list of strings) added to the config
-    - Determines which file extensions to automatically include in the on-startup file cleanup
+    - Determines which file extensions to include in the on-startup file cleanup
     - Includes most common media formats by default
 
 > Note: Media files not in use by the bot are normally deleted once the queue advances, however some can by left behind occassionally; thus, on startup, the bot will remove any stray files like this
@@ -31,6 +31,8 @@
 
 ### Fixes
 - Fixed [Issue #25](https://github.com/svioletg/viMusBot/issues/25): Bot thinks its outdated despite the version numbers matching
+- Fixed YouTube links retrieved using pytube causing occassional errors, the bot will now fall back on the slower yt-dlp method instead of aborting
+- config.yml should now merge and update correctly with config_default.yml
 
 ### Other
 - `-todo` command removed

@@ -1,4 +1,4 @@
-print('Loading...')
+print('Getting ready...')
 
 # Import sys out of order to print the Python version, for troubleshooting
 import sys
@@ -31,16 +31,18 @@ from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 
 # Validate config
+print('Checking config...')
+
 if not os.path.isfile('config_default.yml'):
 	print('config_default.yml not found; downloading...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
 
-with open('config_default.yml','r') as f:
-	config_default = yaml.safe_load(f)
-
 if not os.path.isfile('config.yml'):
 	print('config.yml does not exist. It will be created as a duplicate of config_default.yml')
 	shutil.copyfile('config_default.yml', 'config.yml')
+
+with open('config_default.yml','r') as f:
+	config_default = yaml.safe_load(f)
 
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
@@ -53,41 +55,70 @@ def keys_recursive(d):
 			vals = vals+keys_recursive(v)
 	return vals
 
+# extend_dict() and extend_list() from this stack overflow answer,
+# modified a little to return a new dict instead of directly changing it:
+# https://stackoverflow.com/a/36584863/8108924
+ 
+EXTENDABLE_KEYS = ()
+
+def extend_dict(extend_me, extend_by) -> dict:
+	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
+	if isinstance(extended, dict):
+		for k, v in extend_by.items():
+			if k in extended:
+				extend_dict(extended[k], v)
+			else:
+				extended[k] = v
+	else:
+		if isinstance(extended, list):
+			extend_list(extended, extend_by)
+		else:
+			extended += extend_by
+	return extended
+
+def extend_list(extend_me, extend_by) -> list:
+	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
+	missing = []
+	for item1 in extended:
+		if not isinstance(item1, dict):
+			continue
+		for item2 in extend_by:
+			if not isinstance(item2, dict) or item2 in missing: 
+				continue
+			if filter(lambda x: x in EXTENDABLE_KEYS, item1.keys()):
+				extend_dict(item1, item2)
+			else:
+				missing += [item2, ]
+		extended += missing
+	return extended
+
 default_options = keys_recursive(config_default)
 user_options = keys_recursive(config)
 
-# Check for missing/updated config keys
-# for i in user_options:
-# 	if i not in default_options:
-# 		print(f'"{i}" is no longer used; '+
-# 			'it may have been renamed or removed in a recent update. '+
-# 			'Check the changelog linked above for what might have moved.')
+# Check for missing/updated config keys, merge config
+for i in user_options:
+	if i not in default_options:
+		print(f'"{i}" is no longer used; it may have been renamed or removed in a recent update.')
 
-# for i in default_options:
-# 	if i not in user_options:
-# 		if config.get('auto-update-config', False):
-# 			print('config.yml is missing new options; merging...')
-# 			new_config = config_default | config
-# 			os.replace('config.yml','config_old.yml')
-# 			with open('config.yml','w') as f:
-# 				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-# 			print('config.yml has been updated with new options, '+
-# 				'and your previous settings have been preserved. '+
-# 				'\nconfig_old.yml has been created in case this process has gone wrong.')
-# 			break
-# 		else:
-# 			print('config.yml is missing new options. '+
-# 				'\nSet auto-update-config to true to update your config automatically, '+
-# 				'or check the latest default config and add the missing options manually.')
-# 			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
-# 			print('You are missing:\n')
-# 			print([i.keys() for i in config_default if type(i)==dict])
-# 			print([i.keys() for i in config if type(i)==dict])
-# 			for i in list(set(config_default) - set(config)): print(i)
-# 			print('\nThe auto-update-config option is either missing or set to false, '+
-# 				'so the script will exit.')
-# 			exit()
-
+for i in default_options:
+	if i not in user_options:
+		print(i)
+		if config.get('auto-update-config', False):
+			print('config.yml is missing new options; merging...')
+			new_config = extend_dict(config, config_default)
+			os.replace('config.yml','config_old.yml')
+			with open('config.yml','w') as f:
+				yaml.dump(new_config, f, default_flow_style=False, indent=4)
+			print('config.yml has been updated with new options, '+
+				'and your previous settings have been preserved. '+
+				'\nconfig.yml was backed up as config_old.yml, in case something has gone wrong.')
+			break
+		else:
+			print('config.yml is missing new options.')
+			print('The "auto-update-config" option is either missing or set to false, '+
+				'so the script will exit. Check config_default.yml for what\'s missing.')
+			exit()
+exit()
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
@@ -235,12 +266,18 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 def title_from_url(url):
 	log(f'Fetching title of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
-		return pytube.YouTube(url).title
+		try:
+			return pytube.YouTube(url).title
+		except pytube.exceptions.PytubeError:
+			log('pytube encountered an error during title retrieval. Falling back to yt-dlp.', verbose=True)
+			info_dict = ytdl.extract_info(url, download=False)
+			return info_dict.get('title', None)
 	elif 'soundcloud.com' in url:
 		return spoofy.sc.resolve(url).title
 	elif 'open.spotify.com' in url:
 		return spoofy.spotify_track(url)['title']
 	else:
+		# yt-dlp should handle most URLs
 		info_dict = ytdl.extract_info(url, download=False)
 		return info_dict.get('title', None)
 
@@ -569,7 +606,11 @@ class Music(commands.Cog):
 				log('Checking duration...', verbose=True)
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
-					if pytube.YouTube(url).length > duration_limit*60*60:
+					try:
+						yt_length = pytube.YouTube(url).length
+					except TypeError:
+						yt_length = ytdl.extract_info(url, download=False)['duration']
+					if yt_length > duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
@@ -614,14 +655,14 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('The queue is empty.'))
 			return
 
-		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
-		n=1
-		start=(10*page)-10
-		end=(10*page)
+		embed = discord.Embed(title='Current queue:',color=0xFFFF00)
+		num = 1
+		start = (10*page)-10
+		end = (10*page)
 		if 10*page>len(player_queue.get(ctx)): end=len(player_queue.get(ctx))
 		for i in player_queue.get(ctx)[start:end]:
-			embed.add_field(name=f'#{n+start}. {i.title}',value=i.url,inline=False)
-			n+=1
+			embed.add_field(name=f'#{num+start}. {i.title}',value=i.url,inline=False)
+			num+=1
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
