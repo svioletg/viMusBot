@@ -111,8 +111,8 @@ logging-options:
     colors:
         # Run "palette.py" to see a list of choices
         no-color: no # Disables all message coloring
-        bot.py: "yellow" # For the [bot.py] part
-        spoofy.py: "lime" # For the [spoofy.py] part
+        bot.py: "yellow" # For logs from bot.py
+        spoofy.py: "lime" # For logs from spoofy.py
         warn: "gold" # For non-serious warning messages
         error: "red" # For tracebacks and/or fatal errors
         timer: "magenta" # The time between logs at the end of each message

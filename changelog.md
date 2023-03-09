@@ -10,29 +10,37 @@
     - Almost every function should have types declared for their arguments, and a `->` operator to indicate its return type
     - Old, unused code entirely removed
     - Certain sections were changed to improve readability and clarity
-- in `bot.py`
+- `bot.py`:
     - `public` no longer determines the token file, and is now only used to select which command prefix to use
     - `TODO` dictionary removed, hasn't been used for a long time
+- `spoofy.py`:
+    - `spotify_album()` now retrieves a year
+    - `search_ytmusic_album()` now uses the release year for matching, will pass if at least 2 out of the title, artist, and year match
 
 ### Features
-- `auto-remove` (list of strings) added to the config
-    - Determines which file extensions to include in the on-startup file cleanup
-    - Includes most common media formats by default
+- Song length will now be displayed when using `-nowplaying`
+- Config changes:
+    - `auto-remove` (list of strings) added to the config
+        - Determines which file extensions to include in the on-startup file cleanup
+        - Includes most common media formats by default
 
-> Note: Media files not in use by the bot are normally deleted once the queue advances, however some can by left behind occassionally; thus, on startup, the bot will remove any stray files like this
+    > Note: Media files not in use by the bot are normally deleted once the queue advances, however some can by left behind occassionally; thus, on startup, the bot will remove any stray files like this
 
-- `token-file` (string; file name or path) added to the config
-    - Specifies which file `bot.py` will check for the bot's token
-    - `public` no longer determines this file
-- `vote-to-skip` section added to the config
-    - `enabled` (boolean) added; toggles whether skipping will be done by vote or instantly
-    - `threshold` (number) added; percentage of users connected to a voice channel needed to skip (only include the number, not the percentage sign - doing so will break the YAML)
-- `palette.py` now displays each available color on the same line, separated by a space
+    - `token-file` (string; file name or path) added to the config
+        - Specifies which file `bot.py` will check for the bot's token
+        - `public` no longer determines this file
+    - `logging-options/show-verbose-logs` (boolean) added to the config
+        - If enabled, will stop certain logs from showing in the console window, ones that may be seen as clutter and are more useful for debugging (they are still logged to `vimusbot.log` regardless)
+    - `vote-to-skip` section added to the config
+        - `enabled` (boolean) added; toggles whether skipping will be done by vote or instantly
+        - `threshold` (number) added; percentage of users connected to a voice channel needed to skip (only include the number, not the percentage sign - doing so will break the YAML)
+    - `palette.py` now displays each available color on the same line, separated by a space
 
 ### Fixes
 - Fixed [Issue #25](https://github.com/svioletg/viMusBot/issues/25): Bot thinks its outdated despite the version numbers matching
 - Fixed YouTube links retrieved using pytube causing occassional errors, the bot will now fall back on the slower yt-dlp method instead of aborting
 - config.yml should now merge and update correctly with config_default.yml
+- `duration_limit` was being set incorrectly in `bot.py` and could interfere with the user-set limit, now grabs it from the config file like it should
 
 ### Other
 - `-todo` command removed

@@ -180,21 +180,22 @@ def search_ytmusic_text(query: str) -> tuple:
 	top_video = ytmusic.search(query=query,limit=1,filter='songs')[0]
 	return top_song, top_video
 
-def search_ytmusic_album(title: str, artist: str, upc: str=None) -> str|None:
+def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> str|None:
 	if force_no_match:
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
-	query = f'{title} {artist}'
-	reference = {'title':title, 'artist':artist, 'upc':upc}
+	query = f'{title} {artist} {year}'
+	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
 	album_results = ytmusic.search(query=query,limit=5,filter='albums')
-	for i in album_results:
-		title_match = fuzz.ratio(title,i['title'])>75
-		artist_match = fuzz.ratio(artist,i['artists'][0]['name'])>75
-		if title_match and artist_match:
+	for yt in album_results:
+		title_match = fuzz.ratio(title, yt['title']) > 75
+		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
+		year_match = fuzz.ratio(year, yt['year']) > 75
+		if title_match + artist_match + year_match >= 2:
 			log('Match found.', verbose=True)
-			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(i['browseId'])['audioPlaylistId']
+			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
 	# This will only run if no match has been found
 	log('No match found.', verbose=True)
 	return None
@@ -359,6 +360,7 @@ def spotify_album(url: str) -> dict:
 	return {
 		'title':info['name'], 
 		'artist':info['artists'][0]['name'],
+		'year':info['release_date'].split('-')[0],
 		'upc':info['external_ids']['upc']
 	}
 

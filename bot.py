@@ -31,7 +31,7 @@ from inspect import currentframe, getframeinfo
 from pretty_help import DefaultMenu, PrettyHelp
 
 # Validate config
-print('Checking config...')
+# print('Checking config...')
 
 if not os.path.isfile('config_default.yml'):
 	print('config_default.yml not found; downloading...')
@@ -47,78 +47,78 @@ with open('config_default.yml','r') as f:
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-def keys_recursive(d):
-	vals = []
-	for k, v in d.items():
-		vals.append(k)
-		if isinstance(v, dict):
-			vals = vals+keys_recursive(v)
-	return vals
+# def keys_recursive(d):
+# 	vals = []
+# 	for k, v in d.items():
+# 		vals.append(k)
+# 		if isinstance(v, dict):
+# 			vals = vals+keys_recursive(v)
+# 	return vals
 
 # extend_dict() and extend_list() from this stack overflow answer,
 # modified a little to return a new dict instead of directly changing it:
 # https://stackoverflow.com/a/36584863/8108924
  
-EXTENDABLE_KEYS = ()
+# EXTENDABLE_KEYS = ()
 
-def extend_dict(extend_me, extend_by) -> dict:
-	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
-	if isinstance(extended, dict):
-		for k, v in extend_by.items():
-			if k in extended:
-				extend_dict(extended[k], v)
-			else:
-				extended[k] = v
-	else:
-		if isinstance(extended, list):
-			extend_list(extended, extend_by)
-		else:
-			extended += extend_by
-	return extended
+# def extend_dict(extend_me, extend_by) -> dict:
+# 	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
+# 	if isinstance(extended, dict):
+# 		for k, v in extend_by.items():
+# 			if k in extended:
+# 				extend_dict(extended[k], v)
+# 			else:
+# 				extended[k] = v
+# 	else:
+# 		if isinstance(extended, list):
+# 			extend_list(extended, extend_by)
+# 		else:
+# 			extended += extend_by
+# 	return extended
 
-def extend_list(extend_me, extend_by) -> list:
-	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
-	missing = []
-	for item1 in extended:
-		if not isinstance(item1, dict):
-			continue
-		for item2 in extend_by:
-			if not isinstance(item2, dict) or item2 in missing: 
-				continue
-			if filter(lambda x: x in EXTENDABLE_KEYS, item1.keys()):
-				extend_dict(item1, item2)
-			else:
-				missing += [item2, ]
-		extended += missing
-	return extended
+# def extend_list(extend_me, extend_by) -> list:
+# 	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
+# 	missing = []
+# 	for item1 in extended:
+# 		if not isinstance(item1, dict):
+# 			continue
+# 		for item2 in extend_by:
+# 			if not isinstance(item2, dict) or item2 in missing: 
+# 				continue
+# 			if filter(lambda x: x in EXTENDABLE_KEYS, item1.keys()):
+# 				extend_dict(item1, item2)
+# 			else:
+# 				missing += [item2, ]
+# 		extended += missing
+# 	return extended
 
-default_options = keys_recursive(config_default)
-user_options = keys_recursive(config)
+# default_options = keys_recursive(config_default)
+# user_options = keys_recursive(config)
 
-# Check for missing/updated config keys, merge config
-for i in user_options:
-	if i not in default_options:
-		print(f'"{i}" is no longer used; it may have been renamed or removed in a recent update.')
+# # Check for missing/updated config keys, merge config
+# for i in user_options:
+# 	if i not in default_options:
+# 		print(f'"{i}" is no longer used; it may have been renamed or removed in a recent update.')
 
-for i in default_options:
-	if i not in user_options:
-		print(i)
-		if config.get('auto-update-config', False):
-			print('config.yml is missing new options; merging...')
-			new_config = extend_dict(config, config_default)
-			os.replace('config.yml','config_old.yml')
-			with open('config.yml','w') as f:
-				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-			print('config.yml has been updated with new options, '+
-				'and your previous settings have been preserved. '+
-				'\nconfig.yml was backed up as config_old.yml, in case something has gone wrong.')
-			break
-		else:
-			print('config.yml is missing new options.')
-			print('The "auto-update-config" option is either missing or set to false, '+
-				'so the script will exit. Check config_default.yml for what\'s missing.')
-			exit()
-exit()
+# for i in default_options:
+# 	if i not in user_options:
+# 		print(i)
+# 		if config.get('auto-update-config', False):
+# 			print('config.yml is missing new options; merging...')
+# 			new_config = extend_dict(config, config_default)
+# 			os.replace('config.yml','config_old.yml')
+# 			with open('config.yml','w') as f:
+# 				yaml.dump(new_config, f, default_flow_style=False, indent=4)
+# 			print('config.yml has been updated with new options, '+
+# 				'and your previous settings have been preserved. '+
+# 				'\nconfig.yml was backed up as config_old.yml, in case something has gone wrong.')
+# 			break
+# 		else:
+# 			print('config.yml is missing new options.')
+# 			print('The "auto-update-config" option is either missing or set to false, '+
+# 				'so the script will exit. Check config_default.yml for what\'s missing.')
+# 			exit()
+
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
@@ -181,6 +181,7 @@ with open('config.yml','r') as f:
 allow_spotify_playlists = config['allow-spotify-playlists']
 spotify_playlist_limit = config['spotify-playlist-limit']
 use_top_match = config['use-top-match']
+duration_limit = config['duration-limit']
 
 public = config['public']
 token_file_path = config['token-file']
@@ -204,11 +205,11 @@ def get_aliases(command: str):
 # Clear out downloaded files
 log('Removing previously downloaded files...')
 files = glob.glob('*.*')
-to_remove = [f for f in files if re.search(r'(\..*$)',f)[0] in cleanup_extensions]
+to_remove = [f for f in files if re.search(r'\.(\w+)(?!.*\.)',f)[0] in cleanup_extensions]
 for i in to_remove:
 	os.remove(i)
 del files, to_remove
-
+exit()
 def embedq(*args) -> discord.Embed:
 	"""Shortcut for making new embeds"""
 	if len(args) == 1:
@@ -258,8 +259,6 @@ ytdl_format_options = {
 ffmpeg_options = {
 	'options': '-vn',
 }
-
-duration_limit = 5 # in hours
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
@@ -488,7 +487,9 @@ class Music(commands.Cog):
 		if not voice.is_playing() and not voice.is_paused():
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 		else:
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
+			print(now_playing)
+			print(dir(now_playing))
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{now_playing.length}]',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
@@ -559,7 +560,7 @@ class Music(commands.Cog):
 				if '/album/' in url:
 					log('Spotify album detected.', verbose=True)
 					album_info = spoofy.spotify_album(url)
-					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
+					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
 					if url == None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
@@ -923,6 +924,10 @@ async def play_url(url: str, ctx):
 
 	now_playing = player
 	now_playing.weburl = 'https://www.youtube.com/watch?v='+now_playing.ID
+	try:
+		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length)).lstrip('0')
+	except pytube.exceptions.PytubeError:
+		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration'])).lstrip('0')
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
 	audio_started = time.time()
@@ -934,7 +939,7 @@ async def play_url(url: str, ctx):
 	except UnboundLocalError:
 		pass
 
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
@@ -1017,14 +1022,14 @@ async def on_ready():
 	log('Ready!')
 
 # Retrieve bot token
-f = token_file_path
 log(f'Retrieving token from {plt.blue}{token_file_path}')
 
 if not public:
 	log(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
-	token = open(f).read()
+	with open(token_file_path, 'r') as f:
+		token = f.read()
 except FileNotFoundError:
 	print(f'{f} does not exist; exiting.')
 	exit()
