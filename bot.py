@@ -2,36 +2,35 @@ print('Getting ready...')
 
 # Import sys out of order to print the Python version, for troubleshooting
 import sys
+
 print('python '+sys.version)
 
 import asyncio
-import colorama
-from colorama import Fore, Back, Style
-import discord
-from discord.ext import commands
 import glob
 import importlib
 import logging
 import os
-import pytube
 import random
-import regex as re
 import shutil
 import subprocess
 import sys
 import time
 import traceback
 import urllib.request
+from datetime import datetime, timedelta
+from inspect import currentframe, getframeinfo
+
+import colorama
+import discord
+import pytube
+import regex as re
 import yaml
 import yt_dlp
-
-from datetime import datetime
-from datetime import timedelta
-from inspect import currentframe, getframeinfo
+from colorama import Back, Fore, Style
+from discord.ext import commands
 from pretty_help import DefaultMenu, PrettyHelp
 
-# Validate config
-# print('Checking config...')
+print('Checking for config...')
 
 if not os.path.isfile('config_default.yml'):
 	print('config_default.yml not found; downloading...')
@@ -47,84 +46,11 @@ with open('config_default.yml','r') as f:
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-# def keys_recursive(d):
-# 	vals = []
-# 	for k, v in d.items():
-# 		vals.append(k)
-# 		if isinstance(v, dict):
-# 			vals = vals+keys_recursive(v)
-# 	return vals
-
-# extend_dict() and extend_list() from this stack overflow answer,
-# modified a little to return a new dict instead of directly changing it:
-# https://stackoverflow.com/a/36584863/8108924
- 
-# EXTENDABLE_KEYS = ()
-
-# def extend_dict(extend_me, extend_by) -> dict:
-# 	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
-# 	if isinstance(extended, dict):
-# 		for k, v in extend_by.items():
-# 			if k in extended:
-# 				extend_dict(extended[k], v)
-# 			else:
-# 				extended[k] = v
-# 	else:
-# 		if isinstance(extended, list):
-# 			extend_list(extended, extend_by)
-# 		else:
-# 			extended += extend_by
-# 	return extended
-
-# def extend_list(extend_me, extend_by) -> list:
-# 	extended = extend_me.copy() if type(extend_me) in [dict, list] else extend_me
-# 	missing = []
-# 	for item1 in extended:
-# 		if not isinstance(item1, dict):
-# 			continue
-# 		for item2 in extend_by:
-# 			if not isinstance(item2, dict) or item2 in missing: 
-# 				continue
-# 			if filter(lambda x: x in EXTENDABLE_KEYS, item1.keys()):
-# 				extend_dict(item1, item2)
-# 			else:
-# 				missing += [item2, ]
-# 		extended += missing
-# 	return extended
-
-# default_options = keys_recursive(config_default)
-# user_options = keys_recursive(config)
-
-# # Check for missing/updated config keys, merge config
-# for i in user_options:
-# 	if i not in default_options:
-# 		print(f'"{i}" is no longer used; it may have been renamed or removed in a recent update.')
-
-# for i in default_options:
-# 	if i not in user_options:
-# 		print(i)
-# 		if config.get('auto-update-config', False):
-# 			print('config.yml is missing new options; merging...')
-# 			new_config = extend_dict(config, config_default)
-# 			os.replace('config.yml','config_old.yml')
-# 			with open('config.yml','w') as f:
-# 				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-# 			print('config.yml has been updated with new options, '+
-# 				'and your previous settings have been preserved. '+
-# 				'\nconfig.yml was backed up as config_old.yml, in case something has gone wrong.')
-# 			break
-# 		else:
-# 			print('config.yml is missing new options.')
-# 			print('The "auto-update-config" option is either missing or set to false, '+
-# 				'so the script will exit. Check config_default.yml for what\'s missing.')
-# 			exit()
-
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
-
-from palette import Palette
 import update
+from palette import Palette
 
 _here = os.path.basename(__file__)
 
@@ -209,7 +135,7 @@ to_remove = [f for f in files if re.search(r'\.(\w+)(?!.*\.)',f)[0] in cleanup_e
 for i in to_remove:
 	os.remove(i)
 del files, to_remove
-exit()
+
 def embedq(*args) -> discord.Embed:
 	"""Shortcut for making new embeds"""
 	if len(args) == 1:
@@ -487,22 +413,23 @@ class Music(commands.Cog):
 		if not voice.is_playing() and not voice.is_paused():
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 		else:
-			print(now_playing)
-			print(dir(now_playing))
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{now_playing.length}]',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
+			nowtime = time.time()
+			elapsed = time.strftime('%M:%S', time.gmtime(nowtime - audio_start_time - paused_at))
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('pause'))
 	@commands.check(is_command_enabled)
 	async def pause(self, ctx):
-		"""Pauses the player. Can be resumed with -play."""
-		global paused_at
 		"""Pauses the player."""
+		# Developer note: See on_command_error for how this gets resumed
+		global paused_at
 		if voice.is_playing():
+			paused_at = time.time()
+			print(paused_at)
 			voice.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
-			paused_at=time.time()
 		elif voice.is_paused():
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
@@ -857,7 +784,7 @@ last_played = None
 
 npmessage = None
 
-audio_started = 0
+audio_start_time = 0
 paused_at = 0
 paused_for = 0
 
@@ -867,7 +794,7 @@ async def play_url(url: str, ctx):
 	global now_playing
 	global npmessage
 	global last_played
-	global audio_started, paused_at, paused_for
+	global audio_start_time, paused_at, paused_for
 	global skip_votes
 
 	skip_votes = []
@@ -930,7 +857,7 @@ async def play_url(url: str, ctx):
 		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration'])).lstrip('0')
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
-	audio_started = time.time()
+	audio_start_time = time.time()
 
 	if npmessage != None: await npmessage.delete()
 
@@ -990,15 +917,18 @@ bot = commands.Bot(
 menu = DefaultMenu('◀️', '▶️', '❌')
 bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 
+# Command error handling
 @bot.event
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
 		if ctx.command.name == 'play':
+			# Resuming while paused
 			if voice.is_paused():
 				voice.resume()
 				await ctx.send(embed=embedq('Player is resuming.'))
 				global paused_for
-				paused_for=time.time()-paused_at
+				paused_for = time.time() - paused_at
+				print(paused_for)
 			else:
 				await ctx.send(embed=embedq('No URL given.'))
 		elif ctx.command.name == 'volume':
@@ -1006,7 +936,7 @@ async def on_command_error(ctx, error):
 		elif ctx.command.name == 'analyze':
 			await ctx.send(embed=embedq('A spotify track URL is required.'))
 	elif isinstance(error, discord.ext.commands.CheckFailure):
-		await ctx.send(embed=embedq('This command is disabled for this instance.'))
+		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)

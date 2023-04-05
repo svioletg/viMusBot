@@ -44,6 +44,7 @@
 
 ### Other
 - `-todo` command removed
+- `config.yml` will **no longer automatically update itself** with new keys from `config_default.yml` — see [this page in the new FAQ](https://github.com/svioletg/viMusBot/blob/master/faq.md#how-do-i-update-my-config) on manually updating
 
 ## 1.7.0
 > *2023.01.13 / dev.28*

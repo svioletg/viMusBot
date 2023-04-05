@@ -1,23 +1,22 @@
-import colorama
-from colorama import Fore, Back, Style
 import json
 import os
+import sys
+import time
+from inspect import currentframe, getframeinfo
+
+import colorama
 import pytube
 import regex as re
 import sclib
 import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-import sys
-import time
 import yaml
-
+from colorama import Back, Fore, Style
 from fuzzywuzzy import fuzz
-from inspect import currentframe, getframeinfo
+from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
 # Local files
 import customlog
-
 from palette import Palette
 
 _here = os.path.basename(__file__)
@@ -157,6 +156,9 @@ def isrc_search_test(playlist):
 	log(f'{yes} successes / {no} fails')
 
 def pytube_track_data(pytube_object) -> dict:
+	# TODO: sometimes nonetype error here
+	print(pytube_object if pytube_object==None else '')
+	print(pytube_object.description if pytube_object.description==None else '')
 	description_list = pytube_object.description.split('\n')
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
@@ -248,10 +250,10 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	song_results = ytmusic.search(query=query,limit=limit,filter='songs')
 	video_results = ytmusic.search(query=query,limit=limit,filter='videos')
 	# Remove videos over a certain length
-	for s, v in song_results, video_results:
+	for s, v in song_results.copy(), video_results.copy():
 		if int(s['duration_seconds']) > duration_limit*60*60: song_results.pop(song_results.index(s))
 		if int(v['duration_seconds']) > duration_limit*60*60: video_results.pop(video_results.index(v))
-
+	
 	fast_search = kwargs.get('fast_search',False)
 	if fast_search:
 		log('fast_search is True.', verbose=True)
