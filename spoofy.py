@@ -250,9 +250,11 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	song_results = ytmusic.search(query=query,limit=limit,filter='songs')
 	video_results = ytmusic.search(query=query,limit=limit,filter='videos')
 	# Remove videos over a certain length
-	for s, v in song_results.copy(), video_results.copy():
-		if int(s['duration_seconds']) > duration_limit*60*60: song_results.pop(song_results.index(s))
-		if int(v['duration_seconds']) > duration_limit*60*60: video_results.pop(video_results.index(v))
+	for s, v in zip(song_results, video_results):
+		if int(s['duration_seconds']) > duration_limit*60*60:
+			song_results.pop(song_results.index(s))
+		if int(v['duration_seconds']) > duration_limit*60*60:
+			video_results.pop(video_results.index(v))
 	
 	fast_search = kwargs.get('fast_search',False)
 	if fast_search:

@@ -252,21 +252,24 @@ class General(commands.Cog):
 
 	# Adapted from: https://stackoverflow.com/a/68599108/8108924
 	@commands.Cog.listener()
-	# Disconnect after set amount of inactivity
 	async def on_voice_state_update(self, member, before, after):
 		global voice
 		if not member.id == self.bot.user.id:
 			return
 		elif before.channel is None:
+			# Disconnect after set amount of inactivity
 			if inactivity_timeout == 0:
 				return
-			elapsed = 0
+			timeout_counter = 0
 			while True:
 				await asyncio.sleep(1)
-				elapsed = elapsed + 1
+				timeout_counter += 1
 				if voice.is_playing() and not voice.is_paused():
-					elapsed = 0
-				if elapsed == inactivity_timeout*60:
+					timeout_counter = 0
+					global audio_time_elapsed
+					audio_time_elapsed += 1
+				
+				if timeout_counter == inactivity_timeout*60:
 					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
 				if not voice.is_connected():
@@ -414,7 +417,11 @@ class Music(commands.Cog):
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
 		else:
 			nowtime = time.time()
-			elapsed = time.strftime('%M:%S', time.gmtime(nowtime - audio_start_time - paused_at))
+			# global paused_for
+			# if voice.is_paused():
+			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
+
+			elapsed = time.strftime('%M:%S', time.gmtime(audio_time_elapsed))
 			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
@@ -427,7 +434,6 @@ class Music(commands.Cog):
 		global paused_at
 		if voice.is_playing():
 			paused_at = time.time()
-			print(paused_at)
 			voice.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
 		elif voice.is_paused():
@@ -634,7 +640,7 @@ class Music(commands.Cog):
 		else:
 			if ctx.author not in skip_votes:
 				skip_votes.append(ctx.author)
-			print(skip_votes)
+
 			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
 			if len(skip_votes) == skip_votes_needed:
 				await ctx.send(embed=embedq('Skipping...'))
@@ -664,7 +670,6 @@ class Music(commands.Cog):
 				voice = await ctx.author.voice.channel.connect()
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
-				raise commands.CommandError("Author not connected to a voice channel.")
 
 # 
 # 
@@ -785,6 +790,7 @@ last_played = None
 npmessage = None
 
 audio_start_time = 0
+audio_time_elapsed = 0
 paused_at = 0
 paused_for = 0
 
@@ -794,12 +800,12 @@ async def play_url(url: str, ctx):
 	global now_playing
 	global npmessage
 	global last_played
-	global audio_start_time, paused_at, paused_for
+	global audio_start_time, audio_time_elapsed, paused_at, paused_for
 	global skip_votes
 
 	skip_votes = []
 
-	paused_at, paused_for = 0, 0
+	audio_time_elapsed, paused_at, paused_for = 0, 0, 0
 	last_played = now_playing
 
 	log('Trying to start playing...')
@@ -853,7 +859,7 @@ async def play_url(url: str, ctx):
 	now_playing.weburl = 'https://www.youtube.com/watch?v='+now_playing.ID
 	try:
 		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length)).lstrip('0')
-	except pytube.exceptions.PytubeError:
+	except pytube.exceptions.PytubeError or TypeError:
 		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration'])).lstrip('0')
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
@@ -928,7 +934,6 @@ async def on_command_error(ctx, error):
 				await ctx.send(embed=embedq('Player is resuming.'))
 				global paused_for
 				paused_for = time.time() - paused_at
-				print(paused_for)
 			else:
 				await ctx.send(embed=embedq('No URL given.'))
 		elif ctx.command.name == 'volume':

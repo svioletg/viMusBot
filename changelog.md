@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.8.0
-> *2023.x.x / dev.29*
+> *2023.04.06 / dev.29*
 
 ### Developer
 - Various code improvements & edits
@@ -18,7 +18,7 @@
     - `search_ytmusic_album()` now uses the release year for matching, will pass if at least 2 out of the title, artist, and year match
 
 ### Features
-- Song length will now be displayed when using `-nowplaying`
+- Song length will now be displayed when using `-nowplaying`, as well as elapsed time
 - Config changes:
     - `auto-remove` (list of strings) added to the config
         - Determines which file extensions to include in the on-startup file cleanup
@@ -39,8 +39,10 @@
 ### Fixes
 - Fixed [Issue #25](https://github.com/svioletg/viMusBot/issues/25): Bot thinks its outdated despite the version numbers matching
 - Fixed YouTube links retrieved using pytube causing occassional errors, the bot will now fall back on the slower yt-dlp method instead of aborting
-- config.yml should now merge and update correctly with config_default.yml
 - `duration_limit` was being set incorrectly in `bot.py` and could interfere with the user-set limit, now grabs it from the config file like it should
+- Fixed [Issue #28](https://github.com/svioletg/viMusBot/issues/28): "Not connected to voice" message is duplicated
+- Fixed [Issue #30](https://github.com/svioletg/viMusBot/issues/30): "ValueError: too many values to unpack" for certain songs
+- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search
 
 ### Other
 - `-todo` command removed
