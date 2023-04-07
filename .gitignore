@@ -26,14 +26,20 @@ spoofy_*.py
 *.webm
 *.mp3
 <<<<<<< HEAD
+<<<<<<< HEAD
 # other
 =======
+=======
+>>>>>>> dev
 *.part
 # other
 build/
 dist/
 venv/
 *.spec
+<<<<<<< HEAD
+>>>>>>> dev
+=======
 >>>>>>> dev
 versioningconvention.txt
 new-release.bat

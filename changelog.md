@@ -447,6 +447,11 @@ The non-hotfixed version (in this example, 1.6.2) would then be removed from the
 This is largely to avoid having to change the dev number during development of a new major or minor version.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+Hotfix changelogs are only included on the relevant release page for that version.
+
+>>>>>>> dev
 =======
 Hotfix changelogs are only included on the relevant release page for that version.
 

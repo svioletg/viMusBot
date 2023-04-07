@@ -50,8 +50,6 @@ if force_no_match:
 
 # API Objects
 
-# API Objects
-
 # Connect to youtube music API
 ytmusic = YTMusic()
 

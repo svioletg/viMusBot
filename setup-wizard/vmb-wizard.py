@@ -7,6 +7,10 @@ import requests
 import shutil
 import subprocess
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+import sys
+>>>>>>> dev
 =======
 import sys
 >>>>>>> dev
@@ -127,8 +131,13 @@ elif ostype == 'Windows':
 else:
 	print('[!] Type of OS could not be determined.')
 <<<<<<< HEAD
+<<<<<<< HEAD
 	print('FFmpeg will not be automatically acquired,'+
 		'\nbut setup can proceed regardless.')
+=======
+	print('FFmpeg will not be automatically acquired, '+
+		'but setup can proceed regardless.')
+>>>>>>> dev
 =======
 	print('FFmpeg will not be automatically acquired, '+
 		'but setup can proceed regardless.')
@@ -167,9 +176,15 @@ with open('spotify_config.json', 'w') as f:
 
 print('\nThe script will now attempt to install any required Python packages.')
 <<<<<<< HEAD
+<<<<<<< HEAD
 print('This will be done using the "py -m pip install -r requirements.txt" command.')
 print('\nIf for whatever reason this will not work for you, you can skip this step.')
 print('If you don\'t know what this means, it is likely best to proceed.')
+=======
+print(f'This will be done by running the command "{sys.executable} -m pip install -r requirements.txt"')
+print('\nIf for whatever reason this will not work for you, you can skip this step.')
+print('If you don\'t know what this means, it\'s likely that this won\'t be a concern.')
+>>>>>>> dev
 =======
 print(f'This will be done by running the command "{sys.executable} -m pip install -r requirements.txt"')
 print('\nIf for whatever reason this will not work for you, you can skip this step.')
@@ -180,17 +195,23 @@ q = [inquirer.List(
 	message=f'Automatically install requirements?',
 	choices=['Yes', 'No']
 <<<<<<< HEAD
+<<<<<<< HEAD
 	)]
 answer = inquirer.prompt(q)
 if answer['confirm'] == 'Yes':
 	print('Installing required packages...')
 	subprocess.run(['py', '-m', 'pip', 'install', '-r', 'requirements.txt'])
 =======
+=======
+>>>>>>> dev
 )]
 answer = inquirer.prompt(q)
 if answer['confirm'] == 'Yes':
 	print('Installing required packages...')
 	subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+<<<<<<< HEAD
+>>>>>>> dev
+=======
 >>>>>>> dev
 else:
 	print('Skipping requirements for now.')

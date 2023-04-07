@@ -67,8 +67,13 @@ def test():
 				print(f'{v2}{k}[\'{k2}\']', end=' ')
 		else:
 <<<<<<< HEAD
+<<<<<<< HEAD
 			print(v+k)
 	input('Press ENTER to continue.')
+=======
+			print(v+k, end=' ')
+	input('\nPress ENTER to continue.')
+>>>>>>> dev
 =======
 			print(v+k, end=' ')
 	input('\nPress ENTER to continue.')
