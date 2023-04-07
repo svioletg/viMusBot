@@ -1,36 +1,15 @@
 import colorama
-<<<<<<< HEAD
-<<<<<<< HEAD
-from colorama import Fore, Back, Style
-import inquirer
-=======
->>>>>>> dev
-=======
->>>>>>> dev
 import os
 import requests
 import shutil
 import sys
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 import tkinter
 import tkinter.filedialog
->>>>>>> dev
-=======
-import tkinter
-import tkinter.filedialog
->>>>>>> dev
 import urllib.request
 from zipfile import ZipFile
 
 from palette import Palette
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> dev
 # Just so I can test this in another directory
 if '--test' in sys.argv:
 	root = tkinter.Tk()
@@ -39,33 +18,16 @@ if '--test' in sys.argv:
 else:
 	target_dir = '.'
 
-<<<<<<< HEAD
->>>>>>> dev
-=======
->>>>>>> dev
 colorama.init(autoreset=True)
 plt = Palette()
 
 def check():
 	response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 	latest = response.json()
-<<<<<<< HEAD
-<<<<<<< HEAD
-	latest_tag = latest['tag_name']
-
-	with open('version.txt', 'r') as f:
-		current = f.read()
-=======
-=======
->>>>>>> dev
 	latest_tag = latest['tag_name'].strip()
 
 	with open('version.txt', 'r') as f:
 		current = f.read().strip()
-<<<<<<< HEAD
->>>>>>> dev
-=======
->>>>>>> dev
 
 	return current == latest_tag, {'current':current, 'latest':latest}
 
@@ -89,15 +51,7 @@ def main():
 	confirm = input('Would you like to update now? (y/n) ')
 	if confirm == 'n': print('Exiting.'); exit()
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-	latest_zip = f'viMusBot-{latest_tag}.zip'
-=======
 	latest_zip = f'{target_dir}/viMusBot-{latest_tag}.zip'
->>>>>>> dev
-=======
-	latest_zip = f'{target_dir}/viMusBot-{latest_tag}.zip'
->>>>>>> dev
 
 	print('Retrieving: '+latest['zipball_url'])
 	urllib.request.urlretrieve(latest['zipball_url'], latest_zip)
