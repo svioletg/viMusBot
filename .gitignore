@@ -9,6 +9,7 @@ token.txt
 *.ini
 config.yml
 config_old.yml
+configtest.yml
 # credentials
 spotify_config.json
 headers_auth.json
@@ -16,6 +17,7 @@ headers_auth.json
 yttesting.py
 quickstart.sh
 *.pickle
+.vscode/
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py
@@ -23,6 +25,15 @@ spoofy_*.py
 *.log
 *.webm
 *.mp3
+<<<<<<< HEAD
 # other
+=======
+*.part
+# other
+build/
+dist/
+venv/
+*.spec
+>>>>>>> dev
 versioningconvention.txt
 new-release.bat

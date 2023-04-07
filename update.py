@@ -1,25 +1,51 @@
 import colorama
+<<<<<<< HEAD
 from colorama import Fore, Back, Style
 import inquirer
+=======
+>>>>>>> dev
 import os
 import requests
 import shutil
 import sys
+<<<<<<< HEAD
+=======
+import tkinter
+import tkinter.filedialog
+>>>>>>> dev
 import urllib.request
 from zipfile import ZipFile
 
 from palette import Palette
 
+<<<<<<< HEAD
+=======
+# Just so I can test this in another directory
+if '--test' in sys.argv:
+	root = tkinter.Tk()
+	root.withdraw()
+	target_dir = tkinter.filedialog.askdirectory(parent=root, title='Choose where to setup viMusBot')
+else:
+	target_dir = '.'
+
+>>>>>>> dev
 colorama.init(autoreset=True)
 plt = Palette()
 
 def check():
 	response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 	latest = response.json()
+<<<<<<< HEAD
 	latest_tag = latest['tag_name']
 
 	with open('version.txt', 'r') as f:
 		current = f.read()
+=======
+	latest_tag = latest['tag_name'].strip()
+
+	with open('version.txt', 'r') as f:
+		current = f.read().strip()
+>>>>>>> dev
 
 	return current == latest_tag, {'current':current, 'latest':latest}
 
@@ -43,7 +69,11 @@ def main():
 	confirm = input('Would you like to update now? (y/n) ')
 	if confirm == 'n': print('Exiting.'); exit()
 
+<<<<<<< HEAD
 	latest_zip = f'viMusBot-{latest_tag}.zip'
+=======
+	latest_zip = f'{target_dir}/viMusBot-{latest_tag}.zip'
+>>>>>>> dev
 
 	print('Retrieving: '+latest['zipball_url'])
 	urllib.request.urlretrieve(latest['zipball_url'], latest_zip)

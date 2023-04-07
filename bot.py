@@ -1,36 +1,44 @@
-print('Loading...')
+print('Getting ready...')
 
 # Import sys out of order to print the Python version, for troubleshooting
 import sys
+
 print('python '+sys.version)
 
 import asyncio
-import colorama
-from colorama import Fore, Back, Style
-import discord
-from discord.ext import commands
 import glob
 import importlib
 import logging
 import os
-import pytube
 import random
+import shutil
 import subprocess
 import sys
 import time
 import traceback
 import urllib.request
+from datetime import datetime, timedelta
+from inspect import currentframe, getframeinfo
+
+import colorama
+import discord
+import pytube
+import regex as re
 import yaml
 import yt_dlp
-
-from datetime import datetime
-from datetime import timedelta
-from inspect import currentframe, getframeinfo
+from colorama import Back, Fore, Style
+from discord.ext import commands
 from pretty_help import DefaultMenu, PrettyHelp
 
-# Validate config
+print('Checking for config...')
+
 if not os.path.isfile('config_default.yml'):
+	print('config_default.yml not found; downloading...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+
+if not os.path.isfile('config.yml'):
+	print('config.yml does not exist. It will be created as a duplicate of config_default.yml')
+	shutil.copyfile('config_default.yml', 'config.yml')
 
 with open('config_default.yml','r') as f:
 	config_default = yaml.safe_load(f)
@@ -38,50 +46,10 @@ with open('config_default.yml','r') as f:
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-def keys_recursive(d):
-	vals = []
-	for k, v in d.items():
-		vals.append(k)
-		if isinstance(v, dict):
-			vals=vals+keys_recursive(v)
-	return vals
-
-default_options = keys_recursive(config_default)
-user_options = keys_recursive(config)
-
-for i in user_options:
-	if i not in default_options:
-		print(f'{i} is no longer used; '+
-			'it may have been renamed or removed in a recent update. '+
-			'Check the changelog linked above for what might have moved.')
-
-for i in default_options:
-	if i not in user_options:
-		if config.get('auto-update-config',False):
-			print('config.yml is missing new options; merging...')
-			new_config = {**config_default, **config}
-			os.replace('config.yml','config_old.yml')
-			with open('config.yml','w') as f:
-				yaml.dump(new_config, f, default_flow_style=False, indent=4)
-			print('config.yml has been updated with new options, '+
-				'and your previous settings have been preserved. '+
-				'\nconfig_old.yml has been created in case this process has gone wrong.')
-			break
-		else:
-			print('config.yml is missing new options. '+
-				'\nSet auto-update-config to true to update your config automatically, '+
-				'or check the latest default config and add the missing options manually.')
-			print('Most recent config template: https://github.com/svioletg/viMusBot/blob/master/config_default.yml')
-			print('You are missing:\n')
-			for i in list(set(config_default) - set(config)): print(i)
-			print('\nThe auto-update-config option is either missing or set to false, '+
-				'so the script will exit.')
-			exit()
-
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
-
+import update
 from palette import Palette
 import update
 
@@ -90,41 +58,44 @@ _here = os.path.basename(__file__)
 # For personal reference
 # Represents the version of the overall project, not just this file
 with open('version.txt','r') as f:
-	version = f.read()
-
-### TODO
-TODO = {
-}
+	version = f.read().strip()
 
 # Start discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
-# Personal debug logging
+# Start bot logging
 colorama.init(autoreset=True)
 plt = Palette()
 
 last_logtime = time.time()
 
-def log(msg):
+def log(msg: str, verbose=False):
 	global last_logtime
-	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name)
+	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
 	last_logtime = time.time()
 
-def logln():
-	cf = currentframe()
-	if print_logs: print('@ LINE ', cf.f_back.f_lineno)
+def log_traceback(error: BaseException):
+	trace=traceback.format_exception(error)
+	log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
-log(f'[{version}]')
+def log_line():
+	cf = currentframe()
+	print('@ LINE ', cf.f_back.f_lineno)
+
+log(f'Running on version {version}.')
 
 update_check = update.check()
 
-if not update_check[0]:
+# Check for an outdated version.txt
+if update_check[0] == False and update_check[1]:
 	log(f'{plt.warn}There is a new release available.')
 	current_tag = update_check[1]['current']
 	latest_tag = update_check[1]['latest']['tag_name']
 	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
 	log('Use "update.py" to update.')
+else:
+	log(f'{plt.lime}You are up to date.')
 
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
@@ -137,12 +108,22 @@ with open('config.yml','r') as f:
 allow_spotify_playlists = config['allow-spotify-playlists']
 spotify_playlist_limit = config['spotify-playlist-limit']
 use_top_match = config['use-top-match']
+duration_limit = config['duration-limit']
+
+public = config['public']
+token_file_path = config['token-file']
 public_prefix = config['prefixes']['public']
 dev_prefix = config['prefixes']['developer']
-public = config['public']
 inactivity_timeout = config['inactivity-timeout']
+cleanup_extensions = config['auto-remove']
 
-def command_enabled(ctx):
+vote_to_skip = config['vote-to-skip']['enabled']
+skip_votes_percentage = config['vote-to-skip']['threshold']
+skip_votes_needed = 0
+
+skip_votes = []
+
+def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
 
 def get_aliases(command: str):
@@ -150,28 +131,24 @@ def get_aliases(command: str):
 
 # Clear out downloaded files
 log('Removing previously downloaded files...')
-toremove=[f for f_ in [glob.glob(e) for e in ('*.webm', '*.mp3')] for f in f_]
-for i in toremove:
-	log(i)
+files = glob.glob('*.*')
+to_remove = [f for f in files if re.search(r'\.(\w+)(?!.*\.)',f)[0] in cleanup_extensions]
+for i in to_remove:
 	os.remove(i)
-del toremove
-log('Done.')
+del files, to_remove
 
-# Shortcut for title-only embeds; "embed quick"
-def embedq(*args):
-	if len(args)==1:
-		return discord.Embed(title=args[0],color=0xFFFF00)
-	if len(args)==2:
-		return discord.Embed(title=args[0],description=args[1],color=0xFFFF00)
-	else:
-		log('Invalid number of arguments passed to embedq()')
-		return None
+def embedq(*args) -> discord.Embed:
+	"""Shortcut for making new embeds"""
+	if len(args) == 1:
+		return discord.Embed(title=args[0], color=0xFFFF00)
+	elif len(args) == 2:
+		return discord.Embed(title=args[0], description=args[1], color=0xFFFF00)
 
 # Based on and adapted from:
 # https://github.com/Rapptz/discord.py/blob/v2.0.1/examples/basic_voice.py
 
 # For easier emoji usage
-emoji={
+emoji = {
 	'cancel':'❌',
 	'confirm':'✅',
 	'repeat':'🔁',
@@ -210,19 +187,23 @@ ffmpeg_options = {
 	'options': '-vn',
 }
 
-duration_limit = 5 # in hours
-
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 def title_from_url(url):
-	log(f'Fetching title of \'{url}\'...')
+	log(f'Fetching title of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
-		return pytube.YouTube(url).title
+		try:
+			return pytube.YouTube(url).title
+		except pytube.exceptions.PytubeError:
+			log('pytube encountered an error during title retrieval. Falling back to yt-dlp.', verbose=True)
+			info_dict = ytdl.extract_info(url, download=False)
+			return info_dict.get('title', None)
 	elif 'soundcloud.com' in url:
 		return spoofy.sc.resolve(url).title
 	elif 'open.spotify.com' in url:
 		return spoofy.spotify_track(url)['title']
 	else:
+		# yt-dlp should handle most URLs
 		info_dict = ytdl.extract_info(url, download=False)
 		return info_dict.get('title', None)
 
@@ -264,28 +245,32 @@ class YTDLSource(discord.PCMVolumeTransformer):
 #
 #
 
+voice = None
+
 class General(commands.Cog):
 	def __init__(self, bot):
 		self.bot = bot
 
 	# Adapted from: https://stackoverflow.com/a/68599108/8108924
 	@commands.Cog.listener()
-	# Disconnect after set amount of inactivity
 	async def on_voice_state_update(self, member, before, after):
 		global voice
 		if not member.id == self.bot.user.id:
 			return
-
 		elif before.channel is None:
+			# Disconnect after set amount of inactivity
 			if inactivity_timeout == 0:
 				return
-			elapsed = 0
+			timeout_counter = 0
 			while True:
 				await asyncio.sleep(1)
-				elapsed = elapsed + 1
+				timeout_counter += 1
 				if voice.is_playing() and not voice.is_paused():
-					elapsed = 0
-				if elapsed == inactivity_timeout*60:
+					timeout_counter = 0
+					global audio_time_elapsed
+					audio_time_elapsed += 1
+				
+				if timeout_counter == inactivity_timeout*60:
 					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
 				if not voice.is_connected():
@@ -293,23 +278,28 @@ class General(commands.Cog):
 					break
 
 	@commands.command()
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def reload(self, ctx):
 		# Separated from the others for debug purposes
 		global spoofy
-		if not public:
-			spoofy = importlib.reload(spoofy)
-			log('Reloaded spoofy.py.')
+		spoofy = importlib.reload(spoofy)
+		log('Reloaded spoofy.py.')
+	
+	@commands.command()
+	@commands.check(is_command_enabled)
+	async def stream(self, ctx):
+		print(voice.source)
+		print(dir(voice.source))
 
 	@commands.command(aliases=get_aliases('changelog'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
 		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def ping(self, ctx):
 		"""Test command."""
 		await ctx.send('Pong!')
@@ -318,20 +308,10 @@ class General(commands.Cog):
 		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
 
 	@commands.command(aliases=get_aliases('repository'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
-		await ctx.send(embed=embed)
-
-	@commands.command(aliases=get_aliases('todo'))
-	@commands.check(command_enabled)
-	async def todo(self, ctx):
-		"""Returns a list of planned features or bugs to be fixed."""
-		embed=discord.Embed(title='Here is the current to-do list for viMusBot.',description='Feel free to suggest anything, no matter how minor!\nFEATURE = A new command or new functionality.\nQOL = Improvements to either the user experience or programming workflow.\nBUG = Incorrect or unexpected behavior.\nISSUE = Not a major issue, but something that could be improved.',color=0xFFFF00)
-		for i in TODO:
-			embed.add_field(name=i,value=TODO[i])
-
 		await ctx.send(embed=embed)
 
 
@@ -341,7 +321,7 @@ class Music(commands.Cog):
 
 	# Playing music / Voice-related
 	@commands.command(aliases=get_aliases('analyze'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def analyze(self, ctx, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
 		info = spoofy.spotify_track(spotifyurl)
@@ -374,7 +354,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('clear'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def clear(self, ctx):
 		"""Clears the entire queue."""
 		global player_queue
@@ -382,7 +362,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq('Queue cleared.'))
 
 	@commands.command(aliases=get_aliases('join'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def join(self, ctx):
 		"""Joins the voice channel of the user."""
 		# This actually just calls ensure_voice below,
@@ -390,7 +370,7 @@ class Music(commands.Cog):
 		pass
 
 	@commands.command(aliases=get_aliases('leave'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def leave(self, ctx):
 		"""Disconnects the bot from voice."""
 		global voice
@@ -401,7 +381,7 @@ class Music(commands.Cog):
 		voice = None
 
 	@commands.command(aliases=get_aliases('loop'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def loop(self, ctx):
 		"""Toggles looping for the current track."""
 		global loop_this
@@ -410,7 +390,7 @@ class Music(commands.Cog):
 		await ctx.send(embed=embedq(f'{get_loop_icon()}Looping is set to {loop_this}.'))
 
 	@commands.command(aliases=get_aliases('move'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def move(self, ctx, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
@@ -427,150 +407,127 @@ class Music(commands.Cog):
 			raise e
 
 	@commands.command(aliases=get_aliases('nowplaying'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def nowplaying(self, ctx):
 		"""Displays the currently playing video."""
-		try:
-			if not voice.is_playing() and not voice.is_paused():
-				embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
-			else:
-				embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title}',description=f'Link: {now_playing.weburl}',color=0xFFFF00)
-		except AttributeError:
+		if voice == None:
+			await ctx.send(embed=embedq('Not connected to a voice channel.'))
+			return
+
+		if not voice.is_playing() and not voice.is_paused():
 			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
+		else:
+			nowtime = time.time()
+			# global paused_for
+			# if voice.is_paused():
+			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
+
+			elapsed = time.strftime('%M:%S', time.gmtime(audio_time_elapsed))
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('pause'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def pause(self, ctx):
-		"""Pauses the player. Can be resumed with -play."""
-		global paused_at
 		"""Pauses the player."""
+		# Developer note: See on_command_error for how this gets resumed
+		global paused_at
 		if voice.is_playing():
+			paused_at = time.time()
 			voice.pause()
 			await ctx.send(embed=embedq('Player has been paused.'))
-			paused_at=time.time()
 		elif voice.is_paused():
 			await ctx.send(embed=embedq('Player is already paused.'))
 		else:
 			await ctx.send(embed=embedq('Nothing to pause.'))
 	
 	@commands.command(aliases=get_aliases('play'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def play(self, ctx, *, url: str):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
+		# Will resume if paused, this is handled in on_command_error()
 		global playctx
 		playctx = ctx
 		global qmessage
 		if 'soundcloud.com' in url:
-			qmessage = await ctx.send(embed=embedq('Trying to queue...',
+			qmessage = await ctx.send(
+				embed=embedq(
+				'Trying to queue...',
 				'Note: It is a known issue that SoundCloud links will sometimes fail to queue.'+
 				'\nIf you receive an error, try it again.'+
-				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'))
+				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'
+				)
+			)
 		else:
 			qmessage = await ctx.send(embed=embedq('Trying to queue...'))
-
-
-		# Will resume if paused, this is handled in on_command_error()
 
 		url = url.split('&list=')[0]
 		async with ctx.typing():
 			# Locate youtube equivalent if spotify link given
 			if 'open.spotify.com' in url:
-				log('Spotify URL was received from play command.')
-				log('Checking for playlist...')
-				if '/playlist/' in url:
-					log('Spotify playlist detected.')
-					if allow_spotify_playlists:
-						await qmessage.edit(embed=embedq(
-							'Trying to queue Spotify playlist; '+
-							'this will take a long time, please wait before trying another command.',
-							'This feature is experimental!'))
-						objlist = generate_QueueItems(spoofy.spotify_playlist(url))
-						if len(objlist) > spotify_playlist_limit:
-							await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
-							return
-						queue_batch(ctx, objlist)
-						list_name = spoofy.sp.playlist(url)['name']
-						await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
-						if not voice.is_playing():
-							log('Voice client is not playing; starting...')
-							await advance_queue(ctx)
+				log('Spotify URL was received from play command.', verbose=True)
+				log('Checking for playlist...', verbose=True)
+				if '/playlist/' in url and allow_spotify_playlists:
+					log('Spotify playlist detected.', verbose=True)
+					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
+					objlist = generate_QueueItems(spoofy.spotify_playlist(url))
+					if len(objlist) > spotify_playlist_limit:
+						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
-					else:
-						await ctx.send(embed=embedq(
-							'Spotify playlist support is disabled.',
-							'Contact whoever is hosting your bot if you believe this is a mistake.'))
-						return
+					queue_batch(ctx, objlist)
+					list_name = spoofy.sp.playlist(url)['name']
+					await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
+					if not voice.is_playing():
+						log('Voice client is not playing; starting...')
+						await advance_queue(ctx)
+					return
+				elif not allow_spotify_playlists:
+					await ctx.send(embed=embedq(
+						'Spotify playlists are currently disabled in this bot\'s configuration.',
+						'Contact whoever is hosting your bot if you believe this is a mistake.'
+						)
+					)
+					return
 
-				log('Checking for album...')
+				log('Checking for album...', verbose=True)
 				if '/album/' in url:
-					log('Spotify album detected.')
+					log('Spotify album detected.', verbose=True)
 					album_info = spoofy.spotify_album(url)
-					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'])
-					if url==None:
+					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
+					if url == None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
 			
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
-				# TODO: Change this to use prompt_for_choice()
-				log('Link not detected, searching with query')
-				log(url)
+				log('Link not detected, searching by text', verbose=True)
+				log(f'Searching: "{url}"')
+
 				options = spoofy.search_ytmusic_text(url)
+
 				top_song_title = options[0]['title']
 				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
+
 				top_video_title = options[1]['title']
 				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
 				if top_song_url == top_video_url:
 					url = top_song_url
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
-					embed.add_field(name=f'Top song result: {top_song_title}',value=top_song_url,inline=False)
-					embed.add_field(name=f'Top video result: {top_video_title}',value=top_video_url,inline=False)
+					embed.add_field(name=f'Top song result: {top_song_title}', value=top_song_url, inline=False)
+					embed.add_field(name=f'Top video result: {top_video_title}', value=top_video_url, inline=False)
+
 					prompt = await ctx.send(embed=embed)
-					log('Adding reactions.')
-					await prompt.add_reaction(emoji['num'][1])
-					await prompt.add_reaction(emoji['num'][2])
-					await prompt.add_reaction(emoji['cancel'])
-					def check(reaction, user):
-						log('Reaction check is being called.')
-						return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
-	
-					log('Checking for reaction...')
-					# 
-					try:
-						reaction, user = await bot.wait_for('reaction_add', timeout=30.0, check=check)
-					except asyncio.TimeoutError as e:
-						log('Timeout reached.')
-						embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
+					choice = await prompt_for_choice(ctx, qmessage, prompt, 2)
+					if choice == None:
 						return
-					except Exception as e:
-						log('An error occurred.')
-						print(e)
-						embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-						await qmessage.edit(embed=embed)
-						return
-					else:
-						# If a valid reaction was received.
-						log('Received a valid reaction.')
-						if str(reaction)==emoji['cancel']:
-							embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
-							await prompt.delete()
-							return
-						else:
-							choice=emoji['num'].index(str(reaction))
-							log(choice)
-							embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-							await qmessage.edit(embed=embed)
-					url='https://www.youtube.com/watch?v='+options[choice-1]['videoId']
+					url = 'https://www.youtube.com/watch?v='+options[choice-1]['videoId']
 
 			# Determines if the input was a playlist
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
-				log('URL is a playlist.')
+				log('URL is a playlist.', verbose=True)
 				objlist = generate_QueueItems(url)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
@@ -579,11 +536,15 @@ class Music(commands.Cog):
 					return
 			else:
 				# Runs if the input given was not a playlist
-				log('URL is not a playlist.')
-				log('Checking duration...')
+				log('URL is not a playlist.', verbose=True)
+				log('Checking duration...', verbose=True)
 				# Try pytube first as it's faster
 				if 'https://www.youtube.com' in url:
-					if pytube.YouTube(url).length > duration_limit*60*60:
+					try:
+						yt_length = pytube.YouTube(url).length
+					except TypeError:
+						yt_length = ytdl.extract_info(url, download=False)['duration']
+					if yt_length > duration_limit*60*60:
 						log('Item over duration limit; not queueing.')
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
@@ -608,7 +569,7 @@ class Music(commands.Cog):
 
 			# Start the player if we can use the url itself
 			try:
-				log('Trying to start playing or queueing.')
+				log('Trying to start playing or queueing.', verbose=True)
 				if not voice.is_playing():
 					log('Voice client is not playing; starting...')
 					await play_url(url, ctx)
@@ -621,21 +582,21 @@ class Music(commands.Cog):
 				raise e
 
 	@commands.command(aliases=get_aliases('queue'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def queue(self, ctx, page: int=1):
 		"""Displays the current queue, up to #10."""
 		if player_queue.get(ctx) == []:
 			await ctx.send(embed=embedq('The queue is empty.'))
 			return
 
-		embed=discord.Embed(title='Current queue:',color=0xFFFF00)
-		n=1
-		start=(10*page)-10
-		end=(10*page)
+		embed = discord.Embed(title='Current queue:',color=0xFFFF00)
+		num = 1
+		start = (10*page)-10
+		end = (10*page)
 		if 10*page>len(player_queue.get(ctx)): end=len(player_queue.get(ctx))
 		for i in player_queue.get(ctx)[start:end]:
-			embed.add_field(name=f'#{n+start}. {i.title}',value=i.url,inline=False)
-			n+=1
+			embed.add_field(name=f'#{num+start}. {i.title}',value=i.url,inline=False)
+			num+=1
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
@@ -645,27 +606,48 @@ class Music(commands.Cog):
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('remove'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def remove(self, ctx, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.get(ctx).pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=get_aliases('shuffle'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def shuffle(self, ctx):
 		"""Randomizes the order of the queue."""
 		random.shuffle(player_queue.get(ctx))
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 	@commands.command(aliases=get_aliases('skip'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def skip(self, ctx):
-		"""Skips the currently playing video."""
-		await ctx.send(embed=embedq('Skipping...'))
-		await advance_queue(ctx, skip=True)
+		"""Skips the currently playing media."""
+		if voice == None:
+			await ctx.send(embed=embedq('Not connected to a voice channel.'))
+			return
+		elif not voice.is_playing() or voice.is_paused():
+			await ctx.send(embed=embedq('Nothing to skip.'))
+			return
+
+		# Update number skip votes required based on members joined in voice channel
+		global skip_votes
+		global skip_votes_needed
+		skip_votes_needed = int((len(voice.channel.members)) * (skip_votes_percentage/100))
+
+		if not vote_to_skip:
+			await ctx.send(embed=embedq('Skipping...'))
+			await advance_queue(ctx, skip=True)
+		else:
+			if ctx.author not in skip_votes:
+				skip_votes.append(ctx.author)
+
+			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
+			if len(skip_votes) == skip_votes_needed:
+				await ctx.send(embed=embedq('Skipping...'))
+				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
-	@commands.check(command_enabled)
+	@commands.check(is_command_enabled)
 	async def stop(self, ctx):
 		"""Stops the player and clears the queue."""
 		global player_queue
@@ -688,7 +670,6 @@ class Music(commands.Cog):
 				voice = await ctx.author.voice.channel.connect()
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
-				raise commands.CommandError("Author not connected to a voice channel.")
 
 # 
 # 
@@ -697,59 +678,60 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
-async def prompt_for_choice(ctx, msg, prompt, choices: int, timeout=30):
-	# msg = The message *before* the choice menu (prompt) to be edited based on the outcome
+async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
+	"""Adds reactions to a given Message (prompt) and returns the outcome
+	
+	msg -- Message to be edited based on the outcome
+
+	prompt -- Message to add the reaction choices to
+	"""
 	# Get reaction menu ready
-	log('Adding reactions.')
+	log('Adding reactions.', verbose=True)
 
 	if choices > len(emoji['num']): log('Choices out of range for emoji number list.'); return
 
-	for i in list(range(0,choices)):
-		await prompt.add_reaction(emoji['num'][i+1])
+	for i in list(range(0, choices)):
+		await prompt_msg.add_reaction(emoji['num'][i+1])
 
-	await prompt.add_reaction(emoji['cancel'])
+	await prompt_msg.add_reaction(emoji['cancel'])
 
 	def check(reaction, user):
-		log('Reaction check is being called.')
+		log('Reaction check is being called.', verbose=True)
 		return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
 
-	log('Checking for reaction...')
+	log('Checking for reaction...', verbose=True)
 
 	try:
 		reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
 	except asyncio.TimeoutError as e:
-		log('Timeout reached.')
+		log('Choice prompt timeout reached.')
 		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
-		await msg.edit(embed=embed)
-		await prompt.delete()
-		return None
+		await status_msg.edit(embed=embed)
+		await prompt_msg.delete()
+		return
 	except Exception as e:
-		log('An error occurred.')
-		print(e)
+		log_traceback(e)
 		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
-		await msg.edit(embed=embed)
-		await prompt.delete()
-		return None
+		await status_msg.edit(embed=embed)
+		await prompt_msg.delete()
+		return
 	else:
 		# If a valid reaction was received.
-		log('Received a valid reaction.')
+		log('Received a valid reaction.', verbose=True)
 
 		if str(reaction)==emoji['cancel']:
-			log('Selection cancelled.')
+			log('Selection cancelled.', verbose=True)
 			embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
-			await msg.edit(embed=embed)
-			await prompt.delete()
-			return None
+			await status_msg.edit(embed=embed)
+			await prompt_msg.delete()
+			return
 		else:
-			choice=emoji['num'].index(str(reaction))
-			log(f'{choice} selected.')
+			choice = emoji['num'].index(str(reaction))
+			log(f'{choice} selected.', verbose=True)
 			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
-			await msg.edit(embed=embed)
-			await prompt.delete()
+			await status_msg.edit(embed=embed)
+			await prompt_msg.delete()
 			return choice
-	# Theoretically the code shouldn't reach this point
-	log(f'{plt.warn}NOTICE: Unexpected behavior; prompt returned outside try/except/else')
-	await prompt.delete()
 
 # Queue system
 
@@ -757,7 +739,7 @@ class MediaQueue(object):
 	def __init__(self):
 		self.queues = {}
 
-	# Run in every function to automatically determin
+	# Run in every function to automatically determine
 	# which queue we're working with
 	def ensure_queue_exists(self, ctx):
 		if ctx.author.guild.id not in self.queues:
@@ -807,37 +789,41 @@ last_played = None
 
 npmessage = None
 
-audio_started = 0
+audio_start_time = 0
+audio_time_elapsed = 0
 paused_at = 0
 paused_for = 0
 
 loop_this = False
 
-async def play_url(url, ctx):
+async def play_url(url: str, ctx):
 	global now_playing
 	global npmessage
 	global last_played
-	global audio_started, paused_at, paused_for
+	global audio_start_time, audio_time_elapsed, paused_at, paused_for
+	global skip_votes
 
-	paused_at, paused_for = 0, 0
+	skip_votes = []
+
+	audio_time_elapsed, paused_at, paused_for = 0, 0, 0
 	last_played = now_playing
 
 	log('Trying to start playing...')
 	# Check if we need to match a Spotify link
 	if 'open.spotify.com' in url:
 		log('Trying to match Spotify track...')
-		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!'))
-		spyt=spoofy.spyt(url)
+		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
+		spyt = spoofy.spyt(url)
 
-		log('Checking if unsure...')
-		if type(spyt)==tuple and spyt[0]=='unsure':
+		log('Checking if unsure...', verbose=True)
+		if type(spyt) == tuple and spyt[0] == 'unsure':
 			# This indicates no match was found
-			log('spyt returned unsure.')
+			log('spyt returned unsure.', verbose=True)
 			# Remove the warning, no longer needed
-			spyt=spyt[1]
+			spyt = spyt[1]
 			# Shorten to {limit} results
-			limit=5
-			spyt=dict(list(spyt.items())[:limit])
+			limit = 5
+			spyt = dict(list(spyt.items())[:limit])
 			if use_top_match:
 				# Use first result if that's set in config
 				spyt = spyt[0]
@@ -871,18 +857,23 @@ async def play_url(url, ctx):
 
 	now_playing = player
 	now_playing.weburl = 'https://www.youtube.com/watch?v='+now_playing.ID
+	try:
+		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length)).lstrip('0')
+	except pytube.exceptions.PytubeError or TypeError:
+		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration'])).lstrip('0')
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
-	audio_started = time.time()
+	audio_start_time = time.time()
 
-	if npmessage != None: await npmessage.delete()
+	if npmessage != None:
+		await npmessage.delete()
 
 	try:
 		await qmessage.delete()
 	except UnboundLocalError:
 		pass
 
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title}',description=f'Link: {url}',color=0xFFFF00)
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
@@ -900,16 +891,16 @@ async def advance_queue(ctx, skip=False):
 		if player_queue.get(ctx) == [] and not loop_this:
 			voice.stop()
 		else:
-			if loop_this and not skip: url = now_playing.weburl
-			else: url = player_queue.get(ctx).pop(0).url
+			if loop_this and not skip:
+				url = now_playing.weburl
+			else:
+				url = player_queue.get(ctx).pop(0).url
 			await play_url(url, ctx)
 
 # TODO: This could have a better name
-def get_loop_icon():
+def get_loop_icon() -> str:
 	if loop_this: return emoji['repeat']+' '
 	else: return ''
-
-
 
 # Establish bot user
 intents = discord.Intents.default()
@@ -933,15 +924,17 @@ bot = commands.Bot(
 menu = DefaultMenu('◀️', '▶️', '❌')
 bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 
+# Command error handling
 @bot.event
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
 		if ctx.command.name == 'play':
+			# Resuming while paused
 			if voice.is_paused():
 				voice.resume()
 				await ctx.send(embed=embedq('Player is resuming.'))
 				global paused_for
-				paused_for=time.time()-paused_at
+				paused_for = time.time() - paused_at
 			else:
 				await ctx.send(embed=embedq('No URL given.'))
 		elif ctx.command.name == 'volume':
@@ -949,30 +942,35 @@ async def on_command_error(ctx, error):
 		elif ctx.command.name == 'analyze':
 			await ctx.send(embed=embedq('A spotify track URL is required.'))
 	elif isinstance(error, discord.ext.commands.CheckFailure):
-		await ctx.send(embed=embedq('This command is disabled for this instance.'))
+		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)
 		trace=traceback.format_exception(error)
-		await ctx.send(embed=embedq(error))
+		await ctx.send(embed=embedq(error, 'If this issue persists, please check https://github.com/svioletg/viMusBot/issues and submit a new issue if your problem is not listed.'))
 		# A second traceback is created from this command itself, usually not useful
 		log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
 @bot.event
 async def on_ready():
-	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-	print('------')
+	log(f'Logged in as {bot.user} (ID: {bot.user.id})')
+	print('-----')
+	log('Ready!')
 
 # Retrieve bot token
-if public: f='token.txt'
-else: f='devtoken.txt'; log(f'{plt.warn}NOTICE: Starting in dev mode.')
+log(f'Retrieving token from {plt.blue}{token_file_path}')
+
+if not public:
+	log(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
-	token = open(f).read()
+	with open(token_file_path, 'r') as f:
+		token = f.read()
 except FileNotFoundError:
 	print(f'{f} does not exist; exiting.')
 	exit()
 
+# Begin main thread
 async def main():
 	async with bot:
 		await bot.add_cog(General(bot))

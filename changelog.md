@@ -2,6 +2,53 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.0
+> *2023.04.07 / dev.29*
+
+### Developer
+- Various code improvements & edits
+    - Almost every function should have types declared for their arguments, and a `->` operator to indicate its return type
+    - Old, unused code entirely removed
+    - Certain sections were changed to improve readability and clarity
+- `bot.py`:
+    - `public` no longer determines the token file, and is now only used to select which command prefix to use
+    - `TODO` dictionary removed, hasn't been used for a long time
+- `spoofy.py`:
+    - `spotify_album()` now retrieves a year
+    - `search_ytmusic_album()` now uses the release year for matching, will pass if at least 2 out of the title, artist, and year match
+
+### Features
+- Song length will now be displayed when using `-nowplaying`, as well as elapsed time
+- Vote-to-skip has been added, and can be configured through `config.yml`
+- Config changes:
+    - `auto-remove` (list of strings) added to the config
+        - Determines which file extensions to include in the on-startup file cleanup
+        - Includes most common media formats by default
+
+    > Note: Media files not in use by the bot are normally deleted once the queue advances, however some can by left behind occassionally; thus, on startup, the bot will remove any stray files like this
+
+    - `token-file` (string; file name or path) added to the config
+        - Specifies which file `bot.py` will check for the bot's token
+        - `public` no longer determines this file
+    - `logging-options/show-verbose-logs` (boolean) added to the config
+        - If enabled, will stop certain logs from showing in the console window, ones that may be seen as clutter and are more useful for debugging (they are still logged to `vimusbot.log` regardless)
+    - `vote-to-skip` section added to the config
+        - `enabled` (boolean) added; toggles whether skipping will be done by vote or instantly
+        - `threshold` (number) added; percentage of users connected to a voice channel needed to skip (only include the number, not the percentage sign - doing so will break the YAML)
+    - `palette.py` now displays each available color on the same line, separated by a space
+
+### Fixes
+- Fixed [Issue #25](https://github.com/svioletg/viMusBot/issues/25): Bot thinks its outdated despite the version numbers matching
+- Fixed YouTube links retrieved using pytube causing occassional errors, the bot will now fall back on the slower yt-dlp method instead of aborting
+- `duration_limit` was being set incorrectly in `bot.py` and could interfere with the user-set limit, now grabs it from the config file like it should
+- Fixed [Issue #28](https://github.com/svioletg/viMusBot/issues/28): "Not connected to voice" message is duplicated
+- Fixed [Issue #30](https://github.com/svioletg/viMusBot/issues/30): "ValueError: too many values to unpack" for certain songs
+- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search
+
+### Other
+- `-todo` command removed
+- `config.yml` will **no longer automatically update itself** with new keys from `config_default.yml` — see [this page in the new FAQ](https://github.com/svioletg/viMusBot/blob/master/faq.md#how-do-i-update-my-config) on manually updating
+
 ## 1.7.0
 > *2023.01.13 / dev.28*
 
@@ -399,6 +446,11 @@ On the rare occassion that the latest update must be amended straight away, with
 The non-hotfixed version (in this example, 1.6.2) would then be removed from the releases page, as well. Any following hotfixes would be 1.6.2b, 1.6.2c, 1.6.2d, etc., and previous hotfixes would continue to be removed so that only the fixed version remains.
 This is largely to avoid having to change the dev number during development of a new major or minor version.
 
+<<<<<<< HEAD
+=======
+Hotfix changelogs are only included on the relevant release page for that version.
+
+>>>>>>> dev
 ### Development Versions
 The `dev` branch contains code that is actively being worked on for the next coming update, and due to the frequency of these updates in contrast to public releases, it uses a different numbering system.
 Development versions are numbered as dev.X.Y, where:

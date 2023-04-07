@@ -23,7 +23,7 @@ with open('config.yml', 'r') as f:
 
 log_blacklist = config['logging-options']['ignore-logs-from']
 
-def newlog(msg='', last_logtime=time.time(), called_from=''):
+def newlog(msg='', last_logtime=time.time(), called_from='', verbose=False):
 	for frame in inspect.stack()[1:]:
 		if frame.filename[0] != '<':
 			source = re.search(r'([^\/\\]+$)',frame.filename).group(0)
@@ -34,5 +34,11 @@ def newlog(msg='', last_logtime=time.time(), called_from=''):
 	logstring = f'{plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
 	logfile.write(plt.strip_color(logstring)+'\n')
 	blacklist_exceptions = [plt.warn, plt.error]
-	if (any(i in logstring for i in blacklist_exceptions) or called_from not in log_blacklist) and config['logging-options']['show-console-logs'][source]:
+	if not config['logging-options']['show-console-logs'][source]:
+		return
+	elif (called_from in log_blacklist and any(i in logstring for i in blacklist_exceptions)):
+		return
+	elif verbose and not config['logging-options']['show-verbose-logs']:
+		return
+	else:
 		print(logstring)
