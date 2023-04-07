@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.8.0
-> *2023.04.06 / dev.29*
+> *2023.04.07 / dev.29*
 
 ### Developer
 - Various code improvements & edits
@@ -19,6 +19,7 @@
 
 ### Features
 - Song length will now be displayed when using `-nowplaying`, as well as elapsed time
+- Vote-to-skip has been added, and can be configured through `config.yml`
 - Config changes:
     - `auto-remove` (list of strings) added to the config
         - Determines which file extensions to include in the on-startup file cleanup

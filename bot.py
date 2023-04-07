@@ -812,7 +812,7 @@ async def play_url(url: str, ctx):
 	# Check if we need to match a Spotify link
 	if 'open.spotify.com' in url:
 		log('Trying to match Spotify track...')
-		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!'))
+		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
 		spyt = spoofy.spyt(url)
 
 		log('Checking if unsure...', verbose=True)
@@ -865,7 +865,8 @@ async def play_url(url: str, ctx):
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
 	audio_start_time = time.time()
 
-	if npmessage != None: await npmessage.delete()
+	if npmessage != None:
+		await npmessage.delete()
 
 	try:
 		await qmessage.delete()
