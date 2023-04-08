@@ -7,8 +7,8 @@ PyNaCl == 1.5.0
 python-Levenshtein == 0.20.8
 pytube == 12.1.0
 PyYAML == 6.0
-soundcloud_lib == 0.5.4
-spotipy == 2.22.1
+soundcloud_lib == 0.6.1
+spotipy == 2.23.0
 regex == 2022.10.31
 yt_dlp == 2023.03.04
-ytmusicapi == 0.24.0
+ytmusicapi == 1.0.0

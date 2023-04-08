@@ -28,3 +28,7 @@ Firstly, check the internet connection of wherever you're hosting the bot from. 
 ### "Spotify link detected, searching YouTube..." message displayed for a long time
 
 When the boy detects a Spotify link in the queue, it will attempt to match it to a song or video from YouTube. Sometimes the bot can get stuck during this process, so if this message has lasted for upwards of a minute, you can use the `-skip` command to ignore that track and move to the next one.
+
+### "AttributeError: 'NoneType' object has no attribute 'is_playing'" or similar messages appear when trying to use `-play`, `-nowplaying`, `-stop`, etc.
+
+This is sometimes caused by a network or hardware hiccup on the machine running the bot, causing the script to think `voice` is a `NoneType` — in other words, the bot has somehow lost track of the voice channel, and can not reconnect. Usually this is best fixed by restarting the bot itself, so try to contact whoever is hosting viMusBot for you. This issue *should* be fairly rare, but if it's happening very often, you can [submit a new issue](https://github.com/svioletg/viMusBot/issues/new/choose) to bring this to my attention.

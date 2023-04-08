@@ -159,7 +159,10 @@ def pytube_track_data(pytube_object) -> dict:
 	# TODO: sometimes nonetype error here
 	print(pytube_object if pytube_object==None else '')
 	print(pytube_object.description if pytube_object.description==None else '')
-	description_list = pytube_object.description.split('\n')
+	try:
+		description_list = pytube_object.description.split('\n')
+	except AttributeError as e:
+		print(e)
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
 		return None
@@ -209,6 +212,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	query = f'{title} {artist} {album}'
 	reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
+	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
 	def trim_track_data(data: dict, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
 		if from_pytube:
@@ -217,7 +221,12 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 			if extract_from_ytmusic:
 				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
 			else:
-				data = pytube_track_data(data)
+				try:
+					data = pytube_track_data(data)
+				except AttributeError as e:
+					log('{plt.error}ERROR: An error relating to Issue #34 seems to have been encountered, providing debugging information below...')
+					log(data)
+					log('Please feel free to submit the above to https://github.com/svioletg/viMusBot/issues/34 in order to help fix this issue.')
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -242,7 +251,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.', verbose=True)
-				return trim_track_data(i,from_pytube=True)
+				return trim_track_data(i, from_pytube=True)
 			
 		log('No ISRC match found, falling back on text search.')
 
@@ -408,7 +417,7 @@ def is_jp(text: str) -> bool:
 def spyt(url: str, limit=20, **kwargs) -> dict|tuple:
 	"""Matches a Spotify URL with its closest match from YouTube or YTMusic"""
 	track = spotify_track(url)
-	result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'], limit=limit, **kwargs)
+	result = search_ytmusic(title=track['title'], artist=track['artist'], album=track['album'], isrc=track['isrc'], limit=limit, **kwargs)
 	if type(result) == tuple and result[0] == 'unsure':
 		log('Returning as unsure.')
 		return result
