@@ -26,7 +26,12 @@ token-file: "token.txt"
 vote-to-skip:
     enabled: yes
     # A percentage of users connected to voice required to skip a song; does nothing if vote-to-skip is disabled
-    threshold: 50
+    threshold-type: "percentage"
+    threshold-percentage: 50
+    threshold-exact: 3
+
+# Toggles whether -nowplaying and -queue will show names of who queued what
+show-users-in-queue: yes
 
 # Set your command prefix here
 prefixes:

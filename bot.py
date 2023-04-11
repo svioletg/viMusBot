@@ -10,6 +10,7 @@ import glob
 import importlib
 import logging
 import os
+import pickle
 import random
 import shutil
 import subprocess
@@ -118,10 +119,13 @@ inactivity_timeout = config['inactivity-timeout']
 cleanup_extensions = config['auto-remove']
 
 vote_to_skip = config['vote-to-skip']['enabled']
-skip_votes_percentage = config['vote-to-skip']['threshold']
+skip_votes_type = config['vote-to-skip']['threshold-type']
+skip_votes_exact = config['vote-to-skip']['threshold-exact']
+skip_votes_percentage = config['vote-to-skip']['threshold-percentage']
 skip_votes_needed = 0
-
 skip_votes = []
+
+show_users_in_queue = config['show-users-in-queue']
 
 def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
@@ -423,7 +427,8 @@ class Music(commands.Cog):
 			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
 
 			elapsed = time.strftime('%M:%S', time.gmtime(audio_time_elapsed))
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
+			submitter_text = f'\nQueued by {now_playing.user}' if show_users_in_queue else ''
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
@@ -471,7 +476,7 @@ class Music(commands.Cog):
 				if '/playlist/' in url and allow_spotify_playlists:
 					log('Spotify playlist detected.', verbose=True)
 					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
-					objlist = generate_QueueItems(spoofy.spotify_playlist(url))
+					objlist = generate_QueueItems(spoofy.spotify_playlist(url), ctx.author)
 					if len(objlist) > spotify_playlist_limit:
 						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
@@ -528,7 +533,7 @@ class Music(commands.Cog):
 			valid = ['playlist?list=','/sets/','/album/']
 			if any(i in url for i in valid):
 				log('URL is a playlist.', verbose=True)
-				objlist = generate_QueueItems(url)
+				objlist = generate_QueueItems(url, ctx.author)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not voice.is_playing():
@@ -572,14 +577,51 @@ class Music(commands.Cog):
 				log('Trying to start playing or queueing.', verbose=True)
 				if not voice.is_playing():
 					log('Voice client is not playing; starting...')
-					await play_url(url, ctx)
+					await play_url(url, ctx, ctx.author)
 				else:
-					player_queue.get(ctx).append(QueueItem(url))
-					title=player_queue.get(ctx)[-1].title
+					player_queue.get(ctx).append(QueueItem(url, ctx.author))
+					title = player_queue.get(ctx)[-1].title
 					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue.get(ctx))}'))
 					log('Appened to queue.')
 			except Exception as e:
 				raise e
+
+	# @commands.command(aliases=get_aliases('playlist'))
+	# @commands.check(is_command_enabled)
+	# async def playlist(self, ctx, mode):
+	# 	"""Saves or loads a playlist queue."""
+	# 	if mode not in ['save', 'load']:
+	# 		await ctx.send(embed=embedq('Command structure must be `playlist [save|load] [name]`'))
+
+	# @commands.command(aliases=get_aliases('qstore'))
+	# @commands.check(is_command_enabled)
+	# async def qstore(self, ctx):
+	# 	"""Stores a playlist object as a file."""
+	# 	try:
+	# 		with open('queue.pickle', 'wb') as f:
+	# 			pickle.dump(player_queue, f)
+			
+	# 		await ctx.send('Current queue saved. Use `-qload` to restore it.')
+	# 	except Exception as e:
+	# 		log_traceback(e)
+	# 		await ctx.send(embed=embedq('Queue could not be saved.', e))
+
+	# @commands.command(aliases=get_aliases('qload'))
+	# @commands.check(is_command_enabled)
+	# async def qload(self, ctx, clear_existing=False):
+	# 	"""Loads a playlist object from the file."""
+	# 	try:
+	# 		msg = await ctx.send(embed=embedq('This will clear and overwrite the current queue. Continue?', '1 for no, 2 for yes'))
+	# 		choice = await prompt_for_choice(ctx, msg, msg, 2)
+	# 		if choice == 2:
+	# 			with open('queue.pickle', 'rb') as f:
+	# 				global player_queue
+	# 				player_queue = pickle.load(f)
+			
+	# 		await ctx.send('Queue has been loaded and restored.')
+	# 	except Exception as e:
+	# 		log_traceback(e)
+	# 		await ctx.send(embed=embedq('Queue could not be restored.', e))
 
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
@@ -590,13 +632,14 @@ class Music(commands.Cog):
 			return
 
 		embed = discord.Embed(title='Current queue:',color=0xFFFF00)
-		num = 1
 		start = (10*page)-10
 		end = (10*page)
-		if 10*page>len(player_queue.get(ctx)): end=len(player_queue.get(ctx))
-		for i in player_queue.get(ctx)[start:end]:
-			embed.add_field(name=f'#{num+start}. {i.title}',value=i.url,inline=False)
-			num+=1
+		if 10*page>len(player_queue.get(ctx)):
+			end = len(player_queue.get(ctx))
+		
+		for num, i in enumerate(player_queue.get(ctx)[start:end]):
+			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
+			embed.add_field(name=f'#{num+1+start}. {i.title}', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
@@ -625,14 +668,14 @@ class Music(commands.Cog):
 		if voice == None:
 			await ctx.send(embed=embedq('Not connected to a voice channel.'))
 			return
-		elif not voice.is_playing() or voice.is_paused():
+		elif not voice.is_playing() and len(player_queue.get(ctx)) == 0:
 			await ctx.send(embed=embedq('Nothing to skip.'))
 			return
 
 		# Update number skip votes required based on members joined in voice channel
 		global skip_votes
 		global skip_votes_needed
-		skip_votes_needed = int((len(voice.channel.members)) * (skip_votes_percentage/100))
+		skip_votes_needed = int((len(voice.channel.members)) * (skip_votes_percentage/100)) if skip_votes_type == "percentage" else skip_votes_exact
 
 		if not vote_to_skip:
 			await ctx.send(embed=embedq('Skipping...'))
@@ -640,10 +683,14 @@ class Music(commands.Cog):
 		else:
 			if ctx.author not in skip_votes:
 				skip_votes.append(ctx.author)
+			else:
+				await ctx.send(embed=embedq('You have already voted to skip.'))
+				return
 
 			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
-			if len(skip_votes) == skip_votes_needed:
+			if len(skip_votes) >= skip_votes_needed:
 				await ctx.send(embed=embedq('Skipping...'))
+				voice.pause()
 				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
@@ -679,7 +726,7 @@ class Music(commands.Cog):
 
 # Misc. helper functions
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
-	"""Adds reactions to a given Message (prompt) and returns the outcome
+	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
 	
 	msg -- Message to be edited based on the outcome
 
@@ -749,6 +796,10 @@ class MediaQueue(object):
 		self.ensure_queue_exists(ctx)
 		return self.queues[ctx.author.guild.id]
 
+	def set(self, ctx, new_list: list):
+		self.ensure_queue_exists(ctx)
+		self.queues[ctx.author.guild.id] = new_list
+
 	def clear(self, ctx):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = []
@@ -756,26 +807,29 @@ class MediaQueue(object):
 player_queue = MediaQueue()
 
 class QueueItem(object):
-	def __init__(self, url, title=None):
+	def __init__(self, url, user, title=None):
 		self.url = url
+		self.user = user
 		# Saves time on downloading if we've already got the title
-		if title is not None: self.title = title
-		else: self.title = title_from_url(url)
+		if title is not None:
+			self.title = title
+		else:
+			self.title = title_from_url(url)
 
-def generate_QueueItems(playlist):
+def generate_QueueItems(playlist, user):
 	objlist = []
 	if type(playlist) == list:
-		objlist = [QueueItem(i['url'],title=i['title']) for i in playlist]
+		objlist = [QueueItem(i['url'], user, title=i['title']) for i in playlist]
 		return objlist
 	else:
 		# Anything youtube-dl natively supports is probably a link
 		if 'soundcloud.com' in playlist:
 			# SoundCloud playlists have to be processed differently
 			playlist_entries = spoofy.soundcloud_playlist(playlist)
-			objlist = [QueueItem(i.permalink_url,title=i.title) for i in playlist_entries]
+			objlist = [QueueItem(i.permalink_url, user, title=i.title) for i in playlist_entries]
 		else:
 			playlist_entries = ytdl.extract_info(playlist,download=False)
-			objlist = [QueueItem(i['url'],title=i['title']) for i in playlist_entries['entries']]
+			objlist = [QueueItem(i['url'], user, title=i['title']) for i in playlist_entries['entries']]
 		return objlist
 
 def queue_batch(ctx, batch):
@@ -796,7 +850,7 @@ paused_for = 0
 
 loop_this = False
 
-async def play_url(url: str, ctx):
+async def play_url(url: str, ctx, user):
 	global now_playing
 	global npmessage
 	global last_played
@@ -856,11 +910,14 @@ async def play_url(url: str, ctx):
 		return
 
 	now_playing = player
-	now_playing.weburl = 'https://www.youtube.com/watch?v='+now_playing.ID
+	now_playing.weburl = url
+	now_playing.user = user
 	try:
-		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length)).lstrip('0')
-	except pytube.exceptions.PytubeError or TypeError:
-		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration'])).lstrip('0')
+		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length))
+	except Exception as e:
+		log(f'Falling back on yt-dlp. (Cause: {e})', verbose=True)
+		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration']))
+	
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
 	audio_start_time = time.time()
@@ -872,13 +929,14 @@ async def play_url(url: str, ctx):
 		await qmessage.delete()
 	except UnboundLocalError:
 		pass
-
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}',color=0xFFFF00)
+	
+	submitter_text = f'\nQueued by {user}' if show_users_in_queue else ''
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
 			# Delete last played file
-			log(f'Removing: {i}')
+			log(f'Removing file: {i}')
 			try:
 				os.remove(i)
 			except PermissionError as e:
@@ -894,8 +952,10 @@ async def advance_queue(ctx, skip=False):
 			if loop_this and not skip:
 				url = now_playing.weburl
 			else:
-				url = player_queue.get(ctx).pop(0).url
-			await play_url(url, ctx)
+				next_item = player_queue.get(ctx).pop(0)
+				url = next_item.url
+				user = next_item.user
+			await play_url(url, ctx, user)
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:

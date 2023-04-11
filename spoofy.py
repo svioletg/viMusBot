@@ -87,7 +87,9 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
 	# 'old' = checking for strings in other strings, how matching was done beforehand
-	if mode not in ['fuzz', 'old']: log(f'{mode} is not a valid mode.'); return
+	if mode not in ['fuzz', 'old']: 
+		log(f'{mode} is not a valid mode.')
+		return
 
 	# overrides the fuzzy matching threshold, default is 75%
 	threshold = kwargs.get('threshold',75)
@@ -103,18 +105,20 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
 	try:
 		yt_album = ytresult['album']['name']
-	except KeyError:
+	except Exception as e:
+		log(f'Ignoring album name. (Cause: {e})')
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
-	check = re.compile(r'\(feat\..*\)')
+	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
+	ref_title = check.sub('',ref_title)
 	yt_title = check.sub('',yt_title)
 
-	if mode=='fuzz':
+	if mode == 'fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
-	elif mode=='old':
+	elif mode == 'old':
 		matching_title = ref_title.lower() in yt_title.lower() or (
 			ref_title.split(' - ')[0].lower() in yt_title.lower() 
 			and ref_title.split(' - ')[1].lower() in yt_title.lower()
@@ -159,7 +163,10 @@ def pytube_track_data(pytube_object) -> dict:
 	# TODO: sometimes nonetype error here
 	print(pytube_object if pytube_object==None else '')
 	print(pytube_object.description if pytube_object.description==None else '')
-	description_list = pytube_object.description.split('\n')
+	try:
+		description_list = pytube_object.description.split('\n')
+	except AttributeError as e:
+		print(e)
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
 		return None
@@ -187,6 +194,7 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
+	print(query)
 	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
@@ -198,7 +206,7 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		if title_match + artist_match + year_match >= 2:
 			log('Match found.', verbose=True)
 			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
-	# This will only run if no match has been found
+	
 	log('No match found.', verbose=True)
 	return None
 
@@ -209,6 +217,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	query = f'{title} {artist} {album}'
 	reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
+	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
 	def trim_track_data(data: dict, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
 		if from_pytube:
@@ -217,7 +226,12 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 			if extract_from_ytmusic:
 				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
 			else:
-				data = pytube_track_data(data)
+				try:
+					data = pytube_track_data(data)
+				except AttributeError as e:
+					log('{plt.error}ERROR: An error relating to Issue #34 seems to have been encountered, providing debugging information below...')
+					log(data)
+					log('Please feel free to submit the above to https://github.com/svioletg/viMusBot/issues/34 in order to help fix this issue.')
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -242,7 +256,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.', verbose=True)
-				return trim_track_data(i,from_pytube=True)
+				return trim_track_data(i, from_pytube=True)
 			
 		log('No ISRC match found, falling back on text search.')
 
@@ -279,6 +293,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# First pass, check officially uploaded songs from artist channels
 	for i in song_results[:5]:
+		print(i)
 		if is_matching(reference, i, ignore_artist=True):
 			log('Song match found.')
 			match = i
@@ -288,7 +303,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	if not match_found():
 		log('Not found; checking for close match...')
 		for i in video_results[:5]:
-			if is_matching(reference, i, ignore_artist=True,ignore_album=True):
+			if is_matching(reference, i, ignore_artist=True, ignore_album=True):
 				log('Video match found.')
 				match = i
 				break
@@ -408,7 +423,7 @@ def is_jp(text: str) -> bool:
 def spyt(url: str, limit=20, **kwargs) -> dict|tuple:
 	"""Matches a Spotify URL with its closest match from YouTube or YTMusic"""
 	track = spotify_track(url)
-	result = search_ytmusic(title=track['title'],artist=track['artist'],album=track['album'],isrc=track['isrc'], limit=limit, **kwargs)
+	result = search_ytmusic(title=track['title'], artist=track['artist'], album=track['album'], isrc=track['isrc'], limit=limit, **kwargs)
 	if type(result) == tuple and result[0] == 'unsure':
 		log('Returning as unsure.')
 		return result

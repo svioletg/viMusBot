@@ -2,6 +2,33 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.1
+> *2023.04.11 / dev.30*
+
+### Developer
+- Since [Issue #34](https://github.com/svioletg/viMusBot/issues/34) has been hard to reproduce, a try/except block has been added to where the error typically occurs, and will log some relevant data - that way, when it does occur, it should be easier to identify the problem
+- The vote-skip check is now `>=` instead of `==`, to prevent any bugs with the number being higher than the threshold (say, if you set the exact vote number to 0, for some reason)
+
+### Features
+- `-nowplaying` and `-queue` will now show what user has queued which link (can be disabled, see "Config changes" below)
+- Vote-to-skip threshold can now be set to a specific number of users, in addition to being a percentage
+- Config changes:
+    - Changes in the `vote-to-skip` section:
+        - `threshold-type` (string) was added; can be set to "percentage" or "exact"
+        - `threshold` has been **renamed** to `threshold-percentage`
+        - `threshold-exact` (number) was added; determines the exact number of users needed to successfully skip
+    - `show-users-in-queue` (boolean) was added
+        - Toggles whether the name of who submitted what into the queue will be displayed with `-nowplaying` and `-queue`
+
+### Fixes
+- Fixed total time not displaying correctly when less than a minute (times would show as `:40` instead of `0:40`, for example)
+- Fixed [Issue #35](https://github.com/svioletg/viMusBot/issues/35): "SoundCloud links completely broken (DownloadError [...] URL looks truncated.)"
+> NOTE: This is unrelated to the 403 error that can happen with SoundCloud links. That issue unfortunately remains.
+- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search; this was previously thought to be fixed in 1.8.0, however I made an oversight that rendered the fix useless
+- Fixed an issue with `ytmusicapi` returning some videos with the `album` key set to `None`, instead of the key not existing (which was previously checked for)
+- Spotify/YouTube matching should be slightly improved, the match detection will now ignore any sort of "(20xx Remaster)" information in the title that is missing from the other
+- Using `-skip` will stop the currently playing song immediately, instead of waiting for the next song in queue to be downloaded
+
 ## 1.8.0
 > *2023.04.07 / dev.29*
 
@@ -43,7 +70,8 @@
 - `duration_limit` was being set incorrectly in `bot.py` and could interfere with the user-set limit, now grabs it from the config file like it should
 - Fixed [Issue #28](https://github.com/svioletg/viMusBot/issues/28): "Not connected to voice" message is duplicated
 - Fixed [Issue #30](https://github.com/svioletg/viMusBot/issues/30): "ValueError: too many values to unpack" for certain songs
-- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search
+- ~~Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search~~
+    - CORRECTION: Due to an oversight by me, this was not properly fixed. It was subsequently fixed in 1.8.1.
 
 ### Other
 - `-todo` command removed
