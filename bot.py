@@ -593,34 +593,35 @@ class Music(commands.Cog):
 	# 	if mode not in ['save', 'load']:
 	# 		await ctx.send(embed=embedq('Command structure must be `playlist [save|load] [name]`'))
 
-	@commands.command(aliases=get_aliases('qstore'))
-	@commands.check(is_command_enabled)
-	async def qstore(self, ctx):
-		"""Stores a playlist object as a file."""
-		try:
-			with open('queue.pickle', 'wb') as f:
-				pickle.dump(player_queue.get(ctx), f)
+	# @commands.command(aliases=get_aliases('qstore'))
+	# @commands.check(is_command_enabled)
+	# async def qstore(self, ctx):
+	# 	"""Stores a playlist object as a file."""
+	# 	try:
+	# 		with open('queue.pickle', 'wb') as f:
+	# 			pickle.dump(player_queue, f)
 			
-			await ctx.send('Current queue saved. Use `-qload` to restore it.')
-		except Exception as e:
-			log_traceback(e)
-			await ctx.send(embed=embedq('Queue could not be saved.', e))
+	# 		await ctx.send('Current queue saved. Use `-qload` to restore it.')
+	# 	except Exception as e:
+	# 		log_traceback(e)
+	# 		await ctx.send(embed=embedq('Queue could not be saved.', e))
 
-	@commands.command(aliases=get_aliases('qload'))
-	@commands.check(is_command_enabled)
-	async def qload(self, ctx, clear_existing=False):
-		"""Loads a playlist object from the file."""
-		try:
-			msg = await ctx.send(embed=embedq('This will clear and overwrite the current queue. Continue?', '1 for no, 2 for yes'))
-			choice = await prompt_for_choice(ctx, msg, msg, 2)
-			if choice == 2:
-				with open('queue.pickle', 'rb') as f:
-					player_queue.set(ctx, pickle.load(f))
+	# @commands.command(aliases=get_aliases('qload'))
+	# @commands.check(is_command_enabled)
+	# async def qload(self, ctx, clear_existing=False):
+	# 	"""Loads a playlist object from the file."""
+	# 	try:
+	# 		msg = await ctx.send(embed=embedq('This will clear and overwrite the current queue. Continue?', '1 for no, 2 for yes'))
+	# 		choice = await prompt_for_choice(ctx, msg, msg, 2)
+	# 		if choice == 2:
+	# 			with open('queue.pickle', 'rb') as f:
+	# 				global player_queue
+	# 				player_queue = pickle.load(f)
 			
-			await ctx.send('Queue has been loaded and restored.')
-		except Exception as e:
-			log_traceback(e)
-			await ctx.send(embed=embedq('Queue could not be restored.', e))
+	# 		await ctx.send('Queue has been loaded and restored.')
+	# 	except Exception as e:
+	# 		log_traceback(e)
+	# 		await ctx.send(embed=embedq('Queue could not be restored.', e))
 
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
@@ -689,6 +690,7 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
 			if len(skip_votes) >= skip_votes_needed:
 				await ctx.send(embed=embedq('Skipping...'))
+				voice.pause()
 				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))

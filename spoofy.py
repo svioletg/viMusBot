@@ -87,7 +87,9 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
 	# 'old' = checking for strings in other strings, how matching was done beforehand
-	if mode not in ['fuzz', 'old']: log(f'{mode} is not a valid mode.'); return
+	if mode not in ['fuzz', 'old']: 
+		log(f'{mode} is not a valid mode.')
+		return
 
 	# overrides the fuzzy matching threshold, default is 75%
 	threshold = kwargs.get('threshold',75)
@@ -108,16 +110,15 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
-	check = re.compile(r'(\(feat\..*\))|(\(\d{1,4} Remaster\))')
+	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
+	ref_title = check.sub('',ref_title)
 	yt_title = check.sub('',yt_title)
 
-	if mode=='fuzz':
-		print(ref_title.lower(), yt_title.lower())
-		print(fuzz.ratio(ref_title.lower(), yt_title.lower()))
+	if mode == 'fuzz':
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
-	elif mode=='old':
+	elif mode == 'old':
 		matching_title = ref_title.lower() in yt_title.lower() or (
 			ref_title.split(' - ')[0].lower() in yt_title.lower() 
 			and ref_title.split(' - ')[1].lower() in yt_title.lower()
@@ -193,18 +194,21 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
+	print(query)
 	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
 	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	for yt in album_results:
+		print(query)
+		print(yt)
 		title_match = fuzz.ratio(title, yt['title']) > 75
 		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
 		year_match = fuzz.ratio(year, yt['year']) > 75
 		if title_match + artist_match + year_match >= 2:
 			log('Match found.', verbose=True)
 			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
-	# This will only run if no match has been found
+	
 	log('No match found.', verbose=True)
 	return None
 

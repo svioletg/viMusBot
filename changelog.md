@@ -3,15 +3,13 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.8.1
-> *2023.04.xx / dev.30*
+> *2023.04.11 / dev.30*
 
 ### Developer
 - Since [Issue #34](https://github.com/svioletg/viMusBot/issues/34) has been hard to reproduce, a try/except block has been added to where the error typically occurs, and will log some relevant data - that way, when it does occur, it should be easier to identify the problem
 - The vote-skip check is now `>=` instead of `==`, to prevent any bugs with the number being higher than the threshold (say, if you set the exact vote number to 0, for some reason)
 
 ### Features
-- The current queue can now be saved with `-qstore`, and subsequently restored with `-qload`. Loading a queue with replace the current one.
-> NOTE: This is a precursor to an upcoming playlist management feature. I decided to add this more quick-and-dirty version to help alleviate issues with the bot locking up sometimes, so that you can save a queue and load it again if the bot must be kicked/restarted.
 - `-nowplaying` and `-queue` will now show what user has queued which link (can be disabled, see "Config changes" below)
 - Vote-to-skip threshold can now be set to a specific number of users, in addition to being a percentage
 - Config changes:
@@ -28,6 +26,8 @@
 > NOTE: This is unrelated to the 403 error that can happen with SoundCloud links. That issue unfortunately remains.
 - Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search; this was previously thought to be fixed in 1.8.0, however I made an oversight that rendered the fix useless
 - Fixed an issue with `ytmusicapi` returning some videos with the `album` key set to `None`, instead of the key not existing (which was previously checked for)
+- Spotify/YouTube matching should be slightly improved, the match detection will now ignore any sort of "(20xx Remaster)" information in the title that is missing from the other
+- Using `-skip` will stop the currently playing song immediately, instead of waiting for the next song in queue to be downloaded
 
 ## 1.8.0
 > *2023.04.07 / dev.29*
