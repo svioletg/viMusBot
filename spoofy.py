@@ -103,14 +103,17 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
 	try:
 		yt_album = ytresult['album']['name']
-	except KeyError:
+	except Exception as e:
+		log(f'Ignoring album name. (Cause: {e})')
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
-	check = re.compile(r'\(feat\..*\)')
+	check = re.compile(r'(\(feat\..*\))|(\(\d{1,4} Remaster\))')
 	yt_title = check.sub('',yt_title)
 
 	if mode=='fuzz':
+		print(ref_title.lower(), yt_title.lower())
+		print(fuzz.ratio(ref_title.lower(), yt_title.lower()))
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
@@ -288,6 +291,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# First pass, check officially uploaded songs from artist channels
 	for i in song_results[:5]:
+		print(i)
 		if is_matching(reference, i, ignore_artist=True):
 			log('Song match found.')
 			match = i
@@ -297,7 +301,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 	if not match_found():
 		log('Not found; checking for close match...')
 		for i in video_results[:5]:
-			if is_matching(reference, i, ignore_artist=True,ignore_album=True):
+			if is_matching(reference, i, ignore_artist=True, ignore_album=True):
 				log('Video match found.')
 				match = i
 				break

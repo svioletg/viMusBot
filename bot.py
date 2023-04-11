@@ -10,6 +10,7 @@ import glob
 import importlib
 import logging
 import os
+import pickle
 import random
 import shutil
 import subprocess
@@ -585,6 +586,42 @@ class Music(commands.Cog):
 			except Exception as e:
 				raise e
 
+	# @commands.command(aliases=get_aliases('playlist'))
+	# @commands.check(is_command_enabled)
+	# async def playlist(self, ctx, mode):
+	# 	"""Saves or loads a playlist queue."""
+	# 	if mode not in ['save', 'load']:
+	# 		await ctx.send(embed=embedq('Command structure must be `playlist [save|load] [name]`'))
+
+	@commands.command(aliases=get_aliases('qstore'))
+	@commands.check(is_command_enabled)
+	async def qstore(self, ctx):
+		"""Stores a playlist object as a file."""
+		try:
+			with open('queue.pickle', 'wb') as f:
+				pickle.dump(player_queue.get(ctx), f)
+			
+			await ctx.send('Current queue saved. Use `-qload` to restore it.')
+		except Exception as e:
+			log_traceback(e)
+			await ctx.send(embed=embedq('Queue could not be saved.', e))
+
+	@commands.command(aliases=get_aliases('qload'))
+	@commands.check(is_command_enabled)
+	async def qload(self, ctx, clear_existing=False):
+		"""Loads a playlist object from the file."""
+		try:
+			msg = await ctx.send(embed=embedq('This will clear and overwrite the current queue. Continue?', '1 for no, 2 for yes'))
+			choice = await prompt_for_choice(ctx, msg, msg, 2)
+			if choice == 2:
+				with open('queue.pickle', 'rb') as f:
+					player_queue.set(ctx, pickle.load(f))
+			
+			await ctx.send('Queue has been loaded and restored.')
+		except Exception as e:
+			log_traceback(e)
+			await ctx.send(embed=embedq('Queue could not be restored.', e))
+
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
 	async def queue(self, ctx, page: int=1):
@@ -630,7 +667,7 @@ class Music(commands.Cog):
 		if voice == None:
 			await ctx.send(embed=embedq('Not connected to a voice channel.'))
 			return
-		elif not voice.is_playing() or voice.is_paused():
+		elif not voice.is_playing() and len(player_queue.get(ctx)) == 0:
 			await ctx.send(embed=embedq('Nothing to skip.'))
 			return
 
@@ -687,7 +724,7 @@ class Music(commands.Cog):
 
 # Misc. helper functions
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
-	"""Adds reactions to a given Message (prompt) and returns the outcome
+	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
 	
 	msg -- Message to be edited based on the outcome
 
@@ -756,6 +793,10 @@ class MediaQueue(object):
 	def get(self, ctx):
 		self.ensure_queue_exists(ctx)
 		return self.queues[ctx.author.guild.id]
+
+	def set(self, ctx, new_list: list):
+		self.ensure_queue_exists(ctx)
+		self.queues[ctx.author.guild.id] = new_list
 
 	def clear(self, ctx):
 		self.ensure_queue_exists(ctx)
@@ -872,7 +913,7 @@ async def play_url(url: str, ctx, user):
 	try:
 		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length))
 	except Exception as e:
-		log(f'{e}; falling back on yt-dlp.', verbose=True)
+		log(f'Falling back on yt-dlp. (Cause: {e})', verbose=True)
 		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration']))
 	
 	voice.stop()
@@ -893,7 +934,7 @@ async def play_url(url: str, ctx, user):
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
 			# Delete last played file
-			log(f'Removing: {i}')
+			log(f'Removing file: {i}')
 			try:
 				os.remove(i)
 			except PermissionError as e:

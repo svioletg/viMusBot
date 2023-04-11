@@ -10,6 +10,8 @@
 - The vote-skip check is now `>=` instead of `==`, to prevent any bugs with the number being higher than the threshold (say, if you set the exact vote number to 0, for some reason)
 
 ### Features
+- The current queue can now be saved with `-qstore`, and subsequently restored with `-qload`. Loading a queue with replace the current one.
+> NOTE: This is a precursor to an upcoming playlist management feature. I decided to add this more quick-and-dirty version to help alleviate issues with the bot locking up sometimes, so that you can save a queue and load it again if the bot must be kicked/restarted.
 - `-nowplaying` and `-queue` will now show what user has queued which link (can be disabled, see "Config changes" below)
 - Vote-to-skip threshold can now be set to a specific number of users, in addition to being a percentage
 - Config changes:
@@ -24,6 +26,8 @@
 - Fixed total time not displaying correctly when less than a minute (times would show as `:40` instead of `0:40`, for example)
 - Fixed [Issue #35](https://github.com/svioletg/viMusBot/issues/35): "SoundCloud links completely broken (DownloadError [...] URL looks truncated.)"
 > NOTE: This is unrelated to the 403 error that can happen with SoundCloud links. That issue unfortunately remains.
+- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search; this was previously thought to be fixed in 1.8.0, however I made an oversight that rendered the fix useless
+- Fixed an issue with `ytmusicapi` returning some videos with the `album` key set to `None`, instead of the key not existing (which was previously checked for)
 
 ## 1.8.0
 > *2023.04.07 / dev.29*
@@ -66,7 +70,8 @@
 - `duration_limit` was being set incorrectly in `bot.py` and could interfere with the user-set limit, now grabs it from the config file like it should
 - Fixed [Issue #28](https://github.com/svioletg/viMusBot/issues/28): "Not connected to voice" message is duplicated
 - Fixed [Issue #30](https://github.com/svioletg/viMusBot/issues/30): "ValueError: too many values to unpack" for certain songs
-- Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search
+- ~~Fixed [Issue #31](https://github.com/svioletg/viMusBot/issues/31): "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'" when playing some songs via text search~~
+    - CORRECTION: Due to an oversight by me, this was not properly fixed. It was subsequently fixed in 1.8.1.
 
 ### Other
 - `-todo` command removed
