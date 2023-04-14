@@ -2,6 +2,17 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.2
+> *2023.04.xx / dev.31*
+
+### Developer
+- Added a `__name__ == '__main__'` check to `bot.py` so it can be imported for debug purposes without actually starting asyncio
+
+### Fixes
+- Using `-leave` when the bot is not connected to a voice channel gives a proper message instead of an error
+- Partially fixed an issue where some YouTube videos would randomly cause `NoneType`-related errors when retrieving data through pytube; this appears to be an issue on either pytube or YouTube's end, but for the time being my workaround will have pytube retry retrieving data up to 10 times, at which point it will give up and not queue the link
+- Album matches should be slightly better, since it will strip out any "Remastered" text from titles
+
 ## 1.8.1
 > *2023.04.11 / dev.30*
 

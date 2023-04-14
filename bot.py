@@ -192,13 +192,31 @@ ffmpeg_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
+def length_from_url(url):
+	log(f'Fetching length of \'{url}\'...', verbose=True)
+	if 'youtube.com' in url:
+		try:
+			return pytube.YouTube(url).length
+		except Exception as e:
+			log(f'pytube encountered "{e}" during length retrieval. Falling back on yt-dlp.', verbose=True)
+			info_dict = ytdl.extract_info(url, download=False)
+			return info_dict.get('duration', None)
+	elif 'soundcloud.com' in url:
+		return round(spoofy.sc.resolve(url).duration / 1000)
+	elif 'open.spotify.com' in url:
+		return spoofy.spotify_track(url)['duration']
+	else:
+		# yt-dlp should handle most URLs
+		info_dict = ytdl.extract_info(url, download=False)
+		return info_dict.get('duration', None)
+
 def title_from_url(url):
 	log(f'Fetching title of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
 		try:
 			return pytube.YouTube(url).title
-		except pytube.exceptions.PytubeError:
-			log('pytube encountered an error during title retrieval. Falling back to yt-dlp.', verbose=True)
+		except Exception as e:
+			log(f'pytube encountered "{e}" during title retrieval. Falling back on yt-dlp.', verbose=True)
 			info_dict = ytdl.extract_info(url, download=False)
 			return info_dict.get('title', None)
 	elif 'soundcloud.com' in url:
@@ -380,7 +398,10 @@ class Music(commands.Cog):
 		global player_queue
 		player_queue.clear(ctx)
 		log(f'Leaving voice channel: {ctx.author.voice.channel}')
-		await voice.disconnect()
+		try:
+			await voice.disconnect()
+		except AttributeError:
+			await ctx.send(embed=embedq('Not connected to voice.'))
 		voice = None
 
 	@commands.command(aliases=get_aliases('loop'))
@@ -475,13 +496,16 @@ class Music(commands.Cog):
 				if '/playlist/' in url and allow_spotify_playlists:
 					log('Spotify playlist detected.', verbose=True)
 					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
+
 					objlist = generate_QueueItems(spoofy.spotify_playlist(url), ctx.author)
 					if len(objlist) > spotify_playlist_limit:
 						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
+					
 					queue_batch(ctx, objlist)
 					list_name = spoofy.sp.playlist(url)['name']
 					await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
+
 					if not voice.is_playing():
 						log('Voice client is not playing; starting...')
 						await advance_queue(ctx)
@@ -530,15 +554,15 @@ class Music(commands.Cog):
 					url = 'https://www.youtube.com/watch?v='+options[choice-1]['videoId']
 
 			# Determines if the input was a playlist
-			valid = ['playlist?list=','/sets/','/album/']
+			valid = ['playlist?list=', '/sets/', '/album/']
 			if any(i in url for i in valid):
 				log('URL is a playlist.', verbose=True)
 				objlist = generate_QueueItems(url, ctx.author)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-				if not voice.is_playing():
+				if not voice.is_playing() and len(player_queue.get(ctx)) == 0:
 					await advance_queue(ctx)
-					return
+				return
 			else:
 				# Runs if the input given was not a playlist
 				log('URL is not a playlist.', verbose=True)
@@ -575,7 +599,7 @@ class Music(commands.Cog):
 			# Start the player if we can use the url itself
 			try:
 				log('Trying to start playing or queueing.', verbose=True)
-				if not voice.is_playing():
+				if not voice.is_playing() and len(player_queue.get(ctx)) == 0:
 					log('Voice client is not playing; starting...')
 					await play_url(url, ctx, ctx.author)
 				else:
@@ -631,7 +655,13 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('The queue is empty.'))
 			return
 
-		embed = discord.Embed(title='Current queue:',color=0xFFFF00)
+		queue_time = 0
+		for i in player_queue.get(ctx):
+			queue_time += i.length
+		
+		queue_time = readable_time(queue_time)
+
+		embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=0xFFFF00)
 		start = (10*page)-10
 		end = (10*page)
 		if 10*page>len(player_queue.get(ctx)):
@@ -639,7 +669,7 @@ class Music(commands.Cog):
 		
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
 			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
-			embed.add_field(name=f'#{num+1+start}. {i.title}', value=f'Link: {i.url}{submitter_text}', inline=False)
+			embed.add_field(name=f'#{num+1+start}. {i.title} [{readable_time(i.length)}]', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
@@ -725,6 +755,9 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
+def readable_time(seconds: int|float) -> str:
+	return time.strftime('%M:%S', time.gmtime(seconds))
+
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
 	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
 	
@@ -807,32 +840,30 @@ class MediaQueue(object):
 player_queue = MediaQueue()
 
 class QueueItem(object):
-	def __init__(self, url, user, title=None):
+	def __init__(self, url, user, length=None, title=None):
 		self.url = url
 		self.user = user
-		# Saves time on downloading if we've already got the title
-		if title is not None:
-			self.title = title
-		else:
-			self.title = title_from_url(url)
+		self.length = length if length is not None else length_from_url(url)
+		self.title = title if title is not None else title_from_url(url)
 
-def generate_QueueItems(playlist, user):
+def generate_QueueItems(playlist: str|list, user) -> list:
 	objlist = []
+	# Will be a list if origin is Spotify
 	if type(playlist) == list:
-		objlist = [QueueItem(i['url'], user, title=i['title']) for i in playlist]
+		objlist = [QueueItem(i['url'], user, title=i['title'], length=i['duration']) for i in playlist]
 		return objlist
 	else:
 		# Anything youtube-dl natively supports is probably a link
 		if 'soundcloud.com' in playlist:
 			# SoundCloud playlists have to be processed differently
 			playlist_entries = spoofy.soundcloud_playlist(playlist)
-			objlist = [QueueItem(i.permalink_url, user, title=i.title) for i in playlist_entries]
+			objlist = [QueueItem(i.permalink_url, user, title=i.title, length=round(i.duration/1000)) for i in playlist_entries]
 		else:
-			playlist_entries = ytdl.extract_info(playlist,download=False)
-			objlist = [QueueItem(i['url'], user, title=i['title']) for i in playlist_entries['entries']]
+			playlist_entries = ytdl.extract_info(playlist, download=False)
+			objlist = [QueueItem(i['url'], user, title=i['title'], length=i['duration']) for i in playlist_entries['entries']]
 		return objlist
 
-def queue_batch(ctx, batch):
+def queue_batch(ctx, batch: list[QueueItem]):
 	# batch must be a list of QueueItem objects
 	global player_queue
 	for i in batch:
@@ -851,10 +882,10 @@ paused_for = 0
 loop_this = False
 
 async def play_url(url: str, ctx, user):
+	global audio_start_time, audio_time_elapsed, paused_at, paused_for
+	global last_played
 	global now_playing
 	global npmessage
-	global last_played
-	global audio_start_time, audio_time_elapsed, paused_at, paused_for
 	global skip_votes
 
 	skip_votes = []
@@ -1037,4 +1068,5 @@ async def main():
 		await bot.add_cog(Music(bot))
 		await bot.start(token)
 
-asyncio.run(main())
+if __name__ == '__main__':
+	asyncio.run(main())

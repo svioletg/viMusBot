@@ -1,12 +1,14 @@
-import colorama
 import os
-import requests
 import shutil
 import sys
 import tkinter
 import tkinter.filedialog
 import urllib.request
+from pathlib import Path
 from zipfile import ZipFile
+
+import colorama
+import requests
 
 from palette import Palette
 
@@ -62,18 +64,9 @@ def main():
 		zipf.extractall('.')
 
 	print('Copying...')
-	files = os.listdir(source_dir)
-	for f in files:
-		try:
-			shutil.copy(os.path.join(source_dir, f), './')
-		except PermissionError as e:
-			if f != '.github':
-				# Skipping .github is fine, log any other
-				# unexpected file errors
-				print(e)
-				print(f'Skipping {f}...')
-			else:
-				pass
+	source_dir = Path(source_dir)
+	cwd = str(Path.cwd())
+	shutil.copytree(source_dir, cwd, dirs_exist_ok=True)
 
 	print('Cleaning up...')
 	os.remove(latest_zip)
