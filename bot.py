@@ -206,7 +206,7 @@ def length_from_url(url):
 	elif 'open.spotify.com' in url:
 		return spoofy.spotify_track(url)['duration']
 	else:
-		# yt-dlp should handle most URLs
+		# yt-dlp should handle most other URLs
 		info_dict = ytdl.extract_info(url, download=False)
 		return info_dict.get('duration', None)
 
@@ -560,7 +560,7 @@ class Music(commands.Cog):
 				objlist = generate_QueueItems(url, ctx.author)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-				if not voice.is_playing() and len(player_queue.get(ctx)) == 0:
+				if not voice.is_playing():
 					await advance_queue(ctx)
 				return
 			else:
@@ -669,7 +669,8 @@ class Music(commands.Cog):
 		
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
 			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
-			embed.add_field(name=f'#{num+1+start}. {i.title} [{readable_time(i.length)}]', value=f'Link: {i.url}{submitter_text}', inline=False)
+			length_text = f'[{readable_time(i.length)}]' if readable_time(i.length) is not '00:00' else ''
+			embed.add_field(name=f'#{num+1+start}. {i.title} [{length_text}]', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
@@ -850,7 +851,7 @@ def generate_QueueItems(playlist: str|list, user) -> list:
 	objlist = []
 	# Will be a list if origin is Spotify
 	if type(playlist) == list:
-		objlist = [QueueItem(i['url'], user, title=i['title'], length=i['duration']) for i in playlist]
+		objlist = [QueueItem(i['url'], user, title=i['title'], length=i.get('duration', 0)) for i in playlist]
 		return objlist
 	else:
 		# Anything youtube-dl natively supports is probably a link
@@ -860,7 +861,7 @@ def generate_QueueItems(playlist: str|list, user) -> list:
 			objlist = [QueueItem(i.permalink_url, user, title=i.title, length=round(i.duration/1000)) for i in playlist_entries]
 		else:
 			playlist_entries = ytdl.extract_info(playlist, download=False)
-			objlist = [QueueItem(i['url'], user, title=i['title'], length=i['duration']) for i in playlist_entries['entries']]
+			objlist = [QueueItem(i['url'], user, title=i['title'], length=i.get('duration', 0)) for i in playlist_entries['entries']]
 		return objlist
 
 def queue_batch(ctx, batch: list[QueueItem]):
@@ -1019,19 +1020,20 @@ bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 @bot.event
 async def on_command_error(ctx, error):
 	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
-		if ctx.command.name == 'play':
-			# Resuming while paused
-			if voice.is_paused():
-				voice.resume()
-				await ctx.send(embed=embedq('Player is resuming.'))
-				global paused_for
-				paused_for = time.time() - paused_at
-			else:
-				await ctx.send(embed=embedq('No URL given.'))
-		elif ctx.command.name == 'volume':
-			await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
-		elif ctx.command.name == 'analyze':
-			await ctx.send(embed=embedq('A spotify track URL is required.'))
+		match ctx.command.name:
+			case 'play':
+				# Resuming while paused
+				if voice.is_paused():
+					voice.resume()
+					await ctx.send(embed=embedq('Player is resuming.'))
+					global paused_for
+					paused_for = time.time() - paused_at
+				else:
+					await ctx.send(embed=embedq('No URL given.'))
+			case 'volume':
+				await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
+			case 'analyze':
+				await ctx.send(embed=embedq('A spotify track URL is required.'))
 	elif isinstance(error, discord.ext.commands.CheckFailure):
 		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
 	else:

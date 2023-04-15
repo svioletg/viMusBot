@@ -87,8 +87,8 @@ keytable = {
 def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
-	# 'old' = checking for strings in other strings, how matching was done beforehand
-	if mode not in ['fuzz', 'old']: 
+	# 'strict' = checking for strings in other strings, how matching was done beforehand
+	if mode not in ['fuzz', 'strict']: 
 		log(f'{mode} is not a valid mode.')
 		return
 
@@ -119,7 +119,7 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
-	elif mode == 'old':
+	elif mode == 'strict':
 		matching_title = ref_title.lower() in yt_title.lower() or (
 			ref_title.split(' - ')[0].lower() in yt_title.lower() 
 			and ref_title.split(' - ')[1].lower() in yt_title.lower()
