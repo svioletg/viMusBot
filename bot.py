@@ -446,7 +446,7 @@ class Music(commands.Cog):
 			# if voice.is_paused():
 			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
 
-			elapsed = time.strftime('%M:%S', time.gmtime(audio_time_elapsed))
+			elapsed = timestamp_from_seconds(audio_time_elapsed)
 			submitter_text = f'\nQueued by {now_playing.user}' if show_users_in_queue else ''
 			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
@@ -659,7 +659,7 @@ class Music(commands.Cog):
 		for i in player_queue.get(ctx):
 			queue_time += i.length
 		
-		queue_time = readable_time(queue_time)
+		queue_time = timestamp_from_seconds(queue_time)
 
 		embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=0xFFFF00)
 		start = (10*page)-10
@@ -669,7 +669,7 @@ class Music(commands.Cog):
 		
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
 			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
-			length_text = f'[{readable_time(i.length)}]' if readable_time(i.length) is not '00:00' else ''
+			length_text = f'[{timestamp_from_seconds(i.length)}]' if timestamp_from_seconds(i.length) != '00:00' else ''
 			embed.add_field(name=f'#{num+1+start}. {i.title} [{length_text}]', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
@@ -756,8 +756,8 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
-def readable_time(seconds: int|float) -> str:
-	return time.strftime('%M:%S', time.gmtime(seconds))
+def timestamp_from_seconds(seconds: int|float) -> str:
+	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
 	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
@@ -932,6 +932,7 @@ async def play_url(url: str, ctx, user):
 					return
 				spyt = spyt[choice-1]
 		url = spyt['url']
+		await qmessage.edit(embed=embedq('Match found! Queueing...'))
 
 	# Start the player
 	try:
@@ -945,10 +946,10 @@ async def play_url(url: str, ctx, user):
 	now_playing.weburl = url
 	now_playing.user = user
 	try:
-		now_playing.length = time.strftime('%M:%S', time.gmtime(pytube.YouTube(now_playing.weburl).length))
+		now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
 	except Exception as e:
 		log(f'Falling back on yt-dlp. (Cause: {e})', verbose=True)
-		now_playing.length = time.strftime('%M:%S', time.gmtime(ytdl.extract_info(now_playing.weburl, download=False)['duration']))
+		now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
 	
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))

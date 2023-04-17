@@ -11,11 +11,13 @@
 ### Features
 - Using `-queue` will now display each item's times, as well as the total time of the entire queue
     - If a link's time can't be retrieved (this happens when queueing entire Bandcamp albums, for example), it won't appear and won't be counted as part of the total queue time
+- The bot will edit its *"Spotify link detected, searching YouTube..."* message once a match has been found, so that progress is more visible
 
 ### Fixes
 - Using `-leave` when the bot is not connected to a voice channel gives a proper message instead of an error
 - Partially fixed an issue where some YouTube videos would randomly cause `NoneType`-related errors when retrieving data through pytube; this appears to be an issue on either pytube or YouTube's end, but for the time being my workaround will have pytube retry retrieving data up to 10 times, at which point it will give up and not queue the link
 - Album matches should be slightly better, since it will strip out any "Remastered" text from titles
+- Timestamps will now display properly if over an hour
 
 ## 1.8.1
 > *2023.04.11 / dev.30*
