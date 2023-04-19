@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 import sys
 import time
 from inspect import currentframe, getframeinfo
@@ -86,8 +87,8 @@ keytable = {
 def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
 	# 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
-	# 'old' = checking for strings in other strings, how matching was done beforehand
-	if mode not in ['fuzz', 'old']: 
+	# 'strict' = checking for strings in other strings, how matching was done beforehand
+	if mode not in ['fuzz', 'strict']: 
 		log(f'{mode} is not a valid mode.')
 		return
 
@@ -118,7 +119,7 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 		matching_title = fuzz.ratio(ref_title.lower(), yt_title.lower()) > title_threshold
 		matching_artist = fuzz.ratio(ref_artist.lower(), yt_artist.lower()) > artist_threshold
 		matching_album = fuzz.ratio(ref_album.lower(), yt_album.lower()) > album_threshold
-	elif mode == 'old':
+	elif mode == 'strict':
 		matching_title = ref_title.lower() in yt_title.lower() or (
 			ref_title.split(' - ')[0].lower() in yt_title.lower() 
 			and ref_title.split(' - ')[1].lower() in yt_title.lower()
@@ -161,17 +162,25 @@ def isrc_search_test(playlist):
 
 def pytube_track_data(pytube_object) -> dict:
 	# TODO: sometimes nonetype error here
-	print(pytube_object if pytube_object==None else '')
-	print(pytube_object.description if pytube_object.description==None else '')
 	try:
 		description_list = pytube_object.description.split('\n')
 	except AttributeError as e:
-		print(e)
+		# Sometimes the description doesn't load unless you force pytube to retrieve data from something else
+		pytube_object = pytube.YouTube(pytube_object.watch_url)
+		tries = 0
+		while pytube_object.description == None:
+			tries += 1
+			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})')
+			if tries > 10:
+				log('pytube data retrieval failed too many times.')
+				break
+			pytube_object = pytube.YouTube(pytube_object.watch_url)
+		description_list = pytube_object.description.split('\n')
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
 		return None
 	for i in description_list:
-		if i=='':
+		if i == '':
 			description_list.pop(description_list.index(i))
 	description_dict = {
 		# some keys have been added for previous code compatbility
@@ -194,13 +203,13 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
-	print(query)
 	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
 	album_results = ytmusic.search(query=query,limit=5,filter='albums')
+	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
 	for yt in album_results:
-		title_match = fuzz.ratio(title, yt['title']) > 75
+		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['title'])) > 75
 		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
 		year_match = fuzz.ratio(year, yt['year']) > 75
 		if title_match + artist_match + year_match >= 2:
@@ -219,19 +228,14 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
+	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
 		if from_pytube:
 			# ytmusicapi has a get_song function, but it doesn't retrieve
 			# things like artist, album, etc.
 			if extract_from_ytmusic:
 				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
 			else:
-				try:
-					data = pytube_track_data(data)
-				except AttributeError as e:
-					log('{plt.error}ERROR: An error relating to Issue #34 seems to have been encountered, providing debugging information below...')
-					log(data)
-					log('Please feel free to submit the above to https://github.com/svioletg/viMusBot/issues/34 in order to help fix this issue.')
+				data = pytube_track_data(data)
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -293,7 +297,6 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# First pass, check officially uploaded songs from artist channels
 	for i in song_results[:5]:
-		print(i)
 		if is_matching(reference, i, ignore_artist=True):
 			log('Song match found.')
 			match = i
@@ -366,12 +369,14 @@ def spotify_track(url: str) -> dict:
 	artist = info['artists'][0]['name']
 	album = info['album']['name']
 	isrc = info['external_ids']['isrc']
+	duration = round(info['duration_ms']/1000)
 	return {
 		'title':title,
 		'artist':artist,
 		'album':album,
 		'url':info['external_urls']['spotify'],
-		'isrc':isrc
+		'isrc':isrc,
+		'duration':duration
 	}
 
 def spotify_album(url: str) -> dict:
