@@ -670,7 +670,7 @@ class Music(commands.Cog):
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
 			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
 			length_text = f'[{timestamp_from_seconds(i.length)}]' if timestamp_from_seconds(i.length) != '00:00' else ''
-			embed.add_field(name=f'#{num+1+start}. {i.title} [{length_text}]', value=f'Link: {i.url}{submitter_text}', inline=False)
+			embed.add_field(name=f'#{num+1+start}. {i.title} {length_text}', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
