@@ -578,6 +578,7 @@ class Music(commands.Cog):
 						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
 						return
 				else:
+					#TODO: duration checks should probably be handled with the new length_from_url(), to keep everything organized
 					if 'open.spotify.com' in url:
 						duration = spoofy.sp.track(url)['duration_ms']/1000
 					else:
@@ -949,7 +950,13 @@ async def play_url(url: str, ctx, user):
 		now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
 	except Exception as e:
 		log(f'Falling back on yt-dlp. (Cause: {e})', verbose=True)
-		now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
+		try:
+			now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
+		except Exception as e:
+			log(f'ytdl duration extraction failed, likely a direct file link. (Cause: {e})', verbose=True)
+			log(f'Attempting to retrieve URL through FFprobe...', verbose=True)
+			ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
+			now_playing.length = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 	
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))

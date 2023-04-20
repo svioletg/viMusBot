@@ -2,8 +2,14 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.3
+> *2023.04.xx / dev.32*
+
+### Fixes
+- Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
+
 ## 1.8.2
-> *2023.04.xx / dev.31*
+> *2023.04.19 / dev.31*
 
 ### Developer
 - Added a `__name__ == '__main__'` check to `bot.py` so it can be imported for debug purposes without actually starting asyncio
