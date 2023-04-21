@@ -192,42 +192,6 @@ ffmpeg_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
-def length_from_url(url):
-	log(f'Fetching length of \'{url}\'...', verbose=True)
-	if 'youtube.com' in url:
-		try:
-			return pytube.YouTube(url).length
-		except Exception as e:
-			log(f'pytube encountered "{e}" during length retrieval. Falling back on yt-dlp.', verbose=True)
-			info_dict = ytdl.extract_info(url, download=False)
-			return info_dict.get('duration', None)
-	elif 'soundcloud.com' in url:
-		return round(spoofy.sc.resolve(url).duration / 1000)
-	elif 'open.spotify.com' in url:
-		return spoofy.spotify_track(url)['duration']
-	else:
-		# yt-dlp should handle most other URLs
-		info_dict = ytdl.extract_info(url, download=False)
-		return info_dict.get('duration', None)
-
-def title_from_url(url):
-	log(f'Fetching title of \'{url}\'...', verbose=True)
-	if 'youtube.com' in url:
-		try:
-			return pytube.YouTube(url).title
-		except Exception as e:
-			log(f'pytube encountered "{e}" during title retrieval. Falling back on yt-dlp.', verbose=True)
-			info_dict = ytdl.extract_info(url, download=False)
-			return info_dict.get('title', None)
-	elif 'soundcloud.com' in url:
-		return spoofy.sc.resolve(url).title
-	elif 'open.spotify.com' in url:
-		return spoofy.spotify_track(url)['title']
-	else:
-		# yt-dlp should handle most URLs
-		info_dict = ytdl.extract_info(url, download=False)
-		return info_dict.get('title', None)
-
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
 		super().__init__(source,volume)
@@ -602,7 +566,8 @@ class Music(commands.Cog):
 				log('Trying to start playing or queueing.', verbose=True)
 				if not voice.is_playing() and len(player_queue.get(ctx)) == 0:
 					log('Voice client is not playing; starting...')
-					await play_url(url, ctx, ctx.author)
+					player_queue.get(ctx).append(QueueItem(url, ctx.author))
+					await advance_queue(ctx)
 				else:
 					player_queue.get(ctx).append(QueueItem(url, ctx.author))
 					title = player_queue.get(ctx)[-1].title
@@ -757,6 +722,42 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
+def length_from_url(url):
+	log(f'Fetching length of \'{url}\'...', verbose=True)
+	if 'youtube.com' in url:
+		try:
+			return pytube.YouTube(url).length
+		except Exception as e:
+			log(f'pytube encountered "{e}" during length retrieval. Falling back on yt-dlp.', verbose=True)
+			info_dict = ytdl.extract_info(url, download=False)
+			return info_dict.get('duration', None)
+	elif 'soundcloud.com' in url:
+		return round(spoofy.sc.resolve(url).duration / 1000)
+	elif 'open.spotify.com' in url:
+		return spoofy.spotify_track(url)['duration']
+	else:
+		# yt-dlp should handle most other URLs
+		info_dict = ytdl.extract_info(url, download=False)
+		return info_dict.get('duration', None)
+
+def title_from_url(url):
+	log(f'Fetching title of \'{url}\'...', verbose=True)
+	if 'youtube.com' in url:
+		try:
+			return pytube.YouTube(url).title
+		except Exception as e:
+			log(f'pytube encountered "{e}" during title retrieval. Falling back on yt-dlp.', verbose=True)
+			info_dict = ytdl.extract_info(url, download=False)
+			return info_dict.get('title', None)
+	elif 'soundcloud.com' in url:
+		return spoofy.sc.resolve(url).title
+	elif 'open.spotify.com' in url:
+		return spoofy.spotify_track(url)['title']
+	else:
+		# yt-dlp should handle most URLs
+		info_dict = ytdl.extract_info(url, download=False)
+		return info_dict.get('title', None)
+
 def timestamp_from_seconds(seconds: int|float) -> str:
 	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
@@ -839,14 +840,14 @@ class MediaQueue(object):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = []
 
-player_queue = MediaQueue()
-
 class QueueItem(object):
-	def __init__(self, url, user, length=None, title=None):
+	def __init__(self, url: str, user, length: str=None, title: str=None):
 		self.url = url
 		self.user = user
 		self.length = length if length is not None else length_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
+
+player_queue = MediaQueue()
 
 def generate_QueueItems(playlist: str|list, user) -> list:
 	objlist = []
@@ -883,7 +884,7 @@ paused_for = 0
 
 loop_this = False
 
-async def play_url(url: str, ctx, user):
+async def play_url(item: QueueItem, ctx):
 	global audio_start_time, audio_time_elapsed, paused_at, paused_for
 	global last_played
 	global now_playing
@@ -897,7 +898,9 @@ async def play_url(url: str, ctx, user):
 
 	log('Trying to start playing...')
 	# Check if we need to match a Spotify link
-	if 'open.spotify.com' in url:
+	if 'open.spotify.com' not in item.url:
+		url = item.url
+	else:
 		log('Trying to match Spotify track...')
 		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
 		spyt = spoofy.spyt(url)
@@ -945,18 +948,22 @@ async def play_url(url: str, ctx, user):
 
 	now_playing = player
 	now_playing.weburl = url
-	now_playing.user = user
-	try:
-		now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
-	except Exception as e:
-		log(f'Falling back on yt-dlp. (Cause: {e})', verbose=True)
+	now_playing.user = item.user
+
+	if item.length is not None:
+		now_playing.length = item.length
+	else:
 		try:
-			now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
+			now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
 		except Exception as e:
-			log(f'ytdl duration extraction failed, likely a direct file link. (Cause: {e})', verbose=True)
-			log(f'Attempting to retrieve URL through FFprobe...', verbose=True)
-			ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-			now_playing.length = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
+			log(f'Falling back on yt-dlp. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
+			try:
+				now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
+			except Exception as e:
+				log(f'ytdl duration extraction failed, likely a direct file link. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
+				log(f'Attempting to retrieve URL through FFprobe...', verbose=True)
+				ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
+				now_playing.length = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 	
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
@@ -970,7 +977,7 @@ async def play_url(url: str, ctx, user):
 	except UnboundLocalError:
 		pass
 	
-	submitter_text = f'\nQueued by {user}' if show_users_in_queue else ''
+	submitter_text = f'\nQueued by {item.user}' if show_users_in_queue else ''
 	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
@@ -993,9 +1000,7 @@ async def advance_queue(ctx, skip=False):
 				url = now_playing.weburl
 			else:
 				next_item = player_queue.get(ctx).pop(0)
-				url = next_item.url
-				user = next_item.user
-			await play_url(url, ctx, user)
+			await play_url(next_item, ctx)
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:
