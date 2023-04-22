@@ -531,35 +531,12 @@ class Music(commands.Cog):
 				# Runs if the input given was not a playlist
 				log('URL is not a playlist.', verbose=True)
 				log('Checking duration...', verbose=True)
-				# Try pytube first as it's faster
-				if 'https://www.youtube.com' in url:
-					try:
-						yt_length = pytube.YouTube(url).length
-					except TypeError:
-						yt_length = ytdl.extract_info(url, download=False)['duration']
-					if yt_length > duration_limit*60*60:
-						log('Item over duration limit; not queueing.')
-						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
-						return
-				else:
-					#TODO: duration checks should probably be handled with the new length_from_url(), to keep everything organized
-					if 'open.spotify.com' in url:
-						duration = spoofy.sp.track(url)['duration_ms']/1000
-					else:
-						ytdl_extracted = ytdl.extract_info(url,download=False)
-						try:
-							duration = ytdl_extracted['duration']
-						# 'duration' is not retrieved from the generic extractor used for direct links
-						except KeyError as e:
-							# I'd like to avoid executing something outside of the script here,
-							# but I couldn't find any library for ffprobe
-							ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-							duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
+				duration = duration_from_url(url)
 
-					if duration > duration_limit*60*60:
-						log('Item over duration limit; not queueing.')
-						await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
-						return
+				if duration > duration_limit*60*60:
+					log('Item over duration limit; not queueing.')
+					await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
+					return
 
 			# Start the player if we can use the url itself
 			try:
@@ -722,15 +699,17 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
-def length_from_url(url):
-	log(f'Fetching length of \'{url}\'...', verbose=True)
+
+def duration_from_url(url: str) -> int|float:
+	"""Automatically detects the source of a given URL, and returns its extracted duration."""
+	log(f'Getting length of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
 		try:
 			return pytube.YouTube(url).length
 		except Exception as e:
 			log(f'pytube encountered "{e}" during length retrieval. Falling back on yt-dlp.', verbose=True)
 			info_dict = ytdl.extract_info(url, download=False)
-			return info_dict.get('duration', None)
+			return info_dict.get('duration', 0)
 	elif 'soundcloud.com' in url:
 		return round(spoofy.sc.resolve(url).duration / 1000)
 	elif 'open.spotify.com' in url:
@@ -738,10 +717,11 @@ def length_from_url(url):
 	else:
 		# yt-dlp should handle most other URLs
 		info_dict = ytdl.extract_info(url, download=False)
-		return info_dict.get('duration', None)
+		return info_dict.get('duration', 0)
 
-def title_from_url(url):
-	log(f'Fetching title of \'{url}\'...', verbose=True)
+def title_from_url(url: str) -> str:
+	"""Automatically detects the source of a given URL, and returns its extracted title."""
+	log(f'Getting title of \'{url}\'...', verbose=True)
 	if 'youtube.com' in url:
 		try:
 			return pytube.YouTube(url).title
@@ -759,6 +739,7 @@ def title_from_url(url):
 		return info_dict.get('title', None)
 
 def timestamp_from_seconds(seconds: int|float) -> str:
+	"""Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
 	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
@@ -844,7 +825,7 @@ class QueueItem(object):
 	def __init__(self, url: str, user, length: str=None, title: str=None):
 		self.url = url
 		self.user = user
-		self.length = length if length is not None else length_from_url(url)
+		self.length = length if length is not None else duration_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
 
 player_queue = MediaQueue()
@@ -951,7 +932,7 @@ async def play_url(item: QueueItem, ctx):
 	now_playing.user = item.user
 
 	if item.length is not None:
-		now_playing.length = item.length
+		now_playing.length = timestamp_from_seconds(item.length)
 	else:
 		try:
 			now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)

@@ -6,11 +6,13 @@
 > *2023.04.xx / dev.32*
 
 ### Developer
-- `length_from_url()` and `title_from_url()` have been moved down to the `# Misc. helper functions` section of `bot.py`
+- `length_from_url()` has been **renamed** to `duration_from_url()`
+- `duration_from_url()` and `title_from_url()` have been moved down to the `# Misc. helper functions` section of `bot.py`
 - `play_url()` now requires a `QueueItem` object instead of a URL string (`url` argument replaced with `item`)
     - By extension, `play_url()` no longer requires the `user` argument
     - This was done to cut down on unnecessary and redundant operations, such as retrieving a track's duration when we've already got it in the `QueueItem` it originated from
     - As well, `play_url()` is now *only* invoked by the `advance_queue()` function, as `-play` will now append a new `QueueItem` to the queue before calling `advance_queue()` instead of using the URL
+- The duration limit check now makes use of `duration_from_url()` to keep everything organized better
 
 ### Fixes
 - Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
