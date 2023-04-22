@@ -7,6 +7,7 @@
 
 ### Developer
 - `length_from_url()` has been **renamed** to `duration_from_url()`
+- The `length` attribute of `QueueItem` has been **renamed** to `duration`
 - `duration_from_url()` and `title_from_url()` have been moved down to the `# Misc. helper functions` section of `bot.py`
 - `play_url()` now requires a `QueueItem` object instead of a URL string (`url` argument replaced with `item`)
     - By extension, `play_url()` no longer requires the `user` argument

@@ -350,33 +350,28 @@ def get_uri(url: str) -> str:
 	return url.split("/")[-1].split("?")[0]
 
 def spotify_playlist(url: str) -> list:
-	tracks = sp.playlist(url)['tracks']['items']
+	playlist = sp.playlist(url)['tracks']['items']
 	newlist = []
-	for i in tracks:
+	for item in playlist:
 		newlist.append({
-			'title':i['track']['name'],
-			'artist':i['track']['artists'][0]['name'],
-			'album':i['track']['album']['name'],
-			'isrc':i['track']['external_ids'].get('isrc',None),
-			'url':i['track']['external_urls']['spotify'],
+			'title': item['track']['name'],
+			'artist': item['track']['artists'][0]['name'],
+			'album': item['track']['album']['name'],
+			'isrc': item['track']['external_ids'].get('isrc', None),
+			'url': item['track']['external_urls']['spotify'],
+			'duration': round(item['track']['duration_ms'] / 1000)
 		})
 	return newlist
 
 def spotify_track(url: str) -> dict:
 	info = sp.track(url)
-	title = info['name']
-	# Only retrieves the first artist name
-	artist = info['artists'][0]['name']
-	album = info['album']['name']
-	isrc = info['external_ids']['isrc']
-	duration = round(info['duration_ms']/1000)
 	return {
-		'title':title,
-		'artist':artist,
-		'album':album,
-		'url':info['external_urls']['spotify'],
-		'isrc':isrc,
-		'duration':duration
+		'title': info['name'],
+		'artist': info['artists'][0]['name'],
+		'album': info['album']['name'],
+		'isrc': info['external_ids'].get('isrc', None),
+		'url': info['external_urls']['spotify'],
+		'duration': round(info['duration_ms'] / 1000)
 	}
 
 def spotify_album(url: str) -> dict:

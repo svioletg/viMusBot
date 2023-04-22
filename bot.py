@@ -136,8 +136,8 @@ def get_aliases(command: str):
 log('Removing previously downloaded files...')
 files = glob.glob('*.*')
 to_remove = [f for f in files if re.search(r'\.(\w+)(?!.*\.)',f)[0] in cleanup_extensions]
-for i in to_remove:
-	os.remove(i)
+for t in to_remove:
+	os.remove(t)
 del files, to_remove
 
 def embedq(*args) -> discord.Embed:
@@ -412,7 +412,7 @@ class Music(commands.Cog):
 
 			elapsed = timestamp_from_seconds(audio_time_elapsed)
 			submitter_text = f'\nQueued by {now_playing.user}' if show_users_in_queue else ''
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.length}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
 
@@ -600,7 +600,7 @@ class Music(commands.Cog):
 
 		queue_time = 0
 		for i in player_queue.get(ctx):
-			queue_time += i.length
+			queue_time += i.duration
 		
 		queue_time = timestamp_from_seconds(queue_time)
 
@@ -612,7 +612,7 @@ class Music(commands.Cog):
 		
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
 			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
-			length_text = f'[{timestamp_from_seconds(i.length)}]' if timestamp_from_seconds(i.length) != '00:00' else ''
+			length_text = f'[{timestamp_from_seconds(i.duration)}]' if timestamp_from_seconds(i.duration) != '00:00' else ''
 			embed.add_field(name=f'#{num+1+start}. {i.title} {length_text}', value=f'Link: {i.url}{submitter_text}', inline=False)
 
 		try:
@@ -822,10 +822,10 @@ class MediaQueue(object):
 		self.queues[ctx.author.guild.id] = []
 
 class QueueItem(object):
-	def __init__(self, url: str, user, length: str=None, title: str=None):
+	def __init__(self, url: str, user, duration: int|float=0, title: str=None):
 		self.url = url
 		self.user = user
-		self.length = length if length is not None else duration_from_url(url)
+		self.duration = duration if duration is not 0 else duration_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
 
 player_queue = MediaQueue()
@@ -834,17 +834,17 @@ def generate_QueueItems(playlist: str|list, user) -> list:
 	objlist = []
 	# Will be a list if origin is Spotify
 	if type(playlist) == list:
-		objlist = [QueueItem(i['url'], user, title=i['title'], length=i.get('duration', 0)) for i in playlist]
+		objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist]
 		return objlist
 	else:
 		# Anything youtube-dl natively supports is probably a link
 		if 'soundcloud.com' in playlist:
 			# SoundCloud playlists have to be processed differently
 			playlist_entries = spoofy.soundcloud_playlist(playlist)
-			objlist = [QueueItem(i.permalink_url, user, title=i.title, length=round(i.duration/1000)) for i in playlist_entries]
+			objlist = [QueueItem(i.permalink_url, user, title=i.title, duration=round(i.duration/1000)) for i in playlist_entries]
 		else:
 			playlist_entries = ytdl.extract_info(playlist, download=False)
-			objlist = [QueueItem(i['url'], user, title=i['title'], length=i.get('duration', 0)) for i in playlist_entries['entries']]
+			objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0), skip_duration=i.get('duration', 0)==0) for i in playlist_entries['entries']]
 		return objlist
 
 def queue_batch(ctx, batch: list[QueueItem]):
@@ -884,7 +884,7 @@ async def play_url(item: QueueItem, ctx):
 	else:
 		log('Trying to match Spotify track...')
 		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
-		spyt = spoofy.spyt(url)
+		spyt = spoofy.spyt(item.url)
 
 		log('Checking if unsure...', verbose=True)
 		if type(spyt) == tuple and spyt[0] == 'unsure':
@@ -931,20 +931,20 @@ async def play_url(item: QueueItem, ctx):
 	now_playing.weburl = url
 	now_playing.user = item.user
 
-	if item.length is not None:
-		now_playing.length = timestamp_from_seconds(item.length)
+	if item.duration is not None:
+		now_playing.duration = timestamp_from_seconds(item.duration)
 	else:
 		try:
-			now_playing.length = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
+			now_playing.duration = timestamp_from_seconds(pytube.YouTube(now_playing.weburl).length)
 		except Exception as e:
 			log(f'Falling back on yt-dlp. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
 			try:
-				now_playing.length = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
+				now_playing.duration = timestamp_from_seconds(ytdl.extract_info(now_playing.weburl, download=False)['duration'])
 			except Exception as e:
 				log(f'ytdl duration extraction failed, likely a direct file link. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
 				log(f'Attempting to retrieve URL through FFprobe...', verbose=True)
 				ffprobe = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-				now_playing.length = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
+				now_playing.duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 	
 	voice.stop()
 	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
@@ -959,7 +959,7 @@ async def play_url(item: QueueItem, ctx):
 		pass
 	
 	submitter_text = f'\nQueued by {item.user}' if show_users_in_queue else ''
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.length}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
