@@ -18,6 +18,9 @@
 ### Fixes
 - Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
 
+### Other
+- Spotify-to-YouTube album matching should be much more reliable now, due to making a second pass through the "Songs" filter of YouTube Music
+
 ## 1.8.2
 > *2023.04.19 / dev.31*
 

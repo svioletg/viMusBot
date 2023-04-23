@@ -203,11 +203,11 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
-	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
-	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
+
+	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	for yt in album_results:
 		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['title'])) > 75
 		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
@@ -215,6 +215,15 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		if title_match + artist_match + year_match >= 2:
 			log('Match found.', verbose=True)
 			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
+	
+	song_results = ytmusic.search(query=query,limit=5,filter='songs')
+	for yt in song_results:
+		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['album']['name'])) > 75
+		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
+		year_match = fuzz.ratio(year, yt['year']) > 75
+		if title_match + artist_match + year_match >= 2:
+			log('Match found.', verbose=True)
+			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['album']['id'])['audioPlaylistId']
 	
 	log('No match found.', verbose=True)
 	return None

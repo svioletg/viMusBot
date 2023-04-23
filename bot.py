@@ -483,7 +483,7 @@ class Music(commands.Cog):
 					return
 
 				log('Checking for album...', verbose=True)
-				if '/album/' in url:
+				if 'open.spotify.com/album/' in url:
 					log('Spotify album detected.', verbose=True)
 					album_info = spoofy.spotify_album(url)
 					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
@@ -822,10 +822,10 @@ class MediaQueue(object):
 		self.queues[ctx.author.guild.id] = []
 
 class QueueItem(object):
-	def __init__(self, url: str, user, duration: int|float=0, title: str=None):
+	def __init__(self, url: str, user, duration: int|float=None, title: str=None):
 		self.url = url
 		self.user = user
-		self.duration = duration if duration is not 0 else duration_from_url(url)
+		self.duration = duration if duration is not None else duration_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
 
 player_queue = MediaQueue()
@@ -844,7 +844,7 @@ def generate_QueueItems(playlist: str|list, user) -> list:
 			objlist = [QueueItem(i.permalink_url, user, title=i.title, duration=round(i.duration/1000)) for i in playlist_entries]
 		else:
 			playlist_entries = ytdl.extract_info(playlist, download=False)
-			objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0), skip_duration=i.get('duration', 0)==0) for i in playlist_entries['entries']]
+			objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist_entries['entries']]
 		return objlist
 
 def queue_batch(ctx, batch: list[QueueItem]):
@@ -932,6 +932,8 @@ async def play_url(item: QueueItem, ctx):
 	now_playing.user = item.user
 
 	if item.duration is not None:
+		if item.duration == 0:
+			item.duration = duration_from_url(item.url)
 		now_playing.duration = timestamp_from_seconds(item.duration)
 	else:
 		try:
