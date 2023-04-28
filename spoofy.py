@@ -11,6 +11,7 @@ import regex as re
 import sclib
 import spotipy
 import yaml
+import yt_dlp
 from colorama import Back, Fore, Style
 from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -48,6 +49,24 @@ duration_limit = config['duration-limit']
 # Useful to point this out if left on accidentally
 if force_no_match:
 	log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+
+# Configure youtube dl
+ytdl_format_options = {
+	'format': 'bestaudio/best',
+	'outtmpl': '%(extractor)s-#-%(id)s-#-%(title)s.%(ext)s',
+	'restrictfilenames': True,
+	'noplaylist': True,
+	'nocheckcertificate': True,
+	'ignoreerrors': False,
+	'logtostderr': False,
+	'quiet': False,
+	'no_warnings': False,
+	'default_search': 'auto',
+	'extract_flat': True,
+	'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 # API Objects
 
@@ -167,15 +186,21 @@ def pytube_track_data(pytube_object) -> dict:
 	except AttributeError as e:
 		# Sometimes the description doesn't load unless you force pytube to retrieve data from something else
 		pytube_object = pytube.YouTube(pytube_object.watch_url)
+		pytube_failed = False
 		tries = 0
 		while pytube_object.description == None:
 			tries += 1
 			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})')
-			if tries > 10:
+			if tries >= 10:
 				log('pytube data retrieval failed too many times.')
+				pytube_failed = True
 				break
 			pytube_object = pytube.YouTube(pytube_object.watch_url)
-		description_list = pytube_object.description.split('\n')
+			
+		if pytube_failed:
+			description_list = ytdl.extract_info(pytube_object.watch_url)['description'].split('\n')
+		else:
+			description_list = pytube_object.description.split('\n')
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
 		return None

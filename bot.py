@@ -186,11 +186,11 @@ ytdl_format_options = {
 	'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
+
 ffmpeg_options = {
 	'options': '-vn',
 }
-
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
@@ -490,7 +490,7 @@ class Music(commands.Cog):
 					if url == None:
 						await ctx.send(embed=embedq('No match could be found.'))
 						return
-			
+
 			# Search with text if no url is provided
 			if 'https://' not in ctx.message.content:
 				log('Link not detected, searching by text', verbose=True)

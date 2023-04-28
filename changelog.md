@@ -17,6 +17,7 @@
 
 ### Fixes
 - Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
+- The workaround for `NoneType` errors relating to `pytube` has been amended to fall back on `yt-dlp` for data retrieval if all attempts fail
 
 ### Other
 - Spotify-to-YouTube album matching should be much more reliable now, due to making a second pass through the "Songs" filter of YouTube Music
