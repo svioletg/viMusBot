@@ -269,7 +269,7 @@ class General(commands.Cog):
 		global spoofy
 		spoofy = importlib.reload(spoofy)
 		log('Reloaded spoofy.py.')
-	
+
 	@commands.command()
 	@commands.check(is_command_enabled)
 	async def stream(self, ctx):
@@ -707,7 +707,7 @@ def duration_from_url(url: str) -> int|float:
 		try:
 			return pytube.YouTube(url).length
 		except Exception as e:
-			log(f'pytube encountered "{e}" during length retrieval. Falling back on yt-dlp.', verbose=True)
+			log(f'pytube encountered "{traceback.format_exception(e)[-1]}" during length retrieval. Falling back on yt-dlp.', verbose=True)
 			info_dict = ytdl.extract_info(url, download=False)
 			return info_dict.get('duration', 0)
 	elif 'soundcloud.com' in url:
@@ -726,7 +726,7 @@ def title_from_url(url: str) -> str:
 		try:
 			return pytube.YouTube(url).title
 		except Exception as e:
-			log(f'pytube encountered "{e}" during title retrieval. Falling back on yt-dlp.', verbose=True)
+			log(f'pytube encountered "{traceback.format_exception(e)[-1]}" during title retrieval. Falling back on yt-dlp.', verbose=True)
 			info_dict = ytdl.extract_info(url, download=False)
 			return info_dict.get('title', None)
 	elif 'soundcloud.com' in url:

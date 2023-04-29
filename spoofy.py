@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import time
+import traceback
 from inspect import currentframe, getframeinfo
 
 import colorama
@@ -59,7 +60,7 @@ ytdl_format_options = {
 	'nocheckcertificate': True,
 	'ignoreerrors': False,
 	'logtostderr': False,
-	'quiet': False,
+	'quiet': True,
 	'no_warnings': False,
 	'default_search': 'auto',
 	'extract_flat': True,
@@ -126,7 +127,7 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	try:
 		yt_album = ytresult['album']['name']
 	except Exception as e:
-		log(f'Ignoring album name. (Cause: {e})')
+		log(f'Ignoring album name. (Cause: {traceback.format_exception(e)[-1]})')
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
@@ -190,23 +191,28 @@ def pytube_track_data(pytube_object) -> dict:
 		tries = 0
 		while pytube_object.description == None:
 			tries += 1
-			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})')
+			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})', verbose=True)
 			if tries >= 10:
-				log('pytube data retrieval failed too many times.')
+				log('pytube data retrieval failed too many times.', verbose=True)
 				pytube_failed = True
 				break
 			pytube_object = pytube.YouTube(pytube_object.watch_url)
-			
+
 		if pytube_failed:
+			log('Falling back on yt-dlp...', verbose=True)
 			description_list = ytdl.extract_info(pytube_object.watch_url)['description'].split('\n')
 		else:
 			description_list = pytube_object.description.split('\n')
+
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
+		log(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
 		return None
-	for i in description_list:
+
+	for i in description_list.copy():
 		if i == '':
 			description_list.pop(description_list.index(i))
+
 	description_dict = {
 		# some keys have been added for previous code compatbility
 		'title': pytube_object.title,
@@ -215,6 +221,7 @@ def pytube_track_data(pytube_object) -> dict:
 		'length': pytube_object.length,
 		'videoId': pytube_object.video_id
 	}
+
 	return description_dict
 
 def search_ytmusic_text(query: str) -> tuple:
@@ -262,14 +269,18 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
+	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_with_ytmusic=False) -> dict:
 		if from_pytube:
-			# ytmusicapi has a get_song function, but it doesn't retrieve
-			# things like artist, album, etc.
-			if extract_from_ytmusic:
-				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			if not extract_with_ytmusic:
+				try:
+					data = pytube_track_data(data)
+				except Exception as e:
+					log(f'pytube data trimming failed. Cause: {traceback.format_exception(e)[-1]}')
+					log('Trying ytmusicapi instead...')
+					data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
 			else:
-				data = pytube_track_data(data)
+				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+				
 			try:
 				album = data['album']['name']
 			except KeyError as e:

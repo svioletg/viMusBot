@@ -3,7 +3,7 @@
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
 ## 1.8.3
-> *2023.04.xx / dev.32*
+> *2023.04.29 / dev.32*
 
 ### Developer
 - `length_from_url()` has been **renamed** to `duration_from_url()`
@@ -14,6 +14,7 @@
     - This was done to cut down on unnecessary and redundant operations, such as retrieving a track's duration when we've already got it in the `QueueItem` it originated from
     - As well, `play_url()` is now *only* invoked by the `advance_queue()` function, as `-play` will now append a new `QueueItem` to the queue before calling `advance_queue()` instead of using the URL
 - The duration limit check now makes use of `duration_from_url()` to keep everything organized better
+- The `extract_from_ytmusic` argument of `trim_track_data()` has been **renamed** to `extract_with_ytmusic`
 
 ### Fixes
 - Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
