@@ -2,6 +2,27 @@
 
 ### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
 
+## 1.8.3
+> *2023.04.29 / dev.32*
+
+### Developer
+- `length_from_url()` has been **renamed** to `duration_from_url()`
+- The `length` attribute of `QueueItem` has been **renamed** to `duration`
+- `duration_from_url()` and `title_from_url()` have been moved down to the `# Misc. helper functions` section of `bot.py`
+- `play_url()` now requires a `QueueItem` object instead of a URL string (`url` argument replaced with `item`)
+    - By extension, `play_url()` no longer requires the `user` argument
+    - This was done to cut down on unnecessary and redundant operations, such as retrieving a track's duration when we've already got it in the `QueueItem` it originated from
+    - As well, `play_url()` is now *only* invoked by the `advance_queue()` function, as `-play` will now append a new `QueueItem` to the queue before calling `advance_queue()` instead of using the URL
+- The duration limit check now makes use of `duration_from_url()` to keep everything organized better
+- The `extract_from_ytmusic` argument of `trim_track_data()` has been **renamed** to `extract_with_ytmusic`
+
+### Fixes
+- Fixed an issue that broke playing direct file links, which was causing a KeyError when retrieving the duration
+- The workaround for `NoneType` errors relating to `pytube` has been amended to fall back on `yt-dlp` for data retrieval if all attempts fail
+
+### Other
+- Spotify-to-YouTube album matching should be much more reliable now, due to making a second pass through the "Songs" filter of YouTube Music
+
 ## 1.8.2
 > *2023.04.19 / dev.31*
 

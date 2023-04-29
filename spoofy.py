@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import time
+import traceback
 from inspect import currentframe, getframeinfo
 
 import colorama
@@ -11,6 +12,7 @@ import regex as re
 import sclib
 import spotipy
 import yaml
+import yt_dlp
 from colorama import Back, Fore, Style
 from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -48,6 +50,24 @@ duration_limit = config['duration-limit']
 # Useful to point this out if left on accidentally
 if force_no_match:
 	log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+
+# Configure youtube dl
+ytdl_format_options = {
+	'format': 'bestaudio/best',
+	'outtmpl': '%(extractor)s-#-%(id)s-#-%(title)s.%(ext)s',
+	'restrictfilenames': True,
+	'noplaylist': True,
+	'nocheckcertificate': True,
+	'ignoreerrors': False,
+	'logtostderr': False,
+	'quiet': True,
+	'no_warnings': False,
+	'default_search': 'auto',
+	'extract_flat': True,
+	'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
+}
+
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 # API Objects
 
@@ -107,7 +127,7 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	try:
 		yt_album = ytresult['album']['name']
 	except Exception as e:
-		log(f'Ignoring album name. (Cause: {e})')
+		log(f'Ignoring album name. (Cause: {traceback.format_exception(e)[-1]})')
 		# User-uploaded videos have no 'album' key
 		yt_album = ''
 
@@ -167,21 +187,32 @@ def pytube_track_data(pytube_object) -> dict:
 	except AttributeError as e:
 		# Sometimes the description doesn't load unless you force pytube to retrieve data from something else
 		pytube_object = pytube.YouTube(pytube_object.watch_url)
+		pytube_failed = False
 		tries = 0
 		while pytube_object.description == None:
 			tries += 1
-			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})')
-			if tries > 10:
-				log('pytube data retrieval failed too many times.')
+			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})', verbose=True)
+			if tries >= 10:
+				log('pytube data retrieval failed too many times.', verbose=True)
+				pytube_failed = True
 				break
 			pytube_object = pytube.YouTube(pytube_object.watch_url)
-		description_list = pytube_object.description.split('\n')
+
+		if pytube_failed:
+			log('Falling back on yt-dlp...', verbose=True)
+			description_list = ytdl.extract_info(pytube_object.watch_url)['description'].split('\n')
+		else:
+			description_list = pytube_object.description.split('\n')
+
 	if 'Provided to YouTube by' not in description_list[0]:
 		# This function won't work if it doesn't follow the auto-generated template
+		log(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
 		return None
-	for i in description_list:
+
+	for i in description_list.copy():
 		if i == '':
 			description_list.pop(description_list.index(i))
+
 	description_dict = {
 		# some keys have been added for previous code compatbility
 		'title': pytube_object.title,
@@ -190,6 +221,7 @@ def pytube_track_data(pytube_object) -> dict:
 		'length': pytube_object.length,
 		'videoId': pytube_object.video_id
 	}
+
 	return description_dict
 
 def search_ytmusic_text(query: str) -> tuple:
@@ -203,11 +235,11 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
-	reference = {'title':title, 'artist':artist, 'year':year, 'upc':upc}
 	
 	log('Starting album search...', verbose=True)
-	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
+
+	album_results = ytmusic.search(query=query,limit=5,filter='albums')
 	for yt in album_results:
 		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['title'])) > 75
 		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
@@ -215,6 +247,15 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 		if title_match + artist_match + year_match >= 2:
 			log('Match found.', verbose=True)
 			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
+	
+	song_results = ytmusic.search(query=query,limit=5,filter='songs')
+	for yt in song_results:
+		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['album']['name'])) > 75
+		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
+		year_match = fuzz.ratio(year, yt['year']) > 75
+		if title_match + artist_match + year_match >= 2:
+			log('Match found.', verbose=True)
+			return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['album']['id'])['audioPlaylistId']
 	
 	log('No match found.', verbose=True)
 	return None
@@ -228,14 +269,18 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_from_ytmusic=False) -> dict:
+	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_with_ytmusic=False) -> dict:
 		if from_pytube:
-			# ytmusicapi has a get_song function, but it doesn't retrieve
-			# things like artist, album, etc.
-			if extract_from_ytmusic:
-				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			if not extract_with_ytmusic:
+				try:
+					data = pytube_track_data(data)
+				except Exception as e:
+					log(f'pytube data trimming failed. Cause: {traceback.format_exception(e)[-1]}')
+					log('Trying ytmusicapi instead...')
+					data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
 			else:
-				data = pytube_track_data(data)
+				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+				
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -350,33 +395,28 @@ def get_uri(url: str) -> str:
 	return url.split("/")[-1].split("?")[0]
 
 def spotify_playlist(url: str) -> list:
-	tracks = sp.playlist(url)['tracks']['items']
+	playlist = sp.playlist(url)['tracks']['items']
 	newlist = []
-	for i in tracks:
+	for item in playlist:
 		newlist.append({
-			'title':i['track']['name'],
-			'artist':i['track']['artists'][0]['name'],
-			'album':i['track']['album']['name'],
-			'isrc':i['track']['external_ids'].get('isrc',None),
-			'url':i['track']['external_urls']['spotify'],
+			'title': item['track']['name'],
+			'artist': item['track']['artists'][0]['name'],
+			'album': item['track']['album']['name'],
+			'isrc': item['track']['external_ids'].get('isrc', None),
+			'url': item['track']['external_urls']['spotify'],
+			'duration': round(item['track']['duration_ms'] / 1000)
 		})
 	return newlist
 
 def spotify_track(url: str) -> dict:
 	info = sp.track(url)
-	title = info['name']
-	# Only retrieves the first artist name
-	artist = info['artists'][0]['name']
-	album = info['album']['name']
-	isrc = info['external_ids']['isrc']
-	duration = round(info['duration_ms']/1000)
 	return {
-		'title':title,
-		'artist':artist,
-		'album':album,
-		'url':info['external_urls']['spotify'],
-		'isrc':isrc,
-		'duration':duration
+		'title': info['name'],
+		'artist': info['artists'][0]['name'],
+		'album': info['album']['name'],
+		'isrc': info['external_ids'].get('isrc', None),
+		'url': info['external_urls']['spotify'],
+		'duration': round(info['duration_ms'] / 1000)
 	}
 
 def spotify_album(url: str) -> dict:
