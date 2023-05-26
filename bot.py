@@ -29,7 +29,7 @@ import yaml
 import yt_dlp
 from colorama import Back, Fore, Style
 from discord.ext import commands
-from pretty_help import DefaultMenu, PrettyHelp
+from pretty_help import PrettyHelp
 
 print('Checking for config...')
 
@@ -1007,10 +1007,8 @@ bot = commands.Bot(
 	command_prefix=commands.when_mentioned_or(command_prefix),
 	description='',
 	intents=intents,
+	help_command = PrettyHelp(False, color=0xFFFF00)
 )
-
-menu = DefaultMenu('◀️', '▶️', '❌')
-bot.help_command = PrettyHelp(navigation=menu, color=0xFFFF00)
 
 # Command error handling
 @bot.event
