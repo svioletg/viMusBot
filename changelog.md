@@ -4,11 +4,17 @@
 
 ## 1.8.4
 
-> *2023.05.xx / dev.33*
+> *2023.06.xx / dev.33*
 
 ### Developer
-- Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
-- The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
+- `bot.py`
+    - `update_check` variable renamed to `update_check_result`
+    - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
+    - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
+    - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
+
+### Other
+- If enabled, the queue will now display user's nicknames instead of account names
 
 ## 1.8.3
 > *2023.04.29 / dev.32*

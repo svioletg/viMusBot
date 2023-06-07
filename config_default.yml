@@ -21,6 +21,11 @@ public: yes
 # Path to the text file containing the bot's token
 token-file: "token.txt"
 
+# Set your command prefix here
+prefixes:
+    public: "-"
+    developer: "$"
+
 # Toggles voting to skip; if this is disabled, -skip will skip the currently playing track instantly
 # If enabled, you will enough users to use -skip on the same song before it will actually skip it
 vote-to-skip:
@@ -32,11 +37,6 @@ vote-to-skip:
 
 # Toggles whether -nowplaying and -queue will show names of who queued what
 show-users-in-queue: yes
-
-# Set your command prefix here
-prefixes:
-    public: "-"
-    developer: "$"
 
 # List of file extensions the bot will detect and delete on startup; must start with a "."
 auto-remove:

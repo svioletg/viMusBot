@@ -10,7 +10,6 @@ import glob
 import importlib
 import logging
 import os
-import pickle
 import random
 import shutil
 import subprocess
@@ -85,13 +84,13 @@ def log_line():
 
 log(f'Running on version {version}.')
 
-update_check = update.check()
+update_check_result = update.check()
 
 # Check for an outdated version.txt
-if update_check[0] == False and update_check[1]:
+if update_check_result[0] == False and update_check_result[1]:
 	log(f'{plt.warn}There is a new release available.')
-	current_tag = update_check[1]['current']
-	latest_tag = update_check[1]['latest']['tag_name']
+	current_tag = update_check_result[1]['current']
+	latest_tag = update_check_result[1]['latest']['tag_name']
 	log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
 	log('Use "update.py" to update.')
 else:
@@ -411,7 +410,7 @@ class Music(commands.Cog):
 			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
 
 			elapsed = timestamp_from_seconds(audio_time_elapsed)
-			submitter_text = f'\nQueued by {now_playing.user}' if show_users_in_queue else ''
+			submitter_text = get_queued_by_text(now_playing.user)
 			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
 
 		await ctx.send(embed=embed)
@@ -611,7 +610,7 @@ class Music(commands.Cog):
 			end = len(player_queue.get(ctx))
 		
 		for num, i in enumerate(player_queue.get(ctx)[start:end]):
-			submitter_text = f'\nQueued by {i.user}' if show_users_in_queue else ''
+			submitter_text = get_queued_by_text(i.user)
 			length_text = f'[{timestamp_from_seconds(i.duration)}]' if timestamp_from_seconds(i.duration) != '00:00' else ''
 			embed.add_field(name=f'#{num+1+start}. {i.title} {length_text}', value=f'Link: {i.url}{submitter_text}', inline=False)
 
@@ -699,6 +698,10 @@ class Music(commands.Cog):
 # 
 
 # Misc. helper functions
+
+def get_queued_by_text(user_object: discord.User) -> str:
+	uname = user_object.nick if user_object.nick else user_object.name
+	return f'\nQueued by {uname}' if show_users_in_queue else ''
 
 def duration_from_url(url: str) -> int|float:
 	"""Automatically detects the source of a given URL, and returns its extracted duration."""
@@ -959,8 +962,8 @@ async def play_url(item: QueueItem, ctx):
 		await qmessage.delete()
 	except UnboundLocalError:
 		pass
-	
-	submitter_text = f'\nQueued by {item.user}' if show_users_in_queue else ''
+
+	submitter_text = get_queued_by_text(item.user)
 	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
