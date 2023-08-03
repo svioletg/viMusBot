@@ -1,8 +1,6 @@
 import os
 import shutil
 import sys
-import tkinter
-import tkinter.filedialog
 import urllib.request
 from pathlib import Path
 from zipfile import ZipFile
@@ -11,14 +9,6 @@ import colorama
 import requests
 
 from palette import Palette
-
-# Just so I can test this in another directory
-if '--test' in sys.argv:
-	root = tkinter.Tk()
-	root.withdraw()
-	target_dir = tkinter.filedialog.askdirectory(parent=root, title='Choose where to setup viMusBot')
-else:
-	target_dir = '.'
 
 colorama.init(autoreset=True)
 plt = Palette()
@@ -50,10 +40,11 @@ def main():
 	print(f'Your local version number:\n{plt.gold}{current}{plt.reset}\n'+
 		f'...does not match the current latest release of:\n{plt.lime}{latest_tag}')
 
-	confirm = input('Would you like to update now? (y/n) ')
-	if confirm == 'n': print('Exiting.'); exit()
-
-	latest_zip = f'{target_dir}/viMusBot-{latest_tag}.zip'
+	if input('Would you like to update now? (y/n) ').strip().lower() != 'n':
+		print('Exiting.')
+		raise SystemExit(0)
+	
+	latest_zip = f'./viMusBot-{latest_tag}.zip'
 
 	print('Retrieving: '+latest['zipball_url'])
 	urllib.request.urlretrieve(latest['zipball_url'], latest_zip)
@@ -75,7 +66,7 @@ def main():
 	with open('version.txt', 'r') as f:
 		new_version = f.read()
 		print('Done!')
-		print(f'You are now on {plt.lime}v{new_version}{plt.reset}.')
+		print(f'You are now on {plt.lime}v{new_version}{plt.reset}')
 
 if __name__ == '__main__':
 	main()

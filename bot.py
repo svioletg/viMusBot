@@ -19,6 +19,7 @@ import traceback
 import urllib.request
 from datetime import datetime, timedelta
 from inspect import currentframe, getframeinfo
+from pathlib import Path
 
 import colorama
 import discord
@@ -69,7 +70,7 @@ plt = Palette()
 
 last_logtime = time.time()
 
-def log(msg: str, verbose=False):
+def log(msg: str, verbose: bool=False):
 	global last_logtime
 	customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
 	last_logtime = time.time()
@@ -104,26 +105,26 @@ log('Starting...')
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-allow_spotify_playlists = config['allow-spotify-playlists']
-spotify_playlist_limit = config['spotify-playlist-limit']
-use_top_match = config['use-top-match']
-duration_limit = config['duration-limit']
+ALLOW_SPOTIFY_PLAYLISTS = config['allow-spotify-playlists']
+SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
+USE_TOP_MATCH = config['use-top-match']
+DURATION_LIMIT = config['duration-limit']
 
-public = config['public']
-token_file_path = config['token-file']
-public_prefix = config['prefixes']['public']
-dev_prefix = config['prefixes']['developer']
-inactivity_timeout = config['inactivity-timeout']
-cleanup_extensions = config['auto-remove']
+PUBLIC = config['public']
+TOKEN_FILE_PATH = config['token-file']
+PUBLIC_PREFIX = config['prefixes']['public']
+DEV_PREFIX = config['prefixes']['developer']
+INACTIVITY_TIMEOUT = config['inactivity-timeout']
+CLEANUP_EXTENSIONS = config['auto-remove']
 
-vote_to_skip = config['vote-to-skip']['enabled']
-skip_votes_type = config['vote-to-skip']['threshold-type']
-skip_votes_exact = config['vote-to-skip']['threshold-exact']
-skip_votes_percentage = config['vote-to-skip']['threshold-percentage']
+VOTE_TO_SKIP = config['vote-to-skip']['enabled']
+SKIP_VOTES_TYPE = config['vote-to-skip']['threshold-type']
+SKIP_VOTES_EXACT = config['vote-to-skip']['threshold-exact']
+SKIP_VOTES_PERCENTAGE = config['vote-to-skip']['threshold-percentage']
 skip_votes_needed = 0
 skip_votes = []
 
-show_users_in_queue = config['show-users-in-queue']
+SHOW_USERS_IN_QUEUE = config['show-users-in-queue']
 
 def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
@@ -134,7 +135,7 @@ def get_aliases(command: str):
 # Clear out downloaded files
 log('Removing previously downloaded files...')
 files = glob.glob('*.*')
-to_remove = [f for f in files if re.search(r'\.(\w+)(?!.*\.)',f)[0] in cleanup_extensions]
+to_remove = [f for f in files if Path(f).suffix in CLEANUP_EXTENSIONS]
 for t in to_remove:
 	os.remove(t)
 del files, to_remove
@@ -212,8 +213,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
 				# take first item from a playlist
 				data = data['entries'][0]
 		except Exception as e:
-			print('error in from_url')
-			print(e)
 			raise e
 
 		filename = data['url'] if stream else ytdl.prepare_filename(data)
@@ -243,7 +242,7 @@ class General(commands.Cog):
 			return
 		elif before.channel is None:
 			# Disconnect after set amount of inactivity
-			if inactivity_timeout == 0:
+			if INACTIVITY_TIMEOUT == 0:
 				return
 			timeout_counter = 0
 			while True:
@@ -254,7 +253,7 @@ class General(commands.Cog):
 					global audio_time_elapsed
 					audio_time_elapsed += 1
 				
-				if timeout_counter == inactivity_timeout*60:
+				if timeout_counter == INACTIVITY_TIMEOUT*60:
 					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
 				if not voice.is_connected():
@@ -272,8 +271,8 @@ class General(commands.Cog):
 	@commands.command()
 	@commands.check(is_command_enabled)
 	async def stream(self, ctx):
-		print(voice.source)
-		print(dir(voice.source))
+		log(voice.source)
+		log(dir(voice.source))
 
 	@commands.command(aliases=get_aliases('changelog'))
 	@commands.check(is_command_enabled)
@@ -386,11 +385,9 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
 		except IndexError as e:
 			await ctx.send(embed=embedq('The selected number is out of range.'))
-			print(e)
 			raise e
 		except Exception as e:
 			await ctx.send(embed=embedq('An unexpected error occurred.'))
-			print(e)
 			raise e
 
 	@commands.command(aliases=get_aliases('nowplaying'))
@@ -456,12 +453,12 @@ class Music(commands.Cog):
 			if 'open.spotify.com' in url:
 				log('Spotify URL was received from play command.', verbose=True)
 				log('Checking for playlist...', verbose=True)
-				if '/playlist/' in url and allow_spotify_playlists:
+				if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:
 					log('Spotify playlist detected.', verbose=True)
 					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
 
 					objlist = generate_QueueItems(spoofy.spotify_playlist(url), ctx.author)
-					if len(objlist) > spotify_playlist_limit:
+					if len(objlist) > SPOTIFY_PLAYLIST_LIMIT:
 						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
 					
@@ -473,7 +470,7 @@ class Music(commands.Cog):
 						log('Voice client is not playing; starting...')
 						await advance_queue(ctx)
 					return
-				elif not allow_spotify_playlists:
+				elif not ALLOW_SPOTIFY_PLAYLISTS:
 					await ctx.send(embed=embedq(
 						'Spotify playlists are currently disabled in this bot\'s configuration.',
 						'Contact whoever is hosting your bot if you believe this is a mistake.'
@@ -532,9 +529,9 @@ class Music(commands.Cog):
 				log('Checking duration...', verbose=True)
 				duration = duration_from_url(url)
 
-				if duration > duration_limit*60*60:
+				if duration > DURATION_LIMIT*60*60:
 					log('Item over duration limit; not queueing.')
-					await qmessage.edit(embed=embedq(f'Cannot queue items longer than {duration_limit} hours.'))
+					await qmessage.edit(embed=embedq(f'Cannot queue items longer than {DURATION_LIMIT} hours.'))
 					return
 
 			# Start the player if we can use the url itself
@@ -617,7 +614,6 @@ class Music(commands.Cog):
 		try:
 			embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
 		except Exception as e:
-			print(e)
 			raise e
 		await ctx.send(embed=embed)
 
@@ -648,9 +644,9 @@ class Music(commands.Cog):
 		# Update number skip votes required based on members joined in voice channel
 		global skip_votes
 		global skip_votes_needed
-		skip_votes_needed = int((len(voice.channel.members)) * (skip_votes_percentage/100)) if skip_votes_type == "percentage" else skip_votes_exact
+		skip_votes_needed = int((len(voice.channel.members)) * (SKIP_VOTES_PERCENTAGE/100)) if SKIP_VOTES_TYPE == "percentage" else SKIP_VOTES_EXACT
 
-		if not vote_to_skip:
+		if not VOTE_TO_SKIP:
 			await ctx.send(embed=embedq('Skipping...'))
 			await advance_queue(ctx, skip=True)
 		else:
@@ -691,18 +687,47 @@ class Music(commands.Cog):
 			else:
 				await ctx.send(embed=embedq("You are not connected to a voice channel."))
 
-# 
+# ############################################
 # 
 # End of cog definitions.
 # 
-# 
+# ############################################
 
-# Misc. helper functions
+url_info_cache = {}
 
 def get_queued_by_text(user_object: discord.User) -> str:
-	uname = user_object.nick if user_object.nick else user_object.name
-	return f'\nQueued by {uname}' if show_users_in_queue else ''
+	username = user_object.nick if user_object.nick else user_object.name
+	return f'\nQueued by {username}' if SHOW_USERS_IN_QUEUE else ''
 
+def cache_if_succeeded(key: str):
+	"""
+	Stores result into cache dictionary if retrieval succeeded, or returns result if one already exists
+
+	key (str): The dictionary key to check and/or store results
+	"""
+	def decorator(func):
+		def cache_check(*args, **kwargs):
+			try:
+				url = args[0]
+				if url not in url_info_cache:
+					url_info_cache[url] = {}
+			
+				if url_info_cache[url].get(key, None) not in ['', None]:
+					# Return stored info
+					result = url_info_cache[url][key]
+					log(f'{key} of \'{url}\' already stored: {result}', verbose=True)
+					return result
+				else:
+					# Retrieve info normally
+					result = func(*args, **kwargs)
+					url_info_cache[url][key] = result
+					return result
+			except Exception as e:
+				raise e
+		return cache_check
+	return decorator
+
+@cache_if_succeeded(key='duration')
 def duration_from_url(url: str) -> int|float:
 	"""Automatically detects the source of a given URL, and returns its extracted duration."""
 	log(f'Getting length of \'{url}\'...', verbose=True)
@@ -716,12 +741,14 @@ def duration_from_url(url: str) -> int|float:
 	elif 'soundcloud.com' in url:
 		return round(spoofy.sc.resolve(url).duration / 1000)
 	elif 'open.spotify.com' in url:
+		log('spotify')
 		return spoofy.spotify_track(url)['duration']
 	else:
 		# yt-dlp should handle most other URLs
 		info_dict = ytdl.extract_info(url, download=False)
 		return info_dict.get('duration', 0)
 
+@cache_if_succeeded(key='title')
 def title_from_url(url: str) -> str:
 	"""Automatically detects the source of a given URL, and returns its extracted title."""
 	log(f'Getting title of \'{url}\'...', verbose=True)
@@ -743,6 +770,7 @@ def title_from_url(url: str) -> str:
 
 def timestamp_from_seconds(seconds: int|float) -> str:
 	"""Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
+	# Omit the hour place if not >=60 minutes
 	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
@@ -898,7 +926,7 @@ async def play_url(item: QueueItem, ctx):
 			# Shorten to {limit} results
 			limit = 5
 			spyt = dict(list(spyt.items())[:limit])
-			if use_top_match:
+			if USE_TOP_MATCH:
 				# Use first result if that's set in config
 				spyt = spyt[0]
 			else:
@@ -1003,8 +1031,8 @@ intents.guilds = True
 intents.members = True
 
 # Use separate dev and public mode prefixes
-if public: command_prefix = public_prefix
-else: command_prefix = dev_prefix
+if PUBLIC: command_prefix = PUBLIC_PREFIX
+else: command_prefix = DEV_PREFIX
 
 bot = commands.Bot(
 	command_prefix=commands.when_mentioned_or(command_prefix),
@@ -1048,17 +1076,17 @@ async def on_ready():
 	log('Ready!')
 
 # Retrieve bot token
-log(f'Retrieving token from {plt.blue}{token_file_path}')
+log(f'Retrieving token from {plt.blue}{TOKEN_FILE_PATH}')
 
-if not public:
+if not PUBLIC:
 	log(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
-	with open(token_file_path, 'r') as f:
+	with open(TOKEN_FILE_PATH, 'r') as f:
 		token = f.read()
 except FileNotFoundError:
-	print(f'{f} does not exist; exiting.')
-	exit()
+	log(f'{plt.error}{f} does not exist; exiting.')
+	raise SystemExit(0)
 
 # Begin main thread
 async def main():

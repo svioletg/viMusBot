@@ -1,7 +1,6 @@
 # viMusBot
 
-# You are on the `dev` branch. Switch to the `master` branch here:
-# https://github.com/svioletg/viMusBot/tree/master
+## You are on the `dev` branch. Switch to the `master` branch here: https://github.com/svioletg/viMusBot/tree/master
 
 ### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
 
@@ -18,6 +17,8 @@ Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you
 If you want to be notified of updates & have a GitHub account, you can click "Watch" on this repository, and then select "Custom" -> "Releases" -> "Apply".
 
 ---
+
+This README needs a lot of cleaning up. I'm working on it in the spare time that I have, but suggestions are always welcome on [the issue page](https://github.com/svioletg/viMusBot/issues/40)!
 
 ## Important: Before Using
 ### Do Not Use `dev`

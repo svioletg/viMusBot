@@ -103,6 +103,8 @@ keytable = {
 	11: 'B major or G#/Ab minor',
 }
 
+### SETUP FINISH
+
 # Define matching logic
 def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 	# mode is how exactly the code will determine a match
@@ -146,7 +148,7 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
 			)
 		matching_artist = ref_artist.lower() in yt_artist.lower()
 		matching_album = ref_album.lower() in yt_album.lower()
-
+		
 	# Do not count tracks that are specific/alternate version,
 	# unless said keyword matches the original Spotify title
 	alternate_desired = any(i in ref_title.lower() for i in ['remix', 'cover', 'version'])
@@ -192,7 +194,7 @@ def pytube_track_data(pytube_object) -> dict:
 		while pytube_object.description == None:
 			tries += 1
 			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})', verbose=True)
-			if tries >= 10:
+			if tries >= 5:
 				log('pytube data retrieval failed too many times.', verbose=True)
 				pytube_failed = True
 				break

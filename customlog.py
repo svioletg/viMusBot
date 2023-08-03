@@ -23,7 +23,7 @@ with open('config.yml', 'r') as f:
 
 log_blacklist = config['logging-options']['ignore-logs-from']
 
-def newlog(msg='', last_logtime=time.time(), called_from='', verbose=False):
+def newlog(msg: str='', last_logtime: int|float=time.time(), called_from: str='', verbose: bool=False):
 	for frame in inspect.stack()[1:]:
 		if frame.filename[0] != '<':
 			source = re.search(r'([^\/\\]+$)',frame.filename).group(0)

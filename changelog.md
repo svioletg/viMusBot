@@ -1,6 +1,8 @@
 # Changelog
 
-### See [here](#versioning-info) for an explanation on categories and how my versioning works for this project.
+See [here](#versioning-info) for an explanation on categories and how my versioning works for this project
+
+---
 
 ## 1.8.4
 
@@ -8,13 +10,23 @@
 
 ### Developer
 - `bot.py`
+    - Constants have been made uppercase
     - `update_check` variable renamed to `update_check_result`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
     - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
     - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
+    - Startup file removal will now use `pathlib` to check extensions instead of regex
+- `spoofy.py`
+    - `pytube` can only retry data retrieval 5 times now instead of 10
+- `update.py`
+    - `tkinter` is no longer imported, as it was only used for a test that was left in before release in error
+    - `target_dir` variable removed, files can only be extracted into the directory `update.py` sits in
+
+### Features
+- Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
 
 ### Other
-- If enabled, the queue will now display user's nicknames instead of account names
+- If one exists, the queue will now display user's nicknames instead of account names
 
 ## 1.8.3
 > *2023.04.29 / dev.32*
@@ -256,8 +268,6 @@ In the future, your config file will be automatically merged & updated with the 
 ## 1.6.0
 > *2022.11.29 / dev.22*
 
-### Remember to replace your INI file with the new YAML template!
-
 ### Developer
 - The `log()` function in `bot.py` and `spoofy.py` has been moved to `newlog()` in `customlog.py`, so the log template and other aspects can be edited without needing to copy-paste between files
 - `log()` still exists in the other files, now as a wrapper for `customlog.newlog()` so that you can still call it with only a message
@@ -370,7 +380,7 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 - `print_logs` can be set to false by passing "quiet" as a command-line argument
 - `palette.py` created with the `Palette` class, which will help keep log message styling consistent
 - The `log()` function in both files will now retrieve the name of the function it was called from, and add it to the message
- - `log()` should now be identical across each file, as everything is retrieved automatically
+    - `log()` should now be identical across each file, as everything is retrieved automatically
 - The following apply to `spoofy.py`:
     - `remix_check` and related variables have been renamed to `alternate_check`, as they are now used for multiple different terms
     - `searchYT()` renamed to `search_ytmusic()` for consistency
@@ -544,22 +554,22 @@ For example, take "dev.28.4":
 
 Each version will contain categories for its changes, which are:
 
-#### Developer
+### Developer
 Changes that are only applicable to developers, and that usually make diagnosing problems easier, like improving the logging system.
 
-#### Features
+### Features
 All-new functionality not previously present in the project. This usually coincides with a new **major version**, for example [1.3.0](#130) with its implementation of playlist/album support.
 
-#### Fixes
+### Fixes
 Fixed bugs or other unintended behavior.
 
-#### Improvements
+### Improvements
 General improvements to the either the user or developer experience, like making a command simpler to use, reducing the amount of code needed for something, or otherwise making existing functionality more efficient.
 
-#### Other
+### Other
 Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporary solution or workaround.
 
-#### Notes
+### Notes
 Usually unused, any additional notes regarding the release. Listed last, out of alphabetical order.
 
 ---

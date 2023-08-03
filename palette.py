@@ -42,10 +42,10 @@ class Palette:
 
 	def strip_color(self, string):
 		for k, v in vars(self).items():
-			if k=='colors':
+			if k == 'colors':
 				# Skip the colors dictionary
 				continue
-			elif type(v)==dict:
+			elif type(v) == dict:
 				for k2, v2 in v.items():
 					string = string.replace(v2, '')
 			else:
@@ -54,6 +54,7 @@ class Palette:
 		return string
 
 palette = Palette()
+
 def test():
 	column = 0
 	for k, v in vars(palette).items():
