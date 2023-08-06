@@ -13,7 +13,7 @@ from palette import Palette
 colorama.init(autoreset=True)
 plt = Palette()
 
-def check():
+def check() -> tuple[bool, dict]:
 	response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
 	latest = response.json()
 	latest_tag = latest['tag_name'].strip()

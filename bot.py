@@ -33,11 +33,11 @@ from pretty_help import PrettyHelp
 
 print('Checking for config...')
 
-if not os.path.isfile('config_default.yml'):
+if not Path('config_default.yml').is_file():
 	print('config_default.yml not found; downloading...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
 
-if not os.path.isfile('config.yml'):
+if not Path('config.yml').is_file():
 	print('config.yml does not exist. It will be created as a duplicate of config_default.yml')
 	shutil.copyfile('config_default.yml', 'config.yml')
 
@@ -53,7 +53,7 @@ import spoofy
 import update
 from palette import Palette
 
-_here = os.path.basename(__file__)
+_here = Path(__file__).name
 
 # For personal reference
 # Represents the version of the overall project, not just this file
@@ -77,7 +77,7 @@ def log(msg: str, verbose: bool=False):
 
 def log_traceback(error: BaseException):
 	trace=traceback.format_exception(error)
-	log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
+	log(f'Full traceback below.\n\n{plt.error}{"".join(trace)}')
 
 def log_line():
 	cf = currentframe()
@@ -88,7 +88,7 @@ log(f'Running on version {version}.')
 update_check_result = update.check()
 
 # Check for an outdated version.txt
-if update_check_result[0] == False and update_check_result[1]:
+if update_check_result[0] == False and update_check_result[1] == True:
 	log(f'{plt.warn}There is a new release available.')
 	current_tag = update_check_result[1]['current']
 	latest_tag = update_check_result[1]['latest']['tag_name']
@@ -105,27 +105,48 @@ log('Starting...')
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-ALLOW_SPOTIFY_PLAYLISTS = config['allow-spotify-playlists']
-SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
-USE_TOP_MATCH = config['use-top-match']
-DURATION_LIMIT = config['duration-limit']
 
-PUBLIC = config['public']
-TOKEN_FILE_PATH = config['token-file']
-PUBLIC_PREFIX = config['prefixes']['public']
-DEV_PREFIX = config['prefixes']['developer']
-INACTIVITY_TIMEOUT = config['inactivity-timeout']
-CLEANUP_EXTENSIONS = config['auto-remove']
+#region CONSTANTS FROM CONFIG
+try:
+	ALLOW_SPOTIFY_PLAYLISTS = config['allow-spotify-playlists']
+	SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
+	USE_TOP_MATCH = config['use-top-match']
+	USE_URL_CACHE = config['use-url-cache']
+	DURATION_LIMIT = config['duration-limit']
 
-VOTE_TO_SKIP = config['vote-to-skip']['enabled']
-SKIP_VOTES_TYPE = config['vote-to-skip']['threshold-type']
-SKIP_VOTES_EXACT = config['vote-to-skip']['threshold-exact']
-SKIP_VOTES_PERCENTAGE = config['vote-to-skip']['threshold-percentage']
-skip_votes_needed = 0
-skip_votes = []
+	PUBLIC = config['public']
+	TOKEN_FILE_PATH = config['token-file']
+	PUBLIC_PREFIX = config['prefixes']['public']
+	DEV_PREFIX = config['prefixes']['developer']
+	INACTIVITY_TIMEOUT = config['inactivity-timeout']
+	CLEANUP_EXTENSIONS = config['auto-remove']
 
-SHOW_USERS_IN_QUEUE = config['show-users-in-queue']
+	VOTE_TO_SKIP = config['vote-to-skip']['enabled']
+	SKIP_VOTES_TYPE = config['vote-to-skip']['threshold-type']
+	SKIP_VOTES_EXACT = config['vote-to-skip']['threshold-exact']
+	SKIP_VOTES_PERCENTAGE = config['vote-to-skip']['threshold-percentage']
+	skip_votes_needed = 0
+	skip_votes = []
 
+	SHOW_USERS_IN_QUEUE = config['show-users-in-queue']
+	try:
+		EMBED_COLOR = int(config['embed-color'], 16)
+	except ValueError as e:
+		log(f'{plt.warn}Config error: The value of \'embed-color\', which is currently {plt.blue}{config["embed-color"]}{plt.warn},'+
+      		' could not be converted to a hexadecimal value.')
+		log(f'Exiting...')
+		raise SystemExit(0)
+except KeyError as e:
+	log(f'{plt.warn}Config error: Your configuration is missing the key {e}. '+
+       'If you have recently updated, check the changelog for keys you may need to add.')
+	log(f'Exiting...')
+	raise SystemExit(0)
+except Exception as e:
+	log(f'{plt.error}An unexpected error occurred. Refer to the following traceback, and submit a bug report if you cannot resolve the situation.')
+	log_traceback(e)
+	raise SystemExit(0)
+#endregion
+exit()
 def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
 
@@ -140,21 +161,21 @@ for t in to_remove:
 	os.remove(t)
 del files, to_remove
 
+discord.Embed(title="title", description="description", color=EMBED_COLOR)
+
 def embedq(*args) -> discord.Embed:
 	"""Shortcut for making new embeds"""
 	if len(args) == 1:
-		return discord.Embed(title=args[0], color=0xFFFF00)
+		return discord.Embed(title=args[0], color=EMBED_COLOR)
 	elif len(args) == 2:
-		return discord.Embed(title=args[0], description=args[1], color=0xFFFF00)
-
-# Based on and adapted from:
-# https://github.com/Rapptz/discord.py/blob/v2.0.1/examples/basic_voice.py
+		return discord.Embed(title=args[0], description=args[1], color=EMBED_COLOR)
 
 # For easier emoji usage
 emoji = {
 	'cancel':'❌',
 	'confirm':'✅',
 	'repeat':'🔁',
+	'info':'ℹ️',
 	'num':[
 	'0️⃣',
 	'1️⃣',
@@ -278,7 +299,7 @@ class General(commands.Cog):
 	@commands.check(is_command_enabled)
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
-		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=0xFFFF00)
+		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
@@ -286,15 +307,15 @@ class General(commands.Cog):
 	async def ping(self, ctx):
 		"""Test command."""
 		await ctx.send('Pong!')
-		embed=discord.Embed(title='Pong!',description='Pong!',color=0xFFFF00)
+		embed=discord.Embed(title='Pong!',description='Pong!',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
-		await ctx.send(embed=embedq('this is a test for','the extended embed function'))
+		await ctx.send(embed=embedq('this is a test for', 'the extended embed function'))
 
 	@commands.command(aliases=get_aliases('repository'))
 	@commands.check(is_command_enabled)
 	async def repository(self, ctx):
 		"""Returns the link to the viMusBot GitHub repository."""
-		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=0xFFFF00)
+		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
 
 
@@ -314,7 +335,7 @@ class Music(commands.Cog):
 		data = result[0]
 		skip = result[1]
 		# Assemble embed object
-		embed = discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=0xFFFF00)
+		embed = discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=EMBED_COLOR)
 		# Put key, time sig, and tempo at the top
 		embed.add_field(name='Key',value=data['key']); data.pop('key')
 		embed.add_field(name='Tempo',value=data['tempo']); data.pop('tempo')
@@ -399,7 +420,7 @@ class Music(commands.Cog):
 			return
 
 		if not voice.is_playing() and not voice.is_paused():
-			embed = discord.Embed(title=f'Nothing is playing.',color=0xFFFF00)
+			embed = discord.Embed(title=f'Nothing is playing.',color=EMBED_COLOR)
 		else:
 			nowtime = time.time()
 			# global paused_for
@@ -408,7 +429,7 @@ class Music(commands.Cog):
 
 			elapsed = timestamp_from_seconds(audio_time_elapsed)
 			submitter_text = get_queued_by_text(now_playing.user)
-			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=0xFFFF00)
+			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=EMBED_COLOR)
 
 		await ctx.send(embed=embed)
 
@@ -503,7 +524,7 @@ class Music(commands.Cog):
 				if top_song_url == top_video_url:
 					url = top_song_url
 				else:
-					embed=discord.Embed(title='Please choose an option:',color=0xFFFF00)
+					embed=discord.Embed(title='Please choose an option:',color=EMBED_COLOR)
 					embed.add_field(name=f'Top song result: {top_song_title}', value=top_song_url, inline=False)
 					embed.add_field(name=f'Top video result: {top_video_title}', value=top_video_url, inline=False)
 
@@ -549,43 +570,6 @@ class Music(commands.Cog):
 			except Exception as e:
 				raise e
 
-	# @commands.command(aliases=get_aliases('playlist'))
-	# @commands.check(is_command_enabled)
-	# async def playlist(self, ctx, mode):
-	# 	"""Saves or loads a playlist queue."""
-	# 	if mode not in ['save', 'load']:
-	# 		await ctx.send(embed=embedq('Command structure must be `playlist [save|load] [name]`'))
-
-	# @commands.command(aliases=get_aliases('qstore'))
-	# @commands.check(is_command_enabled)
-	# async def qstore(self, ctx):
-	# 	"""Stores a playlist object as a file."""
-	# 	try:
-	# 		with open('queue.pickle', 'wb') as f:
-	# 			pickle.dump(player_queue, f)
-			
-	# 		await ctx.send('Current queue saved. Use `-qload` to restore it.')
-	# 	except Exception as e:
-	# 		log_traceback(e)
-	# 		await ctx.send(embed=embedq('Queue could not be saved.', e))
-
-	# @commands.command(aliases=get_aliases('qload'))
-	# @commands.check(is_command_enabled)
-	# async def qload(self, ctx, clear_existing=False):
-	# 	"""Loads a playlist object from the file."""
-	# 	try:
-	# 		msg = await ctx.send(embed=embedq('This will clear and overwrite the current queue. Continue?', '1 for no, 2 for yes'))
-	# 		choice = await prompt_for_choice(ctx, msg, msg, 2)
-	# 		if choice == 2:
-	# 			with open('queue.pickle', 'rb') as f:
-	# 				global player_queue
-	# 				player_queue = pickle.load(f)
-			
-	# 		await ctx.send('Queue has been loaded and restored.')
-	# 	except Exception as e:
-	# 		log_traceback(e)
-	# 		await ctx.send(embed=embedq('Queue could not be restored.', e))
-
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
 	async def queue(self, ctx, page: int=1):
@@ -600,7 +584,7 @@ class Music(commands.Cog):
 		
 		queue_time = timestamp_from_seconds(queue_time)
 
-		embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=0xFFFF00)
+		embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=EMBED_COLOR)
 		start = (10*page)-10
 		end = (10*page)
 		if 10*page>len(player_queue.get(ctx)):
@@ -673,6 +657,15 @@ class Music(commands.Cog):
 			await ctx.send(embed=embedq('Player has been stopped.'))
 		else:
 			await ctx.send(embed=embedq('Nothing is playing.'))
+	
+	@commands.command(aliases=get_aliases('clearcache'))
+	@commands.check(is_command_enabled)
+	async def clearcache(self, ctx):
+		"""Removes all information from the current URL cache"""
+		global url_info_cache
+		url_info_cache = {}
+		log(f'URL cache was cleared: {url_info_cache}', verbose=True)
+		await ctx.send(embed=embedq('URL cache has been emptied.', '' if USE_URL_CACHE else f'{emoji["info"]} URL cache is currently disabled.'))
 
 	@join.before_invoke
 	@play.before_invoke
@@ -707,6 +700,11 @@ def cache_if_succeeded(key: str):
 	"""
 	def decorator(func):
 		def cache_check(*args, **kwargs):
+			# Just run functions normally if caching is disabled
+			if USE_URL_CACHE == False:
+				result = func(*args, **kwargs)
+				return result
+			# Otherwise, check the cache for an existing key to return, or create a new one if none is found (or the value is invalid)
 			try:
 				url = args[0]
 				if url not in url_info_cache:
@@ -800,13 +798,13 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 		reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
 	except asyncio.TimeoutError as e:
 		log('Choice prompt timeout reached.')
-		embed=discord.Embed(title='Timed out; cancelling.',color=0xFFFF00)
+		embed=discord.Embed(title='Timed out; cancelling.',color=EMBED_COLOR)
 		await status_msg.edit(embed=embed)
 		await prompt_msg.delete()
 		return
 	except Exception as e:
 		log_traceback(e)
-		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=0xFFFF00)
+		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=EMBED_COLOR)
 		await status_msg.edit(embed=embed)
 		await prompt_msg.delete()
 		return
@@ -816,14 +814,14 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 
 		if str(reaction)==emoji['cancel']:
 			log('Selection cancelled.', verbose=True)
-			embed=discord.Embed(title='Cancelling.',color=0xFFFF00)
+			embed=discord.Embed(title='Cancelling.',color=EMBED_COLOR)
 			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return
 		else:
 			choice = emoji['num'].index(str(reaction))
 			log(f'{choice} selected.', verbose=True)
-			embed=discord.Embed(title=f'#{choice} chosen.',color=0xFFFF00)
+			embed=discord.Embed(title=f'#{choice} chosen.',color=EMBED_COLOR)
 			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return choice
@@ -931,7 +929,7 @@ async def play_url(item: QueueItem, ctx):
 				spyt = spyt[0]
 			else:
 				# Otherwise, prompt the user with choice
-				embed = discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=0xFFFF00)
+				embed = discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=EMBED_COLOR)
 				
 				for i in spyt:
 					title = spyt[i]['title']
@@ -992,7 +990,7 @@ async def play_url(item: QueueItem, ctx):
 		pass
 
 	submitter_text = get_queued_by_text(item.user)
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=0xFFFF00)
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=EMBED_COLOR)
 	npmessage = await ctx.send(embed=embed)
 	if last_played != None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
@@ -1038,7 +1036,7 @@ bot = commands.Bot(
 	command_prefix=commands.when_mentioned_or(command_prefix),
 	description='',
 	intents=intents,
-	help_command = PrettyHelp(False, color=0xFFFF00)
+	help_command = PrettyHelp(False, color=EMBED_COLOR)
 )
 
 # Command error handling

@@ -16,6 +16,9 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
     - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
     - Startup file removal will now use `pathlib` to check extensions instead of regex
+    - Calls to `os.path` replaced with `Path()`
+    - Simplified `log_traceback()`
+    - Added `try/except` statements to the config section to more helpfully explain issues to the user
 - `spoofy.py`
     - `pytube` can only retry data retrieval 5 times now instead of 10
 - `update.py`
@@ -23,7 +26,12 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `target_dir` variable removed, files can only be extracted into the directory `update.py` sits in
 
 ### Features
+- Config changes:
+    - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
+    - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
+    - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
+- The sidebar color on bot messages can now be customized
 
 ### Other
 - If one exists, the queue will now display user's nicknames instead of account names

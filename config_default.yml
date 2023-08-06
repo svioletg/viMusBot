@@ -11,6 +11,9 @@
 
 #####
 
+# The color to use on the side of bot messages
+embed-color: "ff00ff"
+
 # Automatically updates config.yml with any missing options present in config_default.yml
 auto-update-config: no
 
@@ -37,6 +40,10 @@ vote-to-skip:
 
 # Toggles whether -nowplaying and -queue will show names of who queued what
 show-users-in-queue: yes
+
+# Toggles the usage of the URL cache, which is intended to slightly speed up queuing times
+# You may disable this if it is causing problems for you (if it is, please submit an issue reporting the bug)
+use-url-cache: yes
 
 # List of file extensions the bot will detect and delete on startup; must start with a "."
 auto-remove:
@@ -92,6 +99,9 @@ aliases:
         - "gh"
     skip:
         - "s"
+    clearcache:
+        - "emptycache"
+        - "flushcache"
 
 # Any commands listed here will be disabled from use
 command-blacklist:
