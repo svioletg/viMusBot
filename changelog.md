@@ -4,13 +4,14 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ---
 
-## 1.8.4
+## 1.9.0
 
-> *2023.06.xx / dev.33*
+> *2023.09.xx / dev.33*
 
 ### Developer
 - `bot.py`
-    - Constants have been made uppercase
+    - `generate_QueueItems()` is now a static method of the `QueueItem` class, primarily for organization and readability
+    - Most constants have been made uppercase
     - `update_check` variable renamed to `update_check_result`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
     - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
@@ -26,6 +27,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `target_dir` variable removed, files can only be extracted into the directory `update.py` sits in
 
 ### Features
+- `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
 - Config changes:
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
@@ -35,6 +37,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Other
 - If one exists, the queue will now display user's nicknames instead of account names
+- The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 
 ## 1.8.3
 > *2023.04.29 / dev.32*

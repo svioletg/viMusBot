@@ -34,7 +34,7 @@ from pretty_help import PrettyHelp
 print('Checking for config...')
 
 if not Path('config_default.yml').is_file():
-	print('config_default.yml not found; downloading...')
+	print('config_default.yml not found; downloading latest version from remote...')
 	urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
 
 if not Path('config.yml').is_file():
@@ -55,10 +55,9 @@ from palette import Palette
 
 _here = Path(__file__).name
 
-# For personal reference
 # Represents the version of the overall project, not just this file
 with open('version.txt','r') as f:
-	version = f.read().strip()
+	VERSION = f.read().strip()
 
 # Start discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -83,7 +82,7 @@ def log_line():
 	cf = currentframe()
 	print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'Running on version {version}.')
+log(f'Running on version {VERSION}.')
 
 update_check_result = update.check()
 
@@ -101,18 +100,17 @@ log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
 log('Starting...')
 
-# Parse config from YAML
+#region CONFIGURATION FROM YAML
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-
-#region CONSTANTS FROM CONFIG
 try:
 	ALLOW_SPOTIFY_PLAYLISTS = config['allow-spotify-playlists']
 	SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
 	USE_TOP_MATCH = config['use-top-match']
 	USE_URL_CACHE = config['use-url-cache']
 	DURATION_LIMIT = config['duration-limit']
+	MAXIMUM_CONSECUTIVE_URLS = config['maximum-urls']
 
 	PUBLIC = config['public']
 	TOKEN_FILE_PATH = config['token-file']
@@ -146,7 +144,7 @@ except Exception as e:
 	log_traceback(e)
 	raise SystemExit(0)
 #endregion
-exit()
+
 def is_command_enabled(ctx):
 	return not ctx.command.name in config['command-blacklist']
 
@@ -299,7 +297,7 @@ class General(commands.Cog):
 	@commands.check(is_command_enabled)
 	async def changelog(self, ctx):
 		"""Returns a link to the changelog, and displays most recent version."""
-		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {version}',color=EMBED_COLOR)
+		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {VERSION}',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
@@ -450,26 +448,41 @@ class Music(commands.Cog):
 	
 	@commands.command(aliases=get_aliases('play'))
 	@commands.check(is_command_enabled)
-	async def play(self, ctx, *, url: str):
+	async def play(self, ctx, url:str, *args):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		# Will resume if paused, this is handled in on_command_error()
 		global playctx
 		playctx = ctx
 		global qmessage
-		if 'soundcloud.com' in url:
-			qmessage = await ctx.send(
-				embed=embedq(
-				'Trying to queue...',
-				'Note: It is a known issue that SoundCloud links will sometimes fail to queue.'+
-				'\nIf you receive an error, try it again.'+
-				'\nDetails: https://github.com/svioletg/viMusBot/issues/16'
-				)
-			)
-		else:
-			qmessage = await ctx.send(embed=embedq('Trying to queue...'))
+		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
+
+		is_multiple = False
+
+		if len([i for i in [url]+list(args) if i.startswith('https://')]) > 0 and len([i for i in [url]+list(args) if not i.startswith('https://')]) > 0:
+			await qmessage.edit(embed=embedq('Inputs must be either all URLs or a single text query.'))
+			return
+		elif len(args) > 0 and len([i for i in [url]+list(args) if i.startswith('https://')]) == len([url]+list(args)):
+			print('is multiple')
+			is_multiple = True
+			urllist = [url]+list(args)
+
+		if not url.startswith('https://'):
+			url = url+' '+' '.join(args)
 
 		url = url.split('&list=')[0]
 		async with ctx.typing():
+			if is_multiple:
+				if len(urllist) > MAXIMUM_CONSECUTIVE_URLS:
+					await qmessage.edit(embed=embedq('Too many URLs were given.', f'Current limit is {MAXIMUM_CONSECUTIVE_URLS}.'+
+						'Edit `maximum-urls` in `config.yml` to change this.'))
+				objlist = QueueItem.generate(urllist, ctx.author, list_from_command=True)
+				queue_batch(ctx, objlist)
+				await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
+				if not voice.is_playing():
+					log('Voice client is not playing; starting...')
+					await advance_queue(ctx)
+				return
+
 			# Locate youtube equivalent if spotify link given
 			if 'open.spotify.com' in url:
 				log('Spotify URL was received from play command.', verbose=True)
@@ -478,7 +491,7 @@ class Music(commands.Cog):
 					log('Spotify playlist detected.', verbose=True)
 					await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
 
-					objlist = generate_QueueItems(spoofy.spotify_playlist(url), ctx.author)
+					objlist = QueueItem.generate(spoofy.spotify_playlist(url), ctx.author)
 					if len(objlist) > SPOTIFY_PLAYLIST_LIMIT:
 						await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
 						return
@@ -538,7 +551,7 @@ class Music(commands.Cog):
 			valid = ['playlist?list=', '/sets/', '/album/']
 			if any(i in url for i in valid):
 				log('URL is a playlist.', verbose=True)
-				objlist = generate_QueueItems(url, ctx.author)
+				objlist = QueueItem.generate(url, ctx.author)
 				queue_batch(ctx, objlist)
 				await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
 				if not voice.is_playing():
@@ -828,7 +841,7 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 
 # Queue system
 
-class MediaQueue(object):
+class MediaQueue:
 	def __init__(self):
 		self.queues = {}
 
@@ -850,31 +863,50 @@ class MediaQueue(object):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = []
 
-class QueueItem(object):
-	def __init__(self, url: str, user, duration: int|float=None, title: str=None):
+class QueueItem:
+	def __init__(self, url: str, user, title: str=None, duration: int|float=None):
 		self.url = url
 		self.user = user
 		self.duration = duration if duration is not None else duration_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
+	
+	@staticmethod
+	def generate(playlist: str|list, user, list_from_command: bool=False) -> list:
+		"""Creates a list of QueueItem instances from a valid playlist
+
+		- `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
+		- `user`: A discord Member object of the user who queued the playlist
+		- `list_from_command` (bool): Set to True if the play command was called with multiple URL arguments, as in `-p [url] [url] [url]`
+		"""
+		objlist = []
+		# Will be a list if origin is Spotify, or if multiple URLs were sent with the command
+		if type(playlist) == list:
+			if list_from_command:
+				objlist = []
+				for i in playlist:
+					print(i)
+					if 'open.spotify.com' in i:
+						info = spoofy.spotify_track(i)
+						objlist.append(QueueItem(info['url'], user, title=info['title'], duration=info.get('duration', 0)))
+					else:
+						info = ytdl.extract_info(i, download=False)
+						objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
+				return objlist
+			else:
+				objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist]
+			return objlist
+		else:
+			# Anything youtube-dl natively supports is probably a link
+			if 'soundcloud.com' in playlist:
+				# SoundCloud playlists have to be processed differently
+				playlist_entries = spoofy.soundcloud_playlist(playlist)
+				objlist = [QueueItem(i.permalink_url, user, title=i.title, duration=round(i.duration/1000)) for i in playlist_entries]
+			else:
+				playlist_entries = ytdl.extract_info(playlist, download=False)
+				objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist_entries['entries']]
+			return objlist
 
 player_queue = MediaQueue()
-
-def generate_QueueItems(playlist: str|list, user) -> list:
-	objlist = []
-	# Will be a list if origin is Spotify
-	if type(playlist) == list:
-		objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist]
-		return objlist
-	else:
-		# Anything youtube-dl natively supports is probably a link
-		if 'soundcloud.com' in playlist:
-			# SoundCloud playlists have to be processed differently
-			playlist_entries = spoofy.soundcloud_playlist(playlist)
-			objlist = [QueueItem(i.permalink_url, user, title=i.title, duration=round(i.duration/1000)) for i in playlist_entries]
-		else:
-			playlist_entries = ytdl.extract_info(playlist, download=False)
-			objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist_entries['entries']]
-		return objlist
 
 def queue_batch(ctx, batch: list[QueueItem]):
 	# batch must be a list of QueueItem objects
@@ -1029,8 +1061,7 @@ intents.guilds = True
 intents.members = True
 
 # Use separate dev and public mode prefixes
-if PUBLIC: command_prefix = PUBLIC_PREFIX
-else: command_prefix = DEV_PREFIX
+command_prefix = PUBLIC_PREFIX if PUBLIC else DEV_PREFIX
 
 bot = commands.Bot(
 	command_prefix=commands.when_mentioned_or(command_prefix),

@@ -464,7 +464,7 @@ def analyze_track(url: str) -> tuple:
 
 # Other
 def is_jp(text: str) -> bool:
-	# TODO: Test
+	# TODO: Test this
 	return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text)
 
 def spyt(url: str, limit=20, **kwargs) -> dict|tuple:

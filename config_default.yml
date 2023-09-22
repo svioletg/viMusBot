@@ -72,6 +72,10 @@ use-top-match: yes
 # Prevent videos over this limit (in hours) from being queued
 duration-limit: 5
 
+# Maximum number of URLs that can be queued at once with -play
+# High limits may cause significant issues with queueing if the items take too long
+maximum-urls: 5
+
 # Leave the voice channel if nothing has been playing for this many minutes
 # Setting this to 0 will disable it entirely and never automatically leave
 inactivity-timeout: 10
