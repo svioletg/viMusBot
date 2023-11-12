@@ -72,6 +72,9 @@ use-top-match: yes
 # Prevent videos over this limit (in hours) from being queued
 duration-limit: 5
 
+# Choose whether to use pytube to extract data from search results, or to use ytmusic
+data-from-pytube: no
+
 # Maximum number of URLs that can be queued at once with -play
 # High limits may cause significant issues with queueing if the items take too long
 maximum-urls: 5

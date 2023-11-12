@@ -6,9 +6,10 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ## 1.9.0
 
-> *2023.09.xx / dev.33*
+> *2023.12.xx / dev.33*
 
 ### Developer
+- Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
 - `bot.py`
     - `generate_QueueItems()` is now a static method of the `QueueItem` class, primarily for organization and readability
     - Most constants have been made uppercase
@@ -22,6 +23,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - Added `try/except` statements to the config section to more helpfully explain issues to the user
 - `spoofy.py`
     - `pytube` can only retry data retrieval 5 times now instead of 10
+    - `trim_track_data()` has had an argument renamed: `from_pytube` -> `is_pytube_object`
 - `update.py`
     - `tkinter` is no longer imported, as it was only used for a test that was left in before release in error
     - `target_dir` variable removed, files can only be extracted into the directory `update.py` sits in
@@ -29,6 +31,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 ### Features
 - `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
 - Config changes:
+    - `data-from-pytube` (boolean) added; TODO: how do i explain this
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times

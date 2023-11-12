@@ -448,7 +448,7 @@ class Music(commands.Cog):
 	
 	@commands.command(aliases=get_aliases('play'))
 	@commands.check(is_command_enabled)
-	async def play(self, ctx, url:str, *args):
+	async def play(self, ctx, url, *args):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		# Will resume if paused, this is handled in on_command_error()
 		global playctx
@@ -462,7 +462,11 @@ class Music(commands.Cog):
 			await qmessage.edit(embed=embedq('Inputs must be either all URLs or a single text query.'))
 			return
 		elif len(args) > 0 and len([i for i in [url]+list(args) if i.startswith('https://')]) == len([url]+list(args)):
-			print('is multiple')
+			print('mult')
+			if len([i for i in [url]+list(args) if re.match(r'(/sets/|playlist\?list=|/album/|/playlist/)', i) is not None]) > 0:
+				await qmessage.edit(embed=embedq('Cannot multiple album/playlists at once.'))
+				return
+			print('made it past')
 			is_multiple = True
 			urllist = [url]+list(args)
 
@@ -526,26 +530,33 @@ class Music(commands.Cog):
 				log('Link not detected, searching by text', verbose=True)
 				log(f'Searching: "{url}"')
 
-				options = spoofy.search_ytmusic_text(url)
+				top_song, top_video = spoofy.search_ytmusic_text(url)
+				if top_song == top_video == None:
+					await ctx.send(embed=embedq('No song or video match could be found for your query.'))
+					return
 
-				top_song_title = options[0]['title']
-				top_song_url = 'https://www.youtube.com/watch?v='+options[0]['videoId']
-
-				top_video_title = options[1]['title']
-				top_video_url = 'https://www.youtube.com/watch?v='+options[1]['videoId']
-
-				if top_song_url == top_video_url:
-					url = top_song_url
+				# TODO: TEST ALL OF THIS!
+				if top_song is not None:
+					top_song['url'] = 'https://www.youtube.com/watch?v='+top_song['videoId']
+				if top_video is not None:
+					top_video['url'] = 'https://www.youtube.com/watch?v='+top_video['videoId']
+				
+				if top_song == None:
+					url = top_video
+				elif top_video == None:
+					url = top_song
+				elif top_song['url'] == top_video['url']:
+					url = top_song['url']
 				else:
 					embed=discord.Embed(title='Please choose an option:',color=EMBED_COLOR)
-					embed.add_field(name=f'Top song result: {top_song_title}', value=top_song_url, inline=False)
-					embed.add_field(name=f'Top video result: {top_video_title}', value=top_video_url, inline=False)
+					embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
+					embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
 
 					prompt = await ctx.send(embed=embed)
 					choice = await prompt_for_choice(ctx, qmessage, prompt, 2)
 					if choice == None:
 						return
-					url = 'https://www.youtube.com/watch?v='+options[choice-1]['videoId']
+					url = (top_song['url'], top_video['url'])[choice-1]
 
 			# Determines if the input was a playlist
 			valid = ['playlist?list=', '/sets/', '/album/']
@@ -1090,6 +1101,9 @@ async def on_command_error(ctx, error):
 				await ctx.send(embed=embedq('A spotify track URL is required.'))
 	elif isinstance(error, discord.ext.commands.CheckFailure):
 		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
+	elif isinstance(error, yt_dlp.utils.DownloadError):
+		await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
+	# TODO: add custom message for yt_dlp errors like private videos
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)

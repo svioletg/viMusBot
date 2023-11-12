@@ -43,12 +43,13 @@ def log_line():
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
-force_no_match = config['force-no-match']
-spotify_playlist_limit = config['spotify-playlist-limit']
-duration_limit = config['duration-limit']
+FORCE_NO_MATCH = config['force-no-match']
+SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
+DURATION_LIMIT = config['duration-limit']
+DATA_FROM_PYTUBE = config['data-from-pytube']
 
 # Useful to point this out if left on accidentally
-if force_no_match:
+if FORCE_NO_MATCH:
 	log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 # Configure youtube dl
@@ -183,7 +184,6 @@ def isrc_search_test(playlist):
 	log(f'{yes} successes / {no} fails')
 
 def pytube_track_data(pytube_object) -> dict:
-	# TODO: sometimes nonetype error here
 	try:
 		description_list = pytube_object.description.split('\n')
 	except AttributeError as e:
@@ -228,12 +228,20 @@ def pytube_track_data(pytube_object) -> dict:
 
 def search_ytmusic_text(query: str) -> tuple:
 	# For plain-text searching
-	top_song = ytmusic.search(query=query,limit=1,filter='songs')[0]
-	top_video = ytmusic.search(query=query,limit=1,filter='songs')[0]
+	try:
+		top_song = ytmusic.search(query=query, limit=1, filter='songs')[0]
+	except IndexError:
+		top_song = None
+
+	try:
+		top_video = ytmusic.search(query=query, limit=1, filter='videos')[0]
+	except IndexError:
+		top_video = None
+
 	return top_song, top_video
 
 def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> str|None:
-	if force_no_match:
+	if FORCE_NO_MATCH:
 		log(f'{plt.warn}force_no_match is set to True.'); return None
 
 	query = f'{title} {artist} {year}'
@@ -241,7 +249,7 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 	log('Starting album search...', verbose=True)
 	check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
 
-	album_results = ytmusic.search(query=query,limit=5,filter='albums')
+	album_results = ytmusic.search(query=query, limit=5, filter='albums')
 	for yt in album_results:
 		title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['title'])) > 75
 		artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
@@ -263,7 +271,6 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 	return None
 
 def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10, fast_search=False, **kwargs):
-	global force_no_match
 	unsure = False
 
 	query = f'{title} {artist} {album}'
@@ -271,18 +278,18 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict|object, album='', from_pytube=False, extract_with_ytmusic=False) -> dict:
-		if from_pytube:
-			if not extract_with_ytmusic:
+	def trim_track_data(data: dict|object, album='', is_pytube_object=False, extract_with_ytmusic=False) -> dict:
+		if is_pytube_object:
+			if extract_with_ytmusic:
+				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
+			else:
 				try:
 					data = pytube_track_data(data)
 				except Exception as e:
 					log(f'pytube data trimming failed. Cause: {traceback.format_exception(e)[-1]}')
 					log('Trying ytmusicapi instead...')
 					data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
-			else:
-				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
-				
+
 			try:
 				album = data['album']['name']
 			except KeyError as e:
@@ -300,25 +307,25 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		return relevant
 
 	# Start search
-	if isrc != None and not force_no_match:
+	if isrc != None and not FORCE_NO_MATCH:
 		log(f'Searching for ISRC: {isrc}', verbose=True)
 		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.', verbose=True)
-				return trim_track_data(i, from_pytube=True)
+				return trim_track_data(i, is_pytube_object=True, extract_with_ytmusic=not DATA_FROM_PYTUBE)
 			
 		log('No ISRC match found, falling back on text search.')
 
 	log(f'Trying query \"{query}\" with a limit of {limit}')
-	song_results = ytmusic.search(query=query,limit=limit,filter='songs')
-	video_results = ytmusic.search(query=query,limit=limit,filter='videos')
+	song_results = ytmusic.search(query=query, limit=limit, filter='songs')
+	video_results = ytmusic.search(query=query, limit=limit, filter='videos')
 	# Remove videos over a certain length
 	for s, v in zip(song_results, video_results):
-		if int(s['duration_seconds']) > duration_limit*60*60:
+		if int(s['duration_seconds']) > DURATION_LIMIT*60*60:
 			song_results.pop(song_results.index(s))
-		if int(v['duration_seconds']) > duration_limit*60*60:
+		if int(v['duration_seconds']) > DURATION_LIMIT*60*60:
 			video_results.pop(video_results.index(v))
 	
 	fast_search = kwargs.get('fast_search',False)
@@ -328,13 +335,13 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		return trim_track_data(song_results[0])
 
 	log('Checking for exact match...')
-	if force_no_match:
+	if FORCE_NO_MATCH:
 		log(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 	# Check for matches
 	match = None
 	def match_found() -> bool:
-		return match != None if not force_no_match else False
+		return match != None if not FORCE_NO_MATCH else False
 
 	if is_jp(query):
 		# Assumes first Japanese result is correct, otherwise
