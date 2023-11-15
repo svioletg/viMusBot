@@ -38,8 +38,13 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
 - The sidebar color on bot messages can now be customized
 
+### Fixes
+- The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked. Both the top song and video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
+- Looping now functions correctly
+
 ### Other
-- If one exists, the queue will now display user's nicknames instead of account names
+- `PyYAML` is no longer required by `requirements.txt` as it was not actually being used
+- If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 
 ## 1.8.3
