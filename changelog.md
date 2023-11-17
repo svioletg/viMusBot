@@ -21,6 +21,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - Calls to `os.path` replaced with `Path()`
     - Simplified `log_traceback()`
     - Added `try/except` statements to the config section to more helpfully explain issues to the user
+    - `play_url()` renamed to `play_item()`
 - `spoofy.py`
     - `pytube` can only retry data retrieval 5 times now instead of 10
     - `trim_track_data()` has had an argument renamed: `from_pytube` -> `is_pytube_object`

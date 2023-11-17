@@ -214,7 +214,7 @@ ffmpeg_options = {
 
 class YTDLSource(discord.PCMVolumeTransformer):
 	def __init__(self, source, *, data, volume=0.5):
-		super().__init__(source,volume)
+		super().__init__(source, volume)
 
 		self.data = data
 
@@ -277,6 +277,7 @@ class General(commands.Cog):
 					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
 				if not voice.is_connected():
+					log('Voice doesn\'t look connected, setting `voice` to None.')
 					voice = None
 					break
 
@@ -422,11 +423,6 @@ class Music(commands.Cog):
 		if not voice.is_playing() and not voice.is_paused():
 			embed = discord.Embed(title=f'Nothing is playing.',color=EMBED_COLOR)
 		else:
-			nowtime = time.time()
-			# global paused_for
-			# if voice.is_paused():
-			# 	paused_for = (nowtime - paused_at) if paused_at > 0 else 0
-
 			elapsed = timestamp_from_seconds(audio_time_elapsed)
 			submitter_text = get_queued_by_text(now_playing.user)
 			embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=EMBED_COLOR)
@@ -459,7 +455,7 @@ class Music(commands.Cog):
 		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
 
 		is_multiple = False
-
+		# TODO: Issue 54: Multiple URLs in one command
 		if len([i for i in [url]+list(args) if i.startswith('https://')]) > 0 and len([i for i in [url]+list(args) if not i.startswith('https://')]) > 0:
 			await qmessage.edit(embed=embedq('Inputs must be either all URLs or a single text query.'))
 			return
@@ -945,7 +941,7 @@ paused_for = 0
 
 loop_this = False
 
-async def play_url(item: QueueItem, ctx, repeat: bool=False):
+async def play_item(item: QueueItem, ctx):
 	global audio_start_time, audio_time_elapsed, paused_at, paused_for
 	global now_playing
 	global last_played
@@ -956,68 +952,63 @@ async def play_url(item: QueueItem, ctx, repeat: bool=False):
 	skip_votes = []
 
 	audio_time_elapsed, paused_at, paused_for = 0, 0, 0
-	if last_played is None:
-		repeat = False
-	last_played = now_playing
 
-	current_item = item
+	last_played = now_playing
 
 	log('Trying to start playing...')
 
-	# If we're looping, we already have what we need, so don't waste time here
-	if not repeat:
-		# Check if we need to match a Spotify link
-		if 'open.spotify.com' not in item.url:
-			url = item.url
-		else:
-			log('Trying to match Spotify track...')
-			qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
-			spyt = spoofy.spyt(item.url)
-
-			log('Checking if unsure...', verbose=True)
-			if type(spyt) == tuple and spyt[0] == 'unsure':
-				# This indicates no match was found
-				log('spyt returned unsure.', verbose=True)
-				# Remove the warning, no longer needed
-				spyt = spyt[1]
-				# Shorten to {limit} results
-				limit = 5
-				spyt = dict(list(spyt.items())[:limit])
-				if USE_TOP_MATCH:
-					# Use first result if that's set in config
-					spyt = spyt[0]
-				else:
-					# Otherwise, prompt the user with choice
-					embed = discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=EMBED_COLOR)
-					
-					for i in spyt:
-						title = spyt[i]['title']
-						url = spyt[i]['url']
-						artist = spyt[i]['artist']
-						album = spyt[i]['album']
-						if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
-						else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
-
-					prompt = await ctx.send(embed=embed)
-					choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
-					if choice == None:
-						await advance_queue(ctx)
-						return
-					spyt = spyt[choice-1]
-			url = spyt['url']
-			await qmessage.edit(embed=embedq('Match found! Queueing...'))
-
-		# Start the player
-		try:
-			player = await YTDLSource.from_url(url, loop=bot.loop, stream=False)
-		except yt_dlp.utils.DownloadError as e:
-			log(f'Failed to download video: {e}')
-			await ctx.send(embed=embedq('This video is unavailable.', url))
-			await advance_queue(ctx)
-			return
+	# Check if we need to match a Spotify link
+	if 'open.spotify.com' not in item.url:
+		url = item.url
 	else:
-		# Again, if we're looping
-		now_playing = last_played
+		log('Trying to match Spotify track...')
+		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
+		spyt = spoofy.spyt(item.url)
+
+		log('Checking if unsure...', verbose=True)
+		if type(spyt) == tuple and spyt[0] == 'unsure':
+			# This indicates no match was found
+			log('spyt returned unsure.', verbose=True)
+			# Remove the warning, no longer needed
+			spyt = spyt[1]
+			# Shorten to {limit} results
+			limit = 5
+			spyt = dict(list(spyt.items())[:limit])
+			if USE_TOP_MATCH:
+				# Use first result if that's set in config
+				spyt = spyt[0]
+			else:
+				# Otherwise, prompt the user with choice
+				embed = discord.Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=EMBED_COLOR)
+				
+				for i in spyt:
+					title = spyt[i]['title']
+					url = spyt[i]['url']
+					artist = spyt[i]['artist']
+					album = spyt[i]['album']
+					if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
+					else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
+
+				prompt = await ctx.send(embed=embed)
+				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
+				if choice == None:
+					await advance_queue(ctx)
+					return
+				spyt = spyt[choice-1]
+		url = spyt['url']
+		item.url = url
+		await qmessage.edit(embed=embedq('Match found! Queueing...'))
+
+	current_item = item
+
+	# Start the player with retrieved URL
+	try:
+		player = await YTDLSource.from_url(item.url, loop=bot.loop, stream=False)
+	except yt_dlp.utils.DownloadError as e:
+		log(f'Failed to download video: {e}')
+		await ctx.send(embed=embedq('This video is unavailable.', url))
+		await advance_queue(ctx)
+		return
 
 	now_playing = player
 	now_playing.weburl = url
@@ -1041,10 +1032,10 @@ async def play_url(item: QueueItem, ctx, repeat: bool=False):
 				now_playing.duration = float(subprocess.check_output(ffprobe).decode('utf-8').split('.')[0])
 	
 	voice.stop()
-	voice.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
+	voice.play(now_playing, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
 	audio_start_time = time.time()
 
-	if npmessage != None:
+	if npmessage is not None:
 		await npmessage.delete()
 
 	try:
@@ -1053,32 +1044,30 @@ async def play_url(item: QueueItem, ctx, repeat: bool=False):
 		pass
 
 	submitter_text = get_queued_by_text(item.user)
-	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {player.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=EMBED_COLOR)
+	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=EMBED_COLOR)
 	npmessage = await ctx.send(embed=embed)
-	if last_played != None:
+	if last_played is not None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
 			# Delete last played file
-			log(f'Removing file: {i}')
 			try:
+				log(f'Removing file: {i}', verbose=True)
 				os.remove(i)
 			except PermissionError as e:
-				# Will be raised if we're looping, or if 
-				# another server is playing something; safe to ignore
+				log(f'Cannot remove; the file is likely in use.', verbose=True)
 				pass
 
 async def advance_queue(ctx, skip=False):
+	# Triggers every time the player finishes
+	log('Player finished, advancing queue...', verbose=True)
 	if skip or not voice.is_playing():
-		if (player_queue.get(ctx) == []) and not loop_this:
+		if loop_this and current_item is not None:
+			player_queue.get(ctx).append(current_item)
+
+		if player_queue.get(ctx) == []:
 			voice.stop()
 		else:
 			next_item = player_queue.get(ctx).pop(0)
-			if loop_this and not skip:
-				try:
-					await play_url(current_item if current_item is not None else next_item, ctx, repeat=True)
-				except Exception as e:
-					log_traceback(e)
-			else:
-				await play_url(next_item, ctx)
+			await play_item(next_item, ctx)
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:
