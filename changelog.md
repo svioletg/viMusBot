@@ -10,6 +10,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Developer
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
+- Added type annotations to most functions and their parameters, as well as a few variables where it felt needed
 - `bot.py`
     - `generate_QueueItems()` is now a static method of the `QueueItem` class, primarily for organization and readability
     - Most constants have been made uppercase
@@ -23,7 +24,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - Added `try/except` statements to the config section to more helpfully explain issues to the user
     - `play_url()` renamed to `play_item()`
 - `spoofy.py`
-    - `pytube` can only retry data retrieval 5 times now instead of 10
+    - `pytube_track_data()` will not attempt to re-try data retrieval anymore, as the core issue should be fixed (see **Fixes** below)
     - `trim_track_data()` has had an argument renamed: `from_pytube` -> `is_pytube_object`
 - `update.py`
     - `tkinter` is no longer imported, as it was only used for a test that was left in before release in error
@@ -32,7 +33,6 @@ See [here](#versioning-info) for an explanation on categories and how my version
 ### Features
 - `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
 - Config changes:
-    - `data-from-pytube` (boolean) added; TODO: how do i explain this
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
@@ -42,9 +42,12 @@ See [here](#versioning-info) for an explanation on categories and how my version
 ### Fixes
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked. Both the top song and video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
 - Looping now functions correctly
+- `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 
 ### Other
-- `PyYAML` is no longer required by `requirements.txt` as it was not actually being used
+- Changes in `requirements.txt`:
+  - `PyYAML` is no longer required, it has not been used in a long time
+  - `inquirer` is no longer required, it is only used for the `vmb-wizard.py` script and not `bot.py` or `spoofy.py`
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 

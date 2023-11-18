@@ -46,7 +46,6 @@ with open('config.yml','r') as f:
 FORCE_NO_MATCH = config['force-no-match']
 SPOTIFY_PLAYLIST_LIMIT = config['spotify-playlist-limit']
 DURATION_LIMIT = config['duration-limit']
-DATA_FROM_PYTUBE = config['data-from-pytube']
 
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
@@ -183,37 +182,19 @@ def isrc_search_test(playlist):
 				log(f'{plt.error} {tracks.index(i)+1}/{len(tracks)}: Not cleared. {isrc}')
 	log(f'{yes} successes / {no} fails')
 
-def pytube_track_data(pytube_object) -> dict:
-	try:
-		description_list = pytube_object.description.split('\n')
-	except AttributeError as e:
-		# Sometimes the description doesn't load unless you force pytube to retrieve data from something else
-		pytube_object = pytube.YouTube(pytube_object.watch_url)
-		pytube_failed = False
-		tries = 0
-		while pytube_object.description == None:
-			tries += 1
-			log(f'pytube data wasn\'t retrieved correctly. Trying again... (#{tries})', verbose=True)
-			if tries >= 5:
-				log('pytube data retrieval failed too many times.', verbose=True)
-				pytube_failed = True
-				break
-			pytube_object = pytube.YouTube(pytube_object.watch_url)
-
-		if pytube_failed:
-			log('Falling back on yt-dlp...', verbose=True)
-			description_list = ytdl.extract_info(pytube_object.watch_url)['description'].split('\n')
-		else:
-			description_list = pytube_object.description.split('\n')
+def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
+	# This must be done in order for the description to load in
+	pytube_object.bypass_age_gate()
+	description_list = pytube_object.description.split('\n')
 
 	if 'Provided to YouTube by' not in description_list[0]:
-		# This function won't work if it doesn't follow the auto-generated template
+		# This function won't work if it doesn't follow the auto-generated template on most official song uploads
 		log(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
 		return None
 
-	for i in description_list.copy():
-		if i == '':
-			description_list.pop(description_list.index(i))
+	for item in description_list.copy():
+		if item == '':
+			description_list.pop(description_list.index(item))
 
 	description_dict = {
 		# some keys have been added for previous code compatbility
@@ -270,7 +251,7 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 	log('No match found.', verbose=True)
 	return None
 
-def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10, fast_search=False, **kwargs):
+def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: int=10, fast_search: bool=False):
 	unsure = False
 
 	query = f'{title} {artist} {album}'
@@ -278,22 +259,13 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 
 	# TODO: Can this not be outside of search_ytmusic()?
 	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict|object, album='', is_pytube_object=False, extract_with_ytmusic=False) -> dict:
+	def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=False) -> dict:
 		if is_pytube_object:
-			if extract_with_ytmusic:
-				data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
-			else:
-				try:
-					data = pytube_track_data(data)
-				except Exception as e:
-					log(f'pytube data trimming failed. Cause: {traceback.format_exception(e)[-1]}')
-					log('Trying ytmusicapi instead...')
-					data = ytmusic.get_watch_playlist(data.video_id)['tracks'][0]
-
+			data = pytube_track_data(data)
 			try:
 				album = data['album']['name']
 			except KeyError as e:
-				log(e)
+				log(f'Failed to retrieve album from pytube object. ({e})', verbose=True)
 				pass
 		if 'duration' in data: duration = data['duration']
 		elif 'length' in data: duration = data['length']
@@ -307,14 +279,17 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		return relevant
 
 	# Start search
-	if isrc != None and not FORCE_NO_MATCH:
+	if isrc is not None and not FORCE_NO_MATCH:
 		log(f'Searching for ISRC: {isrc}', verbose=True)
 		# For whatever reason, pytube seems to be more accurate here
 		isrc_matches = pytube.Search(isrc).results
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.', verbose=True)
-				return trim_track_data(i, is_pytube_object=True, extract_with_ytmusic=not DATA_FROM_PYTUBE)
+				try:
+					return trim_track_data(i, is_pytube_object=True)
+				except Exception as e:
+					print(e)
 			
 		log('No ISRC match found, falling back on text search.')
 
@@ -328,7 +303,6 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit=10
 		if int(v['duration_seconds']) > DURATION_LIMIT*60*60:
 			video_results.pop(video_results.index(v))
 	
-	fast_search = kwargs.get('fast_search',False)
 	if fast_search:
 		log('fast_search is True.', verbose=True)
 		log('Returning match.', verbose=True)

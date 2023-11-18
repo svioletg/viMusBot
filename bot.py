@@ -48,6 +48,7 @@ with open('config_default.yml','r') as f:
 with open('config.yml','r') as f:
 	config = yaml.safe_load(f)
 
+print('Importing local packages...')
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
@@ -248,15 +249,15 @@ class YTDLSource(discord.PCMVolumeTransformer):
 #
 #
 
-voice = None
+voice: discord.voice_client.VoiceClient = None
 
 class General(commands.Cog):
-	def __init__(self, bot):
+	def __init__(self, bot: commands.bot.Bot):
 		self.bot = bot
 
 	# Adapted from: https://stackoverflow.com/a/68599108/8108924
 	@commands.Cog.listener()
-	async def on_voice_state_update(self, member, before, after):
+	async def on_voice_state_update(self, member: discord.Member, before: discord.member.VoiceState, after):
 		global voice
 		if not member.id == self.bot.user.id:
 			return
@@ -283,7 +284,7 @@ class General(commands.Cog):
 
 	@commands.command()
 	@commands.check(is_command_enabled)
-	async def reload(self, ctx):
+	async def reloadspoofy(self, ctx):
 		# Separated from the others for debug purposes
 		global spoofy
 		spoofy = importlib.reload(spoofy)
@@ -297,14 +298,14 @@ class General(commands.Cog):
 
 	@commands.command(aliases=get_aliases('changelog'))
 	@commands.check(is_command_enabled)
-	async def changelog(self, ctx):
+	async def changelog(self, ctx: commands.Context):
 		"""Returns a link to the changelog, and displays most recent version."""
 		embed=discord.Embed(title='Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md',description=f'Current version: {VERSION}',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
 
 	@commands.command(aliases=get_aliases('ping'))
 	@commands.check(is_command_enabled)
-	async def ping(self, ctx):
+	async def ping(self, ctx: commands.Context):
 		"""Test command."""
 		await ctx.send('Pong!')
 		embed=discord.Embed(title='Pong!',description='Pong!',color=EMBED_COLOR)
@@ -313,7 +314,7 @@ class General(commands.Cog):
 
 	@commands.command(aliases=get_aliases('repository'))
 	@commands.check(is_command_enabled)
-	async def repository(self, ctx):
+	async def repository(self, ctx: commands.Context):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
@@ -326,7 +327,7 @@ class Music(commands.Cog):
 	# Playing music / Voice-related
 	@commands.command(aliases=get_aliases('analyze'))
 	@commands.check(is_command_enabled)
-	async def analyze(self, ctx, spotifyurl: str):
+	async def analyze(self, ctx: commands.Context, spotifyurl: str):
 		"""Returns spotify API information regarding a track."""
 		info = spoofy.spotify_track(spotifyurl)
 		title = info['title']
@@ -359,7 +360,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('clear'))
 	@commands.check(is_command_enabled)
-	async def clear(self, ctx):
+	async def clear(self, ctx: commands.Context):
 		"""Clears the entire queue."""
 		global player_queue
 		player_queue.clear(ctx)
@@ -375,7 +376,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('leave'))
 	@commands.check(is_command_enabled)
-	async def leave(self, ctx):
+	async def leave(self, ctx: commands.Context):
 		"""Disconnects the bot from voice."""
 		global voice
 		global player_queue
@@ -389,7 +390,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('loop'))
 	@commands.check(is_command_enabled)
-	async def loop(self, ctx):
+	async def loop(self, ctx: commands.Context):
 		"""Toggles looping for the current track."""
 		global loop_this
 		# Inverts the boolean
@@ -399,7 +400,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('move'))
 	@commands.check(is_command_enabled)
-	async def move(self, ctx, old: int, new: int):
+	async def move(self, ctx: commands.Context, old: int, new: int):
 		"""Moves a queue item from <old> to <new>."""
 		try:
 			to_move = player_queue.get(ctx)[old-1].title
@@ -414,7 +415,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('nowplaying'))
 	@commands.check(is_command_enabled)
-	async def nowplaying(self, ctx):
+	async def nowplaying(self, ctx: commands.Context):
 		"""Displays the currently playing video."""
 		if voice == None:
 			await ctx.send(embed=embedq('Not connected to a voice channel.'))
@@ -431,7 +432,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('pause'))
 	@commands.check(is_command_enabled)
-	async def pause(self, ctx):
+	async def pause(self, ctx: commands.Context):
 		"""Pauses the player."""
 		# Developer note: See on_command_error for how this gets resumed
 		global paused_at
@@ -446,7 +447,7 @@ class Music(commands.Cog):
 	
 	@commands.command(aliases=get_aliases('play'))
 	@commands.check(is_command_enabled)
-	async def play(self, ctx, url, *args):
+	async def play(self, ctx: commands.Context, url, *args):
 		"""Adds a link to the queue. Plays immediately if the queue is empty."""
 		# Will resume if paused, this is handled in on_command_error()
 		global playctx
@@ -455,7 +456,7 @@ class Music(commands.Cog):
 		qmessage = await ctx.send(embed=embedq('Trying to queue...'))
 
 		is_multiple = False
-		# TODO: Issue 54: Multiple URLs in one command
+		# TODO: Issue #54: Multiple URLs in one command
 		if len([i for i in [url]+list(args) if i.startswith('https://')]) > 0 and len([i for i in [url]+list(args) if not i.startswith('https://')]) > 0:
 			await qmessage.edit(embed=embedq('Inputs must be either all URLs or a single text query.'))
 			return
@@ -598,7 +599,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
-	async def queue(self, ctx, page: int=1):
+	async def queue(self, ctx: commands.Context, page: int=1):
 		"""Displays the current queue, up to #10."""
 		if player_queue.get(ctx) == []:
 			await ctx.send(embed=embedq('The queue is empty.'))
@@ -629,20 +630,20 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('remove'))
 	@commands.check(is_command_enabled)
-	async def remove(self, ctx, spot: int):
+	async def remove(self, ctx: commands.Context, spot: int):
 		"""Removes an item from the queue. Use -q to get its number."""
 		await ctx.send(embed=embedq(f'Removed {player_queue.get(ctx).pop(spot-1).title} from the queue.'))
 
 	@commands.command(aliases=get_aliases('shuffle'))
 	@commands.check(is_command_enabled)
-	async def shuffle(self, ctx):
+	async def shuffle(self, ctx: commands.Context):
 		"""Randomizes the order of the queue."""
 		random.shuffle(player_queue.get(ctx))
 		await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 	@commands.command(aliases=get_aliases('skip'))
 	@commands.check(is_command_enabled)
-	async def skip(self, ctx):
+	async def skip(self, ctx: commands.Context):
 		"""Skips the currently playing media."""
 		if voice == None:
 			await ctx.send(embed=embedq('Not connected to a voice channel.'))
@@ -674,7 +675,7 @@ class Music(commands.Cog):
 
 	@commands.command(aliases=get_aliases('stop'))
 	@commands.check(is_command_enabled)
-	async def stop(self, ctx):
+	async def stop(self, ctx: commands.Context):
 		"""Stops the player and clears the queue."""
 		global player_queue
 		player_queue.clear(ctx)
@@ -686,7 +687,7 @@ class Music(commands.Cog):
 	
 	@commands.command(aliases=get_aliases('clearcache'))
 	@commands.check(is_command_enabled)
-	async def clearcache(self, ctx):
+	async def clearcache(self, ctx: commands.Context):
 		"""Removes all information from the current URL cache"""
 		global url_info_cache
 		url_info_cache = {}
@@ -697,7 +698,7 @@ class Music(commands.Cog):
 	@play.before_invoke
 	@pause.before_invoke
 	@stop.before_invoke
-	async def ensure_voice(self, ctx):
+	async def ensure_voice(self, ctx: commands.Context):
 		if ctx.voice_client is None:
 			if ctx.author.voice:
 				log(f'Joining voice channel: {ctx.author.voice.channel}')
@@ -714,7 +715,7 @@ class Music(commands.Cog):
 
 url_info_cache = {}
 
-def get_queued_by_text(user_object: discord.User) -> str:
+def get_queued_by_text(user_object: discord.Member) -> str:
 	username = user_object.nick if user_object.nick else user_object.name
 	return f'\nQueued by {username}' if SHOW_USERS_IN_QUEUE else ''
 
@@ -765,7 +766,6 @@ def duration_from_url(url: str) -> int|float:
 	elif 'soundcloud.com' in url:
 		return round(spoofy.sc.resolve(url).duration / 1000)
 	elif 'open.spotify.com' in url:
-		log('spotify')
 		return spoofy.spotify_track(url)['duration']
 	else:
 		# yt-dlp should handle most other URLs
@@ -797,7 +797,7 @@ def timestamp_from_seconds(seconds: int|float) -> str:
 	# Omit the hour place if not >=60 minutes
 	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
-async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout=30) -> int:
+async def prompt_for_choice(ctx: commands.Context, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout: int=30) -> int:
 	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
 	
 	msg -- Message to be edited based on the outcome
@@ -847,7 +847,7 @@ async def prompt_for_choice(ctx, status_msg: discord.Message, prompt_msg: discor
 		else:
 			choice = emoji['num'].index(str(reaction))
 			log(f'{choice} selected.', verbose=True)
-			embed=discord.Embed(title=f'#{choice} chosen.',color=EMBED_COLOR)
+			embed = discord.Embed(title=f'#{choice} chosen.',color=EMBED_COLOR)
 			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return choice
@@ -860,31 +860,31 @@ class MediaQueue:
 
 	# Run in every function to automatically determine
 	# which queue we're working with
-	def ensure_queue_exists(self, ctx):
+	def ensure_queue_exists(self, ctx: commands.Context):
 		if ctx.author.guild.id not in self.queues:
 			self.queues[ctx.author.guild.id] = []
 
-	def get(self, ctx):
+	def get(self, ctx: commands.Context) -> list:
 		self.ensure_queue_exists(ctx)
 		return self.queues[ctx.author.guild.id]
 
-	def set(self, ctx, new_list: list):
+	def set(self, ctx: commands.Context, new_list: list):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = new_list
 
-	def clear(self, ctx):
+	def clear(self, ctx: commands.Context):
 		self.ensure_queue_exists(ctx)
 		self.queues[ctx.author.guild.id] = []
 
 class QueueItem:
-	def __init__(self, url: str, user, title: str=None, duration: int|float=None):
+	def __init__(self, url: str, user: discord.Member, title: str=None, duration: int|float=None):
 		self.url = url
 		self.user = user
 		self.duration = duration if duration is not None else duration_from_url(url)
 		self.title = title if title is not None else title_from_url(url)
-	
+
 	@staticmethod
-	def generate(playlist: str|list, user, list_from_command: bool=False) -> list:
+	def generate(playlist: str|list, user: discord.Member, list_from_command: bool=False) -> list:
 		"""Creates a list of QueueItem instances from a valid playlist
 
 		- `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
@@ -921,18 +921,17 @@ class QueueItem:
 
 player_queue = MediaQueue()
 
-def queue_batch(ctx, batch: list[QueueItem]):
-	# batch must be a list of QueueItem objects
+def queue_batch(ctx: commands.Context, batch: list[QueueItem]):
 	global player_queue
-	for i in batch:
-		player_queue.get(ctx).append(i)
+	for item in batch:
+		player_queue.get(ctx).append(item)
 
 now_playing: YTDLSource = None
 last_played: YTDLSource = None
 
 current_item: QueueItem = None
 
-npmessage = None
+npmessage: discord.Message = None
 
 audio_start_time = 0
 audio_time_elapsed = 0
@@ -941,7 +940,7 @@ paused_for = 0
 
 loop_this = False
 
-async def play_item(item: QueueItem, ctx):
+async def play_item(item: QueueItem, ctx: commands.Context):
 	global audio_start_time, audio_time_elapsed, paused_at, paused_for
 	global now_playing
 	global last_played
@@ -1056,12 +1055,12 @@ async def play_item(item: QueueItem, ctx):
 				log(f'Cannot remove; the file is likely in use.', verbose=True)
 				pass
 
-async def advance_queue(ctx, skip=False):
+async def advance_queue(ctx: commands.Context, skip: bool=False):
 	# Triggers every time the player finishes
 	log('Player finished, advancing queue...', verbose=True)
 	if skip or not voice.is_playing():
-		if loop_this and current_item is not None:
-			player_queue.get(ctx).append(current_item)
+		if not skip and loop_this and current_item is not None:
+			player_queue.get(ctx).insert(0, current_item)
 
 		if player_queue.get(ctx) == []:
 			voice.stop()
@@ -1095,8 +1094,8 @@ bot = commands.Bot(
 
 # Command error handling
 @bot.event
-async def on_command_error(ctx, error):
-	if isinstance(error, discord.ext.commands.errors.MissingRequiredArgument):
+async def on_command_error(ctx: commands.Context, error):
+	if isinstance(error, commands.errors.MissingRequiredArgument):
 		match ctx.command.name:
 			case 'play':
 				# Resuming while paused
@@ -1111,7 +1110,7 @@ async def on_command_error(ctx, error):
 				await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
 			case 'analyze':
 				await ctx.send(embed=embedq('A spotify track URL is required.'))
-	elif isinstance(error, discord.ext.commands.CheckFailure):
+	elif isinstance(error, commands.CheckFailure):
 		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
 	elif isinstance(error, yt_dlp.utils.DownloadError):
 		await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
@@ -1119,7 +1118,7 @@ async def on_command_error(ctx, error):
 	else:
 		log(f'Error encountered in command `{ctx.command}`.')
 		log(error)
-		trace=traceback.format_exception(error)
+		trace = traceback.format_exception(error)
 		await ctx.send(embed=embedq(error, 'If this issue persists, please check https://github.com/svioletg/viMusBot/issues and submit a new issue if your problem is not listed.'))
 		# A second traceback is created from this command itself, usually not useful
 		log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
