@@ -163,7 +163,7 @@ del files, to_remove
 
 discord.Embed(title="title", description="description", color=EMBED_COLOR)
 
-def embedq(*args) -> discord.Embed:
+def embedq(*args: str) -> discord.Embed:
 	"""Shortcut for making new embeds"""
 	if len(args) == 1:
 		return discord.Embed(title=args[0], color=EMBED_COLOR)
@@ -532,46 +532,9 @@ class Music(commands.Cog):
 					album_info = spoofy.spotify_album(url)
 					url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
 					if url == None:
-						await ctx.send(embed=embedq('No match could be found.'))
+						await qmessage.edit(embed=embedq('No match could be found.'))
 						return
-
-			# Search with text if no url is provided
-			if 'https://' not in ctx.message.content:
-				log('Link not detected, searching by text', verbose=True)
-				log(f'Searching: "{url}"')
-
-				top_song, top_video = spoofy.search_ytmusic_text(url)
-				if top_song == top_video == None:
-					await ctx.send(embed=embedq('No song or video match could be found for your query.'))
-					return
-
-				# TODO: TEST ALL OF THIS!
-				if top_song is not None:
-					top_song['url'] = 'https://www.youtube.com/watch?v='+top_song['videoId']
-				if top_video is not None:
-					top_video['url'] = 'https://www.youtube.com/watch?v='+top_video['videoId']
-				
-				if top_song == None:
-					log(f'No song result provided, using video result.', verbose=True)
-					url = top_video
-				elif top_video == None:
-					log(f'No video result provided, using song result.', verbose=True)
-					url = top_song
-				elif top_song['url'] == top_video['url']:
-					log(f'Song and video results were identical. Using song result.', verbose=True)
-					url = top_song['url']
-				else:
-					log(f'Prompting user for song/video choice.', verbose=True)
-					embed=discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
-					embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
-					embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
-
-					prompt = await ctx.send(embed=embed)
-					choice = await prompt_for_choice(ctx, qmessage, prompt, 2)
-					if choice == None:
-						return
-					url = (top_song['url'], top_video['url'])[choice-1]
-
+			
 			# Determines if the input was a playlist
 			valid = ['playlist?list=', '/sets/', '/album/']
 			if any(i in url for i in valid):
@@ -593,9 +556,51 @@ class Music(commands.Cog):
 					await qmessage.edit(embed=embedq(f'Cannot queue items longer than {DURATION_LIMIT} hours.'))
 					return
 
-			# Start the player if we can use the url itself
+			# Search with text if no url is provided
+			if 'https://' not in ctx.message.content:
+				await qmessage.edit(embed=embedq('Searching by text...'))
+				log('Link not detected, searching by text', verbose=True)
+				log(f'Searching: "{url}"')
+
+				top_song, top_video = spoofy.search_ytmusic_text(url)
+
+				if top_song == top_video == None:
+					await qmessage.edit(embed=embedq('No song or video match could be found for your query.'))
+					return
+
+				# TODO: TEST ALL OF THIS!
+				if top_song is not None:
+					top_song['url'] = 'https://www.youtube.com/watch?v='+top_song['videoId']
+				if top_video is not None:
+					top_video['url'] = 'https://www.youtube.com/watch?v='+top_video['videoId']
+				
+				if top_song == None:
+					log(f'No song result found; using video result...', verbose=True)
+					url = top_video['url']
+				elif top_video == None:
+					log(f'No video result found; using song result...', verbose=True)
+					url = top_song['url']
+				elif top_song['url'] == top_video['url']:
+					log(f'Song and video results were identical; using song result...', verbose=True)
+					url = top_song['url']
+				else:
+					log(f'Prompting user for song/video choice.', verbose=True)
+					embed = discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
+					embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
+					embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
+
+					prompt = await ctx.send(embed=embed)
+					choice = await prompt_for_choice(ctx, prompt, 2)
+					if choice == None:
+						await qmessage.delete()
+						return
+					else:
+						await qmessage.edit(embed=embedq('Queueing choice...'))
+					url = (top_song['url'], top_video['url'])[choice-1]
+
+			# Queue or start the player
 			try:
-				log('Adding to queue...', verbose=True)
+				log('Appending to queue...', verbose=True)
 				if not voice.is_playing() and player_queue.get(ctx) == []:
 					player_queue.get(ctx).append(QueueItem(url, ctx.author))
 					log('Voice client is not playing; starting...')
@@ -808,58 +813,53 @@ def timestamp_from_seconds(seconds: int|float) -> str:
 	# Omit the hour place if not >=60 minutes
 	return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
 
-async def prompt_for_choice(ctx: commands.Context, status_msg: discord.Message, prompt_msg: discord.Message, choices: int, timeout: int=30) -> int:
+async def prompt_for_choice(ctx: commands.Context, prompt_msg: discord.Message, choices: int, timeout: int=30) -> int|None:
 	"""Adds reactions to a given Message (prompt_msg) and returns the outcome
 	
 	msg -- Message to be edited based on the outcome
 
 	prompt -- Message to add the reaction choices to
+
+	Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully
 	"""
 	# Get reaction menu ready
-	log('Adding reactions.', verbose=True)
+	log('Adding reactions...', verbose=True)
 
-	if choices > len(emoji['num']): log('Choices out of range for emoji number list.'); return
+	if choices > len(emoji['num']):
+		log('Choices out of range for emoji number list.'); return
 
 	for i in list(range(0, choices)):
 		await prompt_msg.add_reaction(emoji['num'][i+1])
 
 	await prompt_msg.add_reaction(emoji['cancel'])
 
-	def check(reaction, user):
-		log('Reaction check is being called.', verbose=True)
-		return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji)==emoji['cancel'])
+	def check(reaction: discord.Reaction, user: discord.Member) -> bool:
+		log('Reaction check is being called...', verbose=True)
+		return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji) == emoji['cancel'])
 
-	log('Checking for reaction...', verbose=True)
+	log('Waiting for reaction...', verbose=True)
 
 	try:
 		reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
 	except asyncio.TimeoutError as e:
 		log('Choice prompt timeout reached.')
-		embed=discord.Embed(title='Timed out; cancelling.',color=EMBED_COLOR)
-		await status_msg.edit(embed=embed)
 		await prompt_msg.delete()
 		return
 	except Exception as e:
 		log_traceback(e)
-		embed=discord.Embed(title='An unexpected error occurred; cancelling.',color=EMBED_COLOR)
-		await status_msg.edit(embed=embed)
-		await prompt_msg.delete()
+		await prompt_msg.edit(embed=embedq('An unexpected error occurred.'))
 		return
 	else:
 		# If a valid reaction was received.
 		log('Received a valid reaction.', verbose=True)
 
-		if str(reaction)==emoji['cancel']:
+		if str(reaction) == emoji['cancel']:
 			log('Selection cancelled.', verbose=True)
-			embed=discord.Embed(title='Cancelling.',color=EMBED_COLOR)
-			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return
 		else:
 			choice = emoji['num'].index(str(reaction))
 			log(f'{choice} selected.', verbose=True)
-			embed = discord.Embed(title=f'#{choice} chosen.',color=EMBED_COLOR)
-			await status_msg.edit(embed=embed)
 			await prompt_msg.delete()
 			return choice
 
@@ -1001,7 +1001,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 					else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
 
 				prompt = await ctx.send(embed=embed)
-				choice = await prompt_for_choice(ctx, qmessage, prompt, len(spyt))
+				choice = await prompt_for_choice(ctx, prompt, len(spyt))
 				if choice == None:
 					await advance_queue(ctx)
 					return
@@ -1141,6 +1141,8 @@ async def on_command_error(ctx: commands.Context, error):
 				await ctx.send(embed=embedq('A spotify track URL is required.'))
 	elif isinstance(error, commands.CheckFailure):
 		await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
+	elif isinstance(error, commands.CommandNotFound):
+		pass
 	elif isinstance(error, yt_dlp.utils.DownloadError):
 		await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
 	# TODO: add custom message for yt_dlp errors like private videos
