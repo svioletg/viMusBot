@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 import urllib.request
 from pathlib import Path
 from zipfile import ZipFile
@@ -26,13 +25,13 @@ def check() -> tuple[bool, dict]:
 def main():
 	print('Checking...')
 
-	verison_check = check()
-	is_latest = verison_check[0]
-	current = verison_check[1]['current']
-	latest = verison_check[1]['latest']
+	version_check = check()
+	is_latest = version_check[0]
+	current = version_check[1]['current']
+	latest = version_check[1]['latest']
 	latest_tag = latest['tag_name']
 
-	if check()[0]:
+	if is_latest:
 		print(f'{plt.yellow}{current}{plt.reset}=={plt.blue}{latest_tag}')
 		print('You are up to date.')
 		exit()

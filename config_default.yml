@@ -34,7 +34,7 @@ prefixes:
 vote-to-skip:
     enabled: yes
     # A percentage of users connected to voice required to skip a song; does nothing if vote-to-skip is disabled
-    threshold-type: "percentage"
+    threshold-type: "percentage" # Can be "percentage" or "exact"
     threshold-percentage: 50
     threshold-exact: 3
 

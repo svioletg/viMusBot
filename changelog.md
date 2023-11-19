@@ -41,6 +41,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Fixes
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
+- `customlog.py` did not actually ignore logs from the function names present in the `ignore-logs-from` config key due to an incorrectly typed expression, which has now been fixed
 - Fixed [Issue #4](https://github.com/svioletg/viMusBot/issues/4): "Queueing a track right as one is finishing or starting skips the next in queue"
 - Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
 - `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
