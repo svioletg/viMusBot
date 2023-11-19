@@ -19,7 +19,7 @@ import time
 import traceback
 import urllib.request
 from datetime import datetime, timedelta
-from inspect import currentframe, getframeinfo
+from inspect import stack, getmodule, currentframe
 from pathlib import Path
 
 import colorama
@@ -278,9 +278,14 @@ class General(commands.Cog):
 					log('Leaving voice due to inactivity.')
 					await voice.disconnect()
 				if not voice.is_connected():
-					log('Voice doesn\'t look connected, setting `voice` to None.')
-					voice = None
-					break
+					log('Voice doesn\'t look connected, waiting three seconds...', verbose=True)
+					await asyncio.sleep(3)
+					if not voice.is_connected():
+						log('Still disconnected. Setting `voice` to None...', verbose=True)
+						voice = None
+						break
+					else:
+						log('Voice looks connected again. Continuing as normal.', verbose=True)
 
 	@commands.command()
 	@commands.check(is_command_enabled)
@@ -318,6 +323,12 @@ class General(commands.Cog):
 		"""Returns the link to the viMusBot GitHub repository."""
 		embed=discord.Embed(title='You can view the bot\'s code and submit bug reports or feature requests here.',description='https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.',color=EMBED_COLOR)
 		await ctx.send(embed=embed)
+	
+	@commands.command(aliases=get_aliases('issue4test'))
+	@commands.check(is_command_enabled)
+	async def test(self, ctx: commands.Context):
+		# TODO: REMOVE BEFORE PUBLIC
+		pass
 
 
 class Music(commands.Cog):
@@ -502,7 +513,7 @@ class Music(commands.Cog):
 					queue_batch(ctx, objlist)
 					list_name = spoofy.sp.playlist(url)['name']
 					await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
-
+					# TODO: remove this and have it funnel down to a later advance call
 					if not voice.is_playing():
 						log('Voice client is not playing; starting...')
 						await advance_queue(ctx)
@@ -584,18 +595,17 @@ class Music(commands.Cog):
 
 			# Start the player if we can use the url itself
 			try:
-				log('Trying to start playing or queueing.', verbose=True)
-				if not voice.is_playing() and len(player_queue.get(ctx)) == 0:
-					log('Voice client is not playing; starting...')
+				log('Adding to queue...', verbose=True)
+				if not voice.is_playing() and player_queue.get(ctx) == []:
 					player_queue.get(ctx).append(QueueItem(url, ctx.author))
+					log('Voice client is not playing; starting...')
 					await advance_queue(ctx)
 				else:
 					player_queue.get(ctx).append(QueueItem(url, ctx.author))
 					title = player_queue.get(ctx)[-1].title
 					await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue.get(ctx))}'))
-					log('Appened to queue.')
 			except Exception as e:
-				raise e
+				log_traceback(e)
 
 	@commands.command(aliases=get_aliases('queue'))
 	@commands.check(is_command_enabled)
@@ -645,6 +655,7 @@ class Music(commands.Cog):
 	@commands.check(is_command_enabled)
 	async def skip(self, ctx: commands.Context):
 		"""Skips the currently playing media."""
+		log('Trying to skip...', verbose=True)
 		if voice == None:
 			await ctx.send(embed=embedq('Not connected to a voice channel.'))
 			return
@@ -667,10 +678,10 @@ class Music(commands.Cog):
 				await ctx.send(embed=embedq('You have already voted to skip.'))
 				return
 
-			await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
+			voteskip_message = await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
 			if len(skip_votes) >= skip_votes_needed:
+				await voteskip_message.delete()
 				await ctx.send(embed=embedq('Skipping...'))
-				voice.pause()
 				await advance_queue(ctx, skip=True)
 
 	@commands.command(aliases=get_aliases('stop'))
@@ -896,27 +907,26 @@ class QueueItem:
 		if type(playlist) == list:
 			if list_from_command:
 				objlist = []
-				for i in playlist:
-					print(i)
-					if 'open.spotify.com' in i:
-						info = spoofy.spotify_track(i)
+				for item in playlist:
+					if 'open.spotify.com' in item:
+						info = spoofy.spotify_track(item)
 						objlist.append(QueueItem(info['url'], user, title=info['title'], duration=info.get('duration', 0)))
 					else:
-						info = ytdl.extract_info(i, download=False)
+						info = ytdl.extract_info(item, download=False)
 						objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
 				return objlist
 			else:
-				objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist]
+				objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist]
 			return objlist
 		else:
 			# Anything youtube-dl natively supports is probably a link
 			if 'soundcloud.com' in playlist:
 				# SoundCloud playlists have to be processed differently
 				playlist_entries = spoofy.soundcloud_playlist(playlist)
-				objlist = [QueueItem(i.permalink_url, user, title=i.title, duration=round(i.duration/1000)) for i in playlist_entries]
+				objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
 			else:
 				playlist_entries = ytdl.extract_info(playlist, download=False)
-				objlist = [QueueItem(i['url'], user, title=i['title'], duration=i.get('duration', 0)) for i in playlist_entries['entries']]
+				objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
 			return objlist
 
 player_queue = MediaQueue()
@@ -932,6 +942,7 @@ last_played: YTDLSource = None
 current_item: QueueItem = None
 
 npmessage: discord.Message = None
+qmessage: discord.Message = None
 
 audio_start_time = 0
 audio_time_elapsed = 0
@@ -946,6 +957,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 	global last_played
 	global current_item
 	global npmessage
+	global qmessage
 	global skip_votes
 
 	skip_votes = []
@@ -961,7 +973,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 		url = item.url
 	else:
 		log('Trying to match Spotify track...')
-		qmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
+		await qmessage.edit(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
 		spyt = spoofy.spyt(item.url)
 
 		log('Checking if unsure...', verbose=True)
@@ -1039,12 +1051,14 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
 	try:
 		await qmessage.delete()
-	except UnboundLocalError:
+	except UnboundLocalError as e:
+		log(e)
 		pass
 
 	submitter_text = get_queued_by_text(item.user)
 	embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{now_playing.duration}]',description=f'Link: {url}{submitter_text}',color=EMBED_COLOR)
 	npmessage = await ctx.send(embed=embed)
+
 	if last_played is not None:
 		for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
 			# Delete last played file
@@ -1055,18 +1069,33 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 				log(f'Cannot remove; the file is likely in use.', verbose=True)
 				pass
 
+advance_lock = False
+
 async def advance_queue(ctx: commands.Context, skip: bool=False):
 	# Triggers every time the player finishes
-	log('Player finished, advancing queue...', verbose=True)
-	if skip or not voice.is_playing():
-		if not skip and loop_this and current_item is not None:
-			player_queue.get(ctx).insert(0, current_item)
+	global advance_lock
+	if not advance_lock and (skip or not voice.is_playing()):
+		log('Locking...', verbose=True)
+		advance_lock = True
 
-		if player_queue.get(ctx) == []:
-			voice.stop()
-		else:
-			next_item = player_queue.get(ctx).pop(0)
-			await play_item(next_item, ctx)
+		try:
+			if not skip and loop_this and current_item is not None:
+				player_queue.get(ctx).insert(0, current_item)
+
+			if player_queue.get(ctx) == []:
+				voice.stop()
+			else:
+				next_item = player_queue.get(ctx).pop(0)
+				await play_item(next_item, ctx)
+			
+			log('Tasks finished; unlocking...', verbose=True)
+			advance_lock = False
+		except Exception as e:
+			log_traceback(e)
+			log('Error encountered; unlocking...', verbose=True)
+			advance_lock = False
+	elif advance_lock:
+		log('Attempted call while locked.', verbose=True)
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:

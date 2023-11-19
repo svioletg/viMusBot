@@ -24,15 +24,14 @@ with open('config.yml', 'r') as f:
 LOG_BLACKLIST = config['logging-options']['ignore-logs-from']
 
 def newlog(msg: str='', last_logtime: int|float=time.time(), called_from: str='', verbose: bool=False):
-	
 	for frame in inspect.stack()[1:]:
 		if frame.filename[0] != '<':
 			source = re.search(r'([^\/\\]+$)',frame.filename).group(0)
 			break
 
 	elapsed = time.time()-last_logtime
-	timestamp = datetime.now().strftime('%m-%d-%Y %H:%M:%S')
-	logstring = f'{plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
+	timestamp = datetime.now().strftime('%H:%M:%S')
+	logstring = f'[{timestamp}] {plt.file[source]}[{source}]{plt.reset}{plt.func} {called_from}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
 	logfile.write(plt.strip_color(logstring)+'\n')
 	blacklist_exceptions = [plt.warn, plt.error]
 	if not config['logging-options']['show-console-logs'][source]:

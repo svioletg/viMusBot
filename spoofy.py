@@ -251,32 +251,31 @@ def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> s
 	log('No match found.', verbose=True)
 	return None
 
+# Trim ytmusic song data down to what's relevant to us
+def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=False) -> dict:
+	if is_pytube_object:
+		data = pytube_track_data(data)
+		try:
+			album = data['album']['name']
+		except KeyError as e:
+			log(f'Failed to retrieve album from pytube object. ({e})', verbose=True)
+			pass
+	if 'duration' in data: duration = data['duration']
+	elif 'length' in data: duration = data['length']
+	relevant = {
+		'title': data['title'],
+		'artist': data['artists'][0]['name'],
+		'url': 'https://www.youtube.com/watch?v='+data['videoId'],
+		'album': album,
+		'duration': duration,
+	}
+	return relevant
+
 def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: int=10, fast_search: bool=False):
 	unsure = False
 
 	query = f'{title} {artist} {album}'
 	reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
-
-	# TODO: Can this not be outside of search_ytmusic()?
-	# Trim ytmusic song data down to what's relevant to us
-	def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=False) -> dict:
-		if is_pytube_object:
-			data = pytube_track_data(data)
-			try:
-				album = data['album']['name']
-			except KeyError as e:
-				log(f'Failed to retrieve album from pytube object. ({e})', verbose=True)
-				pass
-		if 'duration' in data: duration = data['duration']
-		elif 'length' in data: duration = data['length']
-		relevant = {
-			'title': data['title'],
-			'artist': data['artists'][0]['name'],
-			'url': 'https://www.youtube.com/watch?v='+data['videoId'],
-			'album': album,
-			'duration': duration,
-		}
-		return relevant
 
 	# Start search
 	if isrc is not None and not FORCE_NO_MATCH:
@@ -286,10 +285,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
 		for i in isrc_matches:
 			if fuzz.ratio(i.title, reference['title']) > 75:
 				log('Found an ISRC match.', verbose=True)
-				try:
-					return trim_track_data(i, is_pytube_object=True)
-				except Exception as e:
-					print(e)
+				return trim_track_data(i, is_pytube_object=True)
 			
 		log('No ISRC match found, falling back on text search.')
 

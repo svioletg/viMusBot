@@ -41,7 +41,8 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Fixes
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked. Both the top song and video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
-- Looping now functions correctly
+- Fixed [Issue #4](https://github.com/svioletg/viMusBot/issues/4): "Queueing a track right as one is finishing or starting skips the next in queue"
+- Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
 - `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 
 ### Other
@@ -50,6 +51,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
   - `inquirer` is no longer required, it is only used for the `vmb-wizard.py` script and not `bot.py` or `spoofy.py`
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
+- Current timestamp has been added to the bot's logs, to aid in future debugging
 
 ## 1.8.3
 > *2023.04.29 / dev.32*
