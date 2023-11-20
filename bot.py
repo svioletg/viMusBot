@@ -3,7 +3,7 @@ print('Getting ready...')
 # Import sys out of order to print the Python version, for troubleshooting
 import sys
 
-print('python '+sys.version)
+print('Python '+sys.version)
 
 # Continue with remaining imports
 import asyncio
@@ -12,14 +12,12 @@ import importlib
 import logging
 import os
 import random
-import shutil
 import subprocess
 import sys
 import time
 import traceback
 import urllib.request
-from datetime import datetime, timedelta
-from inspect import stack, getmodule, currentframe
+from inspect import currentframe
 from pathlib import Path
 
 import colorama
@@ -28,6 +26,7 @@ import pytube
 import regex as re
 import yaml
 import yt_dlp
+from benedict import benedict
 from colorama import Back, Fore, Style
 from discord.ext import commands
 from pretty_help import PrettyHelp
@@ -39,14 +38,15 @@ if not Path('config_default.yml').is_file():
     urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
 
 if not Path('config.yml').is_file():
-    print('config.yml does not exist; creating copy from config_default.yml...')
-    shutil.copyfile('config_default.yml', 'config.yml')
+    print('config.yml does not exist; creating blank config.yml...')
+    with open('config.yml', 'w') as f:
+        f.write('')
 
 with open('config_default.yml','r') as f:
-    config_default: dict = yaml.safe_load(f)
+    config_default = benedict(yaml.safe_load(f))
 
 with open('config.yml','r') as f:
-    config: dict = yaml.safe_load(f)
+    config = benedict(yaml.safe_load(f))
 
 print('Importing local packages...')
 # Import local files after main packages, and after validating config
@@ -54,7 +54,6 @@ import customlog
 import spoofy
 import update
 from palette import Palette
-from sharedmisc import get_nested
 
 _here = Path(__file__).name
 
@@ -104,40 +103,36 @@ log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 log('Parsing config...')
 
 #region CONFIGURATION FROM YAML
-PUBLIC             : bool = get_nested(config, config_default, 'public')
-TOKEN_FILE_PATH    : str  = get_nested(config, config_default, 'token-file')
-PUBLIC_PREFIX      : str  = get_nested(config, config_default, 'prefixes', 'public')
-DEV_PREFIX         : str  = get_nested(config, config_default, 'prefixes', 'developer')
-INACTIVITY_TIMEOUT : int  = get_nested(config, config_default, 'inactivity-timeout')
-CLEANUP_EXTENSIONS : list = get_nested(config, config_default, 'auto-remove')
+PUBLIC             : bool = config.get('public', config_default['public'])
+TOKEN_FILE_PATH    : str  = config.get('token-file', config_default['token-file'])
+PUBLIC_PREFIX      : str  = config.get('prefixes.public', config_default['prefixes.public'])
+DEV_PREFIX         : str  = config.get('prefixes.developer', config_default['prefixes.developer'])
+EMBED_COLOR        : int  = int(config.get('embed-color', config_default['embed-color']), 16)
+INACTIVITY_TIMEOUT : int  = config.get('inactivity-timeout', config_default['inactivity-timeout'])
+CLEANUP_EXTENSIONS : list = config.get('auto-remove', config_default['auto-remove'])
+DISABLED_COMMANDS  : list = config.get('command-blacklist', config_default['command-blacklist'])
 
-SHOW_USERS_IN_QUEUE      : bool = get_nested(config, config_default, 'show-users-in-queue')
-ALLOW_SPOTIFY_PLAYLISTS  : bool = get_nested(config, config_default, 'allow-spotify-playlists')
-USE_TOP_MATCH            : bool = get_nested(config, config_default, 'use-top-match')
-USE_URL_CACHE            : bool = get_nested(config, config_default, 'use-url-cache')
-SPOTIFY_PLAYLIST_LIMIT   : int  = get_nested(config, config_default, 'spotify-playlist-limit')
-DURATION_LIMIT           : int  = get_nested(config, config_default, 'duration-limit')
-MAXIMUM_CONSECUTIVE_URLS : int  = get_nested(config, config_default, 'maximum-urls')
+SHOW_USERS_IN_QUEUE      : bool = config.get('show-users-in-queue', config_default['show-users-in-queue'])
+ALLOW_SPOTIFY_PLAYLISTS  : bool = config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])
+USE_TOP_MATCH            : bool = config.get('use-top-match', config_default['use-top-match'])
+USE_URL_CACHE            : bool = config.get('use-url-cache', config_default['use-url-cache'])
+SPOTIFY_PLAYLIST_LIMIT   : int  = config.get('spotify-playlist-limit', config_default['spotify-playlist-limit'])
+DURATION_LIMIT           : int  = config.get('duration-limit', config_default['duration-limit'])
+MAXIMUM_CONSECUTIVE_URLS : int  = config.get('maximum-urls', config_default['maximum-urls'])
 
-VOTE_TO_SKIP          : bool = get_nested(config, config_default, 'vote-to-skip', 'enabled')
-SKIP_VOTES_TYPE       : str  = get_nested(config, config_default, 'vote-to-skip', 'threshold-type')
-SKIP_VOTES_EXACT      : int  = get_nested(config, config_default, 'vote-to-skip', 'threshold-exact')
-SKIP_VOTES_PERCENTAGE : int  = get_nested(config, config_default, 'vote-to-skip', 'threshold-percentage')
+VOTE_TO_SKIP          : bool = config.get('vote-to-skip.enabled', config_default['vote-to-skip.enabled'])
+SKIP_VOTES_TYPE       : str  = config.get('vote-to-skip.threshold-type', config_default['vote-to-skip.threshold-type'])
+SKIP_VOTES_EXACT      : int  = config.get('vote-to-skip.threshold-exact', config_default['vote-to-skip.threshold-exact'])
+SKIP_VOTES_PERCENTAGE : int  = config.get('vote-to-skip.threshold-percentage', config_default['vote-to-skip.threshold-percentage'])
 skip_votes_needed = 0
 skip_votes = []
-
-try:
-    EMBED_COLOR = int(get_nested(config, config_default, 'embed-color'), 16)
-except ValueError:
-    log('Invalid hex value for embed-color in config.yml; defaulting to white...')
-    EMBED_COLOR = 0xffffff
 #endregion
 
 def is_command_enabled(ctx: commands.Context):
-    return not ctx.command.name in get_nested(config, config_default, 'command-blacklist')
+    return not ctx.command.name in DISABLED_COMMANDS
 
 def get_aliases(command: str):
-    return get_nested(config, config_default, 'aliases').get(command, [])
+    return config.get(f'aliases.{command}', config_default.get(f'aliases.{command}', []))
 
 # Clear out downloaded files
 log('Removing previously downloaded media files...')
@@ -950,7 +945,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         url = item.url
     else:
         log('Trying to match Spotify track...')
-        await qmessage.edit(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait; this may take a while!\nIf this has been stuck for a while, use the skip command.'))
+        await qmessage.edit(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
         spyt = spoofy.spyt(item.url)
 
         log('Checking if unsure...', verbose=True)

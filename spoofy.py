@@ -1,6 +1,5 @@
 import json
 import os
-import pickle
 import sys
 import time
 import traceback
@@ -13,6 +12,7 @@ import sclib
 import spotipy
 import yaml
 import yt_dlp
+from benedict import benedict
 from colorama import Back, Fore, Style
 from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -21,7 +21,6 @@ from ytmusicapi import YTMusic
 # Local files
 import customlog
 from palette import Palette
-from sharedmisc import get_nested
 
 _here = os.path.basename(__file__)
 
@@ -42,14 +41,14 @@ def log_line():
 
 # Parse config from YAML
 with open('config_default.yml','r') as f:
-    config_default = yaml.safe_load(f)
+    config_default = benedict(yaml.safe_load(f))
 
 with open('config.yml','r') as f:
-    config = yaml.safe_load(f)
+    config = benedict(yaml.safe_load(f))
 
-FORCE_NO_MATCH         = get_nested(config, config_default, 'force-no-match')
-SPOTIFY_PLAYLIST_LIMIT = get_nested(config, config_default, 'spotify-playlist-limit')
-DURATION_LIMIT         = get_nested(config, config_default, 'duration-limit')
+FORCE_NO_MATCH         : bool = config.get('force-no-match', config_default['force-no-match'])
+SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit', config_default['spotify-playlist-limit'])
+DURATION_LIMIT         : int  = config.get('duration-limit', config_default['duration-limit'])
 
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
@@ -291,10 +290,10 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
         log(f'Searching for ISRC: {isrc}', verbose=True)
         # For whatever reason, pytube seems to be more accurate here
         isrc_matches = pytube.Search(isrc).results
-        for i in isrc_matches:
-            if fuzz.ratio(i.title, reference['title']) > 75:
+        for song in isrc_matches:
+            if fuzz.ratio(song.title, reference['title']) > 75:
                 log('Found an ISRC match.', verbose=True)
-                return trim_track_data(i, is_pytube_object=True)
+                return trim_track_data(song, is_pytube_object=True)
             
         log('No ISRC match found, falling back on text search.')
 
@@ -329,19 +328,19 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
         match = song_results[0]
 
     # First pass, check officially uploaded songs from artist channels
-    for i in song_results[:5]:
-        if is_matching(reference, i, ignore_artist=True):
+    for song in song_results[:5]:
+        if is_matching(reference, song, ignore_artist=True):
             log('Song match found.')
-            match = i
+            match = song
             break
 
     # Next, try standard non-"song" videos
     if not match_found():
         log('Not found; checking for close match...')
-        for i in video_results[:5]:
-            if is_matching(reference, i, ignore_artist=True, ignore_album=True):
+        for song in video_results[:5]:
+            if is_matching(reference, song, ignore_artist=True, ignore_album=True):
                 log('Video match found.')
-                match = i
+                match = song
                 break
     
     if not match_found():
@@ -453,7 +452,7 @@ def is_jp(text: str) -> bool:
     # TODO: Test this
     return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text)
 
-def spyt(url: str, limit=20, **kwargs) -> dict|tuple:
+def spyt(url: str, limit: int=20, **kwargs) -> dict|tuple:
     """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
     track = spotify_track(url)
     result = search_ytmusic(title=track['title'], artist=track['artist'], album=track['album'], isrc=track['isrc'], limit=limit, **kwargs)

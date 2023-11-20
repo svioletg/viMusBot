@@ -32,9 +32,6 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Features
 - `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
-- Config changes:
-    - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
-    - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
     - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
 - The sidebar color on bot messages can now be customized
@@ -47,7 +44,12 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 
 ### Other
+- Config changes:
+    - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
+    - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
+    - `auto-update-config` removed; no longer used
 - Changes in `requirements.txt`:
+  - `python-benedict` is now required
   - `PyYAML` is no longer required, it has not been used in a long time
   - `inquirer` is no longer required, it is only used for the `vmb-wizard.py` script and not `bot.py` or `spoofy.py`
 - If one is set, the queue will now display the nicknames of users instead of account names

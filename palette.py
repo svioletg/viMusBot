@@ -1,21 +1,20 @@
 import colorama
-from colorama import Fore, Back, Style
 import yaml
-
-from sharedmisc import get_nested
+from benedict import benedict
+from colorama import Back, Fore, Style
 
 colorama.init(autoreset=True)
 
 with open('config_default.yml', 'r') as f:
-    config_default = yaml.safe_load(f)
+    config_default = benedict(yaml.safe_load(f))
 
 with open('config.yml', 'r') as f:
-    config = yaml.safe_load(f)
+    config = benedict(yaml.safe_load(f))
 
-NO_COLOR: bool = get_nested(config, config_default, 'logging-options', 'colors', 'no-color')
+NO_COLOR: bool = config.get('logging-options.colors.no-color', config_default['logging-options.colors.no-color'])
 
 def get_color_config(key: str):
-    return get_nested(config, config_default, 'logging-options', 'colors', key)
+    return config.get(f'logging-options.colors.{key}', config_default[f'logging-options.colors.{key}'])
 
 class Palette:
     def __init__(self):
@@ -35,8 +34,8 @@ class Palette:
         self.colors = vars(self)
         # User-defined
         self.file = {
-            'bot.py': self.colors[get_color_config('bot.py')],
-            'spoofy.py': self.colors[get_color_config('spoofy.py')],
+            'bot.py': self.colors[get_color_config('bot-py')],
+            'spoofy.py': self.colors[get_color_config('spoofy-py')],
         }
         self.warn  = self.colors[get_color_config('warn')]
         self.error = self.colors[get_color_config('error')]

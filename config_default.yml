@@ -14,9 +14,6 @@
 # The color to use on the side of bot messages
 embed-color: "ff00ff"
 
-# Automatically updates config.yml with any missing options present in config_default.yml
-auto-update-config: no
-
 # Should be yes/on/true almost always
 # Currently only decides which prefix to use (true = public, false = developer) 
 public: yes
@@ -118,8 +115,8 @@ logging-options:
     # Everything still outputs to vimusbot.log regardless of the options below
     # Toggle outputting logs from bot.py and/or spoofy.py to the console
     show-console-logs:
-        bot.py: yes
-        spoofy.py: yes
+        bot-py: yes
+        spoofy-py: yes
     # Certain logs are tagged as "verbose"; these are messages that are useful for debugging, but may be seen as screen clutter for most users
     # This toggles whether they will be displayed in the command line (verbose logs are sent to vimusbot.log regardless of this setting)
     show-verbose-logs: yes
@@ -130,8 +127,8 @@ logging-options:
     colors:
         # Run "palette.py" to see a list of choices
         no-color: no # Disables all message coloring
-        bot.py: "yellow" # For logs from bot.py
-        spoofy.py: "lime" # For logs from spoofy.py
+        bot-py: "yellow" # For logs from bot.py
+        spoofy-py: "lime" # For logs from spoofy.py
         warn: "gold" # For non-serious warning messages
         error: "red" # For tracebacks and/or fatal errors
         timer: "magenta" # The time between logs at the end of each message
