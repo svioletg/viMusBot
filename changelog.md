@@ -44,13 +44,14 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 
 ### Other
+- A number of `.bat` scripts have been added to aid in the setup process for less Python and/or command line-experienced users
+- The project's `README.md` has been completely rewritten, in hopes of providing a far more concise and understandable setup experience
 - Config changes:
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
     - `auto-update-config` removed; no longer used
 - Changes in `requirements.txt`:
   - `python-benedict` is now required
-  - `PyYAML` is no longer required, it has not been used in a long time
   - `inquirer` is no longer required, it is only used for the `vmb-wizard.py` script and not `bot.py` or `spoofy.py`
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end

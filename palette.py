@@ -65,7 +65,7 @@ def test():
         if k == 'colors':
             # Skip self.colors since its just the vars of Palette's attributes
             continue
-        elif type(v) == dict:
+        if isinstance(v, dict):
             for k2, v2 in v.items():
                 print(f'{v2}{k}[\'{k2}\']', end=' ')
         else:

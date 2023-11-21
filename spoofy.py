@@ -32,7 +32,8 @@ last_logtime = time.time()
 
 def log(msg: str, verbose=False):
     global last_logtime
-    customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
+    customlog.newlog(msg=msg, last_logtime=last_logtime, 
+                     called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
     last_logtime = time.time()
 
 def log_line():
@@ -279,7 +280,8 @@ def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=Fal
     }
     return relevant
 
-def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: int=10, fast_search: bool=False):
+def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, 
+                   limit: int=10, fast_search: bool=False):
     unsure = False
 
     query = f'{title} {artist} {album}'

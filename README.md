@@ -1,6 +1,7 @@
 # viMusBot
 
 ## You are on the `dev` branch. Switch to the `master` branch here: https://github.com/svioletg/viMusBot/tree/master
+## This entire README will be rewritten before the next release. ([Issue #40](https://github.com/svioletg/viMusBot/issues/40))
 
 ### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/changelog.md)
 
@@ -8,40 +9,45 @@
 
 ---
 
-A bot made in Python 3.10 using the [discord.py](https://github.com/Rapptz/discord.py) library, for personal usage. I wasn't happy enough with the options already available, so I decided to try my own take on it.
+viMusBot is a Discord music bot with support for Spotify Links, written in Python. You will need [FFmpeg](https://www.ffmpeg.org/) installed in order for the bot to function.
 
-Please submit an [issue](https://github.com/svioletg/viMusBot/issues/new) if you've experienced a bug or otherwise odd behavior, or have a feature to request, and feel free to comment on existing issues to provide any additional details that may help narrow down the issue or reach a solution. No bug or feature is too large/small to be submitted, this system is best for me to keep track of everything.
+> *My intention for this README is to be as clear and understandable as possible for general users unfamiliar with Python and/or using the command line. If you find some sections are lacking information, poorly worded, or any other issues are present, feel free to [open a new issue](https://github.com/svioletg/viMusBot/issues) so I can get around to fixing it, thank you!*
 
----
+Start by downloading `Source code (zip)` from the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest), extract the contents wherever you choose, and then follow the instructions below as needed.
 
-If you want to be notified of updates & have a GitHub account, you can click "Watch" on this repository, and then select "Custom" -> "Releases" -> "Apply".
+## Setting up: Python
 
----
+You will need to install Python in order to run the bot, which can be gotten from https://www.python.org/downloads. As of writing this, viMusBot is fully compatible with the current latest version, that being Python 3.12. If using the Windows installer, make sure to tick the "Add Python 3.12 to PATH" checkbox near the bottom. You can confirm that Python was successfully installed by opening a command prompt, and running the `py` command.
 
-This README needs a lot of cleaning up. I'm working on it in the spare time that I have, but suggestions are always welcome on [the issue page](https://github.com/svioletg/viMusBot/issues/40)!
+Next, you need to install viMusBot's required packages. If you're unfamiliar with using Python, the `envsetup.bat` file is included to automatically create a Python virtual enviornment (venv), and install the requirements there. A second batch file, `start.bat`, is also included which will run the main script using the newly created venv. Note that `.bat` files will only work on Windows.
 
-## Important: Before Using
-### Do Not Use `dev`
-If you're downloading from this repository, *always* download from either the [releases page](https://github.com/svioletg/viMusBot/releases/latest) (recommended) or the **master** branch. The **dev** branch is for keeping track of incremental work-in-progress changes that are *not* suitable for general use, and are typically unstable or non-functioning.
+## Setting up: Non-Python dependencies
 
-### Use On One Server
-When I say "an **instance** of the bot" or anything similar, what I'm referring to is *one* `bot.py` script that is currently running, in a single window or `screen` (the command-line tool `screen`, not a monitor screen).
+Aside from Python and its required packages (explained in the next section), you will only need one additional program for the bot and its voice channel-related functions to work: [FFmpeg](https://www.ffmpeg.org/).
 
-While it's of course fine to have your instance in multiple servers, it should be noted that using it to play music in more than one server at a time *will* cause problems, and it is heavily recommended to only play music through it on one server at any given moment.
+For **Linux**, you can likely install it via your distro's package manger. e.g for Ubuntu, you can run `apt install ffmpeg`.
 
-I'm aiming to fix this eventually, progress is being tracked in [Issue #17](https://github.com/svioletg/viMusBot/issues/17) if you'd like to see any updates, but for the time being if you really need to have the bot actively playing on multiple servers, the best idea would be to run mutiple separate instances.
+For **Windows**, go to [this page](https://github.com/BtbN/FFmpeg-Builds/releases) and download `ffmpeg-master-latest-win64-gpl.zip`, attached to the top release on the page. Extract this anywhere you'd like, and move or copy `ffmpeg.exe` and `ffprobe.exe` from within `bin` to the same folder as `bot.py`.
 
-## How To Use
+For **Mac**, go to [this page](https://evermeet.cx/ffmpeg/) and download the archives for both `FFmpeg` and `FFprobe`. They should each have a single file within named `ffmpeg` and `ffprobe` respectively, add these to your PATH variable or drop them inside the same folder as `bot.py`.
 
-If you're not familiar with using the command line or Python, [get Python here](https://www.python.org/downloads/) and skip to [Using The Wizard](#using-the-wizard) for a more guided setup.
+## Setting up: Discord
 
-I've tried to make this section as thorough as I can, but if you don't mind some googling or are more familiar with the command line, here's the short version:
+## Setting up: Spotify API
 
----
+You'll need to supply an API "client ID" and "client secret" in order for Spotify-related functions to work. The process is fairly simple, and you'll only need a Spotify account - this does **not** require a Spotify Premium subscription.
 
-1. Get the source files from the [latest release](https://github.com/svioletg/viMusBot/releases/latest), extract them where you want.
-2. Create `spotify_config.json` and `token.txt`. Create an app with the Spotify Web API and enter your Client ID and Client Secret in the following format:
-```
+1. Start by visiting your [Spotify for Developers Dashboard](https://developer.spotify.com/dashboard). Once you're logged in and at this page, you should see a blue "Create app" button.
+2. Click "**Create app**", and fill in the Name and Description fields with whatever you want; the Website field can be left blank. The Redirect URI field is required, although it will not actually be used by the bot, so you can just enter `localhost`.
+3. Under "Which API/SDKs are you planning to use?", select "Web API". Click the checkbox below to agree to Spotify's terms, and finally hit the blue "Save" button.
+![Spotify app setup page](https://i.imgur.com/hoPjBKE.png)
+4. You should now be sent to your app's dashboard with some graphs displayed. On the right side of the screen, click "Settings".
+5. Click "View client secret" to reveal the string. The file `spotifysetup.bat` has been included with viMusBot to set up your config automatically — open it, and then paste in the requested information.
+![Client ID and client secret fields](https://i.imgur.com/4AoWjWj.png)
+
+You can also manually create the required `spotify_config.json` file, and then paste in the following:
+
+```json
 {
     "spotify":
     {
@@ -50,102 +56,13 @@ I've tried to make this section as thorough as I can, but if you don't mind some
     }
 }
 ```
-3. Ensure you've selected the right intents and permissions (see **Bot Token & Permissions** below), and paste your bot's token into `token.txt`.
-4. Duplicate `config_default.yml` and rename the copy as `config.yml` - the bot will only use the latter for its options. Edit it how you like.
-5. If FFmpeg and FFprobe aren't installed on your system, either install it through your package manager of choice or download the binaries and drop them in the viMusBot folder.
-6. Open a command prompt or terminal in your viMusBot directory, and run `python3 bot.py`.
 
-For a more in-depth tutorial, continue below.
+Where `YOUR_ID` and `YOUR_SECRET` are your app's client ID and client secret respectively.
 
----
+## Running & Updating
 
-There are two ways to start using the bot. If you're generally familiar with using the command prompt or terminal for your OS, follow the [**Standard Setup**](#standard-setup) section below. Alternatively, I've provided a script in this project to automatically obtain and walk you through most of the files and information you'll need; in which case, follow the [**Using The Wizard**](#using-the-wizard) section.
+viMusBot should now be fully equipped to run. If you know how to run Python scripts, just run `bot.py`. If you used the `envsetup.bat` file earlier to set up a virtual enviornment, you can use `start.bat` to automatically run the bot within said enviornment. You can stop the bot at any time by pressing `Ctrl` and `C` at the same time, while within the command prompt window.
 
-***Regardless of which section you follow***, you must first install the latest version of [Python](https://www.python.org/downloads/). Anything above Python 3.7 should in theory work, but its best to grab the latest one.
+viMusBot will automatically check for new releases each time it starts. To automatically update your files, run the `update.py` script, or open `update.bat`. If you're using the latter, all of this project's dependencies will be automatically updated as well, so you should be set. If you only ran the `update.py` script, you'll have to update them manually by using `pip install -r requirements.txt`.
 
-***If you are using the Windows installer***, when the installer starts you will see a "Add Python [your version] to PATH" checkbox near the bottom. Make sure that's ticked *on*, or else the `python3` command will not function, and you'll have to add it yourself before you can use any scripts provided here.
-
-If you're installing on Linux, you should be able to run `apt install python3` and be set. Substitute `apt` if you're using a different package manager.
-
-### Standard Setup
-
-Ensure that the latest version of Python has been installed and added to your PATH.
-
-1. Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest) of this repository, look in the "Assets" section, and download "Source code" in either .zip or .tar.gz format; extract it wherever you like. Inside should be a "viMusBot" folder, which in turn contains all of the files you'll run the bot with.
-
-2. Download both FFmpeg and FFprobe and drop them into the extracted folder - it should have `bot.py` and `spoofy.py` along with some others inside of it.
-    - If you're on *Linux*, you likely already have these installed, otherwise `apt install ffmpeg` (or apt equivalent) will install both FFmpeg and FFprobe for you.
-    - If you're on *Windows* you'll probably have to download these manually. Go to [ffmpeg.org](https://ffmpeg.org) and find the Windows builds, or click [here](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip) for a direct download of BtbN's latest Windows build.
-        - From this ZIP, go into the "bin" folder found inside and copy "ffmpeg.exe" and "ffprobe.exe" to the bot's folder.
-
-3. Open a command prompt or terminal in your viMusBot folder, and run the command: `pip install -r requirements.txt`
-    - If this does not work, try `python3 -m pip install -r requirements.txt`
-
-4. Create the following new documents inside your folder:
-    - `spotify_config.json`
-    - `token.txt`
-
-5. Copy-paste the "config_default.yml" file, and rename it to "config.yml".
-    - It is recommend you keep the original in case you want to completely reset to default or check something.
-
-From this point, skip to [Getting Your Credentials](#getting-your-credentials) to finish setting up.
-
----
-
-### Using The Wizard
-
-Go to the [latest release](https://github.com/svioletg/viMusBot/releases/latest), download the `vmb-wizard.py` file, and save it anywhere - the bot will not be setup in its directory, rather it will ask you where to download the files to.
-
-Installing Python should have installed the Python Launcher for the version you have; assuming this is the case, you can simply double-click the file and it will open a console of its own.
-
-Follow the instructions on screen. You may want to do the steps below for getting your credentials first, just to have them on hand. If you're using the wizard, you may ignore any instructions regarding creating files, as it will do this for you.
-
-Once the setup has finished, the bot will be ready to use in the directory you selected, and you only need to double-click the `bot.py` file to start it.
-
-Setup will have created a `config.yml` file for you - the default settings should be fine in most cases, but I do suggest you look through it just in case you'd like to change some things. You can edit this file in any text editor, although something like Notepad++ will make it a little easier to navigate.
-
-> *NOTE: If the bot detects any new changes in the default config file, after updating for example, it will merge your settings with the new options. This will remove things like comments and extra formatting, so it is reocmmended to keep `config_default.yml` to refer back to if you need help on what a particular option does.*
-
----
-
-### Getting Your Credentials
-
-This bot will require some information in order for the Spotify API features to function, along with a token for bot to run on Discord. The latter will be covered first.
-
-### Bot Token & Permissions
-
-1. Go to https://discord.com/developers/applications and log in.
-2. Click the blue "New Application" button in the top right. Enter any name you want, and create the app. You should then be taken to a new dashboard for it.
-3. From the left side menu, go to the "Bot" tab, and then select "Add Bot" on the right. Set its username to whatever you want it to display as, and select an icon if you wish. This is not required, and if no icon is selected, it will simply display as a default Discord icon.
-4. Click "Reset Token", and then when you see a token appear, click "Copy". **If you're using the setup wizard, skip to step 5 here.** Open up `token.txt` and paste this string into it, and save the file. Unless you reset your token again, you will not need to change this in the future.
-    - Note: Whether to leave the "Public Bot" toggle on or off is up to you. If it's off, only you will ever be able to invite it to servers. Otherwise, anyone with an invite link may do so.
-5. Scroll down to **Privileged Gateway Intents**, and turn *on* the **Server Members Intent** and **Message Content Intent** switches, seen below.
-![intent switches](https://cdn.discordapp.com/attachments/327195739346173962/1058205536769806376/image.png)
-6. Go to **Bot Permissions** below this, and enable the following:
-![bot permissions](https://cdn.discordapp.com/attachments/327195739346173962/1039979708219129966/image.png)
-7. Make sure these settings are saved, and you're now done with this section. To generate an invite link, go to "OAuth2" on the left side menu, then select "URL Generator". Tick the "bot" box in **Scopes**, and then enable the same permissions you did above.
-
-### Spotify API
-
-In order for the bot to use the Spotify Web API and look up track, album, and playlist info - which is used to then find a YouTube equivalent match so that Spotify links may be used to queue songs - we need to authenticate to it with a client ID and secret, which we'll acquire now.
-
-1. Go to your [Developer Dashboard](https://developer.spotify.com/dashboard/applications) and log in with your Spotify account.
-2. Select "Create An App", enter a title and description (doesn't matter what, neither will be used or seen by the bot), and click "Show Client Secret" when taken to the app's overview page.
-
-![spotify secret button](https://cdn.discordapp.com/attachments/327195739346173962/1058207796497219595/image.png)
-
-3. **If you're using the setup wizard, it will ask you for this information.** Otherwise, create `spotify_config.json` in your bot's folder, and paste in the following text...
-```
-{
-    "spotify":
-    {
-        "client_id": "YOUR_ID",
-        "client_secret": "YOUR_SECRET"
-    }
-}
-```
-...and replace `YOUR_ID` with the string seen next to "Client ID", and `YOUR_SECRET` with the string seen next to "Client Secret". Make sure they are both surrounded by quotation marks like above.
-
----
-
-With all the above done, you should be ready to go! If you have any questions or need clarification, feel free to ask by submitting a new issue.
+If you experience any issues with the bot, or you want a new feature added, you're free to [open a new issue](https://github.com/svioletg/viMusBot/issues) so I can look into it when possible.

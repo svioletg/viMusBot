@@ -258,6 +258,7 @@ class General(commands.Cog):
                     await voice.disconnect()
                 if not voice.is_connected():
                     log('Voice doesn\'t look connected, waiting three seconds...', verbose=True)
+                    # TODO: this seemed to work well in a live test! maybe adjust the timing a bit before release
                     await asyncio.sleep(3)
                     if not voice.is_connected():
                         log('Still disconnected. Setting `voice` to None...', verbose=True)
@@ -934,7 +935,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
     skip_votes = []
 
-    audio_time_elapsed, paused_at, paused_for = 0, 0, 0
+    audio_time_elapsed = paused_at = paused_for = 0
 
     last_played = now_playing
 
@@ -1114,6 +1115,7 @@ async def on_command_error(ctx: commands.Context, error):
     elif isinstance(error, commands.CheckFailure):
         await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
     elif isinstance(error, commands.CommandNotFound):
+        # Just ignore these
         pass
     elif isinstance(error, yt_dlp.utils.DownloadError):
         await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))

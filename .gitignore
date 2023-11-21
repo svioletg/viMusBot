@@ -1,3 +1,4 @@
+.*/
 __pycache__/
 bin/
 past-versions/
@@ -12,6 +13,7 @@ config_old.yml
 configtest.yml
 # credentials
 spotify_config.json
+test_spotify_config.json
 headers_auth.json
 # misc testing files
 yttesting.py

@@ -1,0 +1,1 @@
+.vmbvenv\scripts\python update.py
