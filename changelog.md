@@ -12,19 +12,20 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
 - Added type annotations to most functions and their parameters, as well as a few variables where it felt needed
 - `bot.py`
-    - `generate_QueueItems()` is now a static method of the `QueueItem` class, primarily for organization and readability
     - Most constants have been made uppercase
-    - `update_check` variable renamed to `update_check_result`
+    - `generate_QueueItems()` has been renamed to `generate_from_list()` and is now a class method of the `QueueItem`
+    - `player_queue` renamed to `media_queue`
+    - `update_check` renamed to `update_check_result`
+    - `play_url()` renamed to `play_item()`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
-    - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
+    - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5 and above, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
     - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
     - Startup file removal will now use `pathlib` to check extensions instead of regex
     - Calls to `os.path` replaced with `Path()`
     - Simplified `log_traceback()`
-    - Added `try/except` statements to the config section to more helpfully explain issues to the user
-    - `play_url()` renamed to `play_item()`
 - `spoofy.py`
-    - `pytube_track_data()` will not attempt to re-try data retrieval anymore, as the core issue should be fixed (see **Fixes** below)
+    - `pytube_track_data()` will not attempt to retry data retrieval anymore, as the core issue should be fixed (see **Fixes** below)
+      - In the event that it still fails — as of writing, there's an issue with non-age-restricted videos raising an age restriction error that has not been fixed in a public release, for example — it will fall back on `yt_dlp`
     - `trim_track_data()` has had an argument renamed: `from_pytube` -> `is_pytube_object`
 - `update.py`
     - `tkinter` is no longer imported, as it was only used for a test that was left in before release in error
@@ -39,9 +40,9 @@ See [here](#versioning-info) for an explanation on categories and how my version
 ### Fixes
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
 - `customlog.py` did not actually ignore logs from the function names present in the `ignore-logs-from` config key due to an incorrectly typed expression, which has now been fixed
+- `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 - Fixed [Issue #4](https://github.com/svioletg/viMusBot/issues/4): "Queueing a track right as one is finishing or starting skips the next in queue"
 - Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
-- `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 
 ### Other
 - A number of `.bat` scripts have been added to aid in the setup process for less Python and/or command line-experienced users
@@ -592,8 +593,10 @@ All-new functionality not previously present in the project. This usually coinci
 ### Fixes
 Fixed bugs or other unintended behavior.
 
-### Improvements
+### Improvements (no longer used)
 General improvements to the either the user or developer experience, like making a command simpler to use, reducing the amount of code needed for something, or otherwise making existing functionality more efficient.
+
+This category is no longer used, and notes of this nature will be put into **Other** or **Features** instead.
 
 ### Other
 Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporary solution or workaround.

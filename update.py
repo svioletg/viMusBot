@@ -39,10 +39,10 @@ def main():
     print(f'Your local version number:\n{plt.gold}{current}{plt.reset}\n'+
         f'...does not match the current latest release of:\n{plt.lime}{latest_tag}')
 
-    if input('Would you like to update now? (y/n) ').strip().lower() != 'n':
+    if input('Would you like to update now? (y/n) ').strip().lower() != 'y':
         print('Exiting.')
         raise SystemExit(0)
-    
+
     latest_zip = f'./viMusBot-{latest_tag}.zip'
 
     print('Retrieving: '+latest['zipball_url'])

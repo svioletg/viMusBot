@@ -323,9 +323,12 @@ class Music(commands.Cog):
         # Assemble embed object
         embed = discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=EMBED_COLOR)
         # Put key, time sig, and tempo at the top
-        embed.add_field(name='Key',value=data['key']); data.pop('key')
-        embed.add_field(name='Tempo',value=data['tempo']); data.pop('tempo')
-        embed.add_field(name='Time Signature',value=data['time_signature']); data.pop('time_signature')
+        embed.add_field(name='Key',value=data['key'])
+        data.pop('key')
+        embed.add_field(name='Tempo',value=data['tempo'])
+        data.pop('tempo')
+        embed.add_field(name='Time Signature',value=data['time_signature'])
+        data.pop('time_signature')
 
         # Add the rest
         for i in data:
@@ -347,8 +350,8 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def clear(self, ctx: commands.Context):
         """Clears the entire queue."""
-        global player_queue
-        player_queue.clear(ctx)
+        global media_queue
+        media_queue.clear(ctx)
         await ctx.send(embed=embedq('Queue cleared.'))
 
     @commands.command(aliases=get_aliases('join'))
@@ -364,8 +367,8 @@ class Music(commands.Cog):
     async def leave(self, ctx: commands.Context):
         """Disconnects the bot from voice."""
         global voice
-        global player_queue
-        player_queue.clear(ctx)
+        global media_queue
+        media_queue.clear(ctx)
         log(f'Leaving voice channel: {ctx.author.voice.channel}')
         try:
             await voice.disconnect()
@@ -388,8 +391,8 @@ class Music(commands.Cog):
     async def move(self, ctx: commands.Context, old: int, new: int):
         """Moves a queue item from <old> to <new>."""
         try:
-            to_move = player_queue.get(ctx)[old-1].title
-            player_queue.get(ctx).insert(new-1, player_queue.get(ctx).pop(old-1))
+            to_move = media_queue.get(ctx)[old-1].title
+            media_queue.get(ctx).insert(new-1, media_queue.get(ctx).pop(old-1))
             await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
         except IndexError as e:
             await ctx.send(embed=embedq('The selected number is out of range.'))
@@ -402,7 +405,7 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def nowplaying(self, ctx: commands.Context):
         """Displays the currently playing video."""
-        if voice == None:
+        if voice is None:
             await ctx.send(embed=embedq('Not connected to a voice channel.'))
             return
 
@@ -432,7 +435,7 @@ class Music(commands.Cog):
     
     @commands.command(aliases=get_aliases('play'))
     @commands.check(is_command_enabled)
-    async def play(self, ctx: commands.Context, url, *args):
+    async def play(self, ctx: commands.Context, *queries):
         """Adds a link to the queue. Plays immediately if the queue is empty."""
         # Will resume if paused, this is handled in on_command_error()
         global playctx
@@ -440,36 +443,85 @@ class Music(commands.Cog):
         global qmessage
         qmessage = await ctx.send(embed=embedq('Trying to queue...'))
 
-        is_multiple = False
         # TODO: Issue #54: Multiple URLs in one command
-        if len([i for i in [url]+list(args) if i.startswith('https://')]) > 0 and len([i for i in [url]+list(args) if not i.startswith('https://')]) > 0:
-            await qmessage.edit(embed=embedq('Inputs must be either all URLs or a single text query.'))
-            return
-        elif len(args) > 0 and len([i for i in [url]+list(args) if i.startswith('https://')]) == len([url]+list(args)):
-            print('mult')
-            if len([i for i in [url]+list(args) if re.match(r'(/sets/|playlist\?list=|/album/|/playlist/)', i) is not None]) > 0:
-                await qmessage.edit(embed=embedq('Cannot multiple album/playlists at once.'))
-                return
-            print('made it past')
-            is_multiple = True
-            urllist = [url]+list(args)
+        # TODO: remove *args, change url to queries*, set url explicitly later instead of changing it
+        multiple_urls = False
 
-        if not url.startswith('https://'):
-            url = url+' '+' '.join(args)
+        url_count = text_count = 0
+        for q in queries:
+            if q.startswith('https://'):
+                url_count += 1
+                if url_count > 1 and re.match(r'(/sets/|playlist\?list=|/album/|/playlist/)', q) is not None:
+                    await qmessage.edit(embed=embedq('Cannot multiple album/playlists at once.'))
+            else:
+                text_count += 1
+        
+        if url_count > 0 and text_count > 0:
+            await qmessage.edit(embed=embedq('Queries must be either all URLs or a single text query.'))
+        
+        query_type = 'link' if url_count > 0 else 'text'
 
-        url = url.split('&list=')[0]
+        if query_type == 'text':
+            query = ' '.join(queries)
+        elif query_type == 'link':
+            multiple_urls = len(queries) > 1
+            if not multiple_urls:
+                # Prevent yt-dlp from grabbing the playlist the track is from
+                url = queries[0].split('&list=')[0]
+
         async with ctx.typing():
-            if is_multiple:
-                if len(urllist) > MAXIMUM_CONSECUTIVE_URLS:
+            if multiple_urls:
+                if len(queries) > MAXIMUM_CONSECUTIVE_URLS:
                     await qmessage.edit(embed=embedq('Too many URLs were given.', f'Current limit is {MAXIMUM_CONSECUTIVE_URLS}.'+
                         'Edit `maximum-urls` in `config.yml` to change this.'))
-                objlist = QueueItem.generate(urllist, ctx.author, list_from_command=True)
+                objlist = QueueItem.generate_from_list(queries, ctx.author)
                 queue_batch(ctx, objlist)
                 await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
                 if not voice.is_playing():
                     log('Voice client is not playing; starting...')
                     await advance_queue(ctx)
                 return
+            
+            # Search with text if no url is provided
+            if query_type == 'text':
+                await qmessage.edit(embed=embedq('Searching by text...'))
+                log('Link not detected, searching by text', verbose=True)
+                log(f'Searching: "{query}"')
+
+                top_song, top_video = spoofy.search_ytmusic_text(query)
+
+                if top_song == top_video is None:
+                    await qmessage.edit(embed=embedq('No song or video match could be found for your query.'))
+                    return
+
+                if top_song is not None:
+                    top_song['url'] = 'https://www.youtube.com/watch?v='+top_song['videoId']
+                if top_video is not None:
+                    top_video['url'] = 'https://www.youtube.com/watch?v='+top_video['videoId']
+                
+                if top_song is None:
+                    log(f'No song result found; using video result...', verbose=True)
+                    url = top_video['url']
+                elif top_video is None:
+                    log(f'No video result found; using song result...', verbose=True)
+                    url = top_song['url']
+                elif top_song['url'] == top_video['url']:
+                    log(f'Song and video results were identical; using song result...', verbose=True)
+                    url = top_song['url']
+                else:
+                    log(f'Prompting user for song/video choice.', verbose=True)
+                    embed = discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
+                    embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
+                    embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
+
+                    prompt = await ctx.send(embed=embed)
+                    choice = await prompt_for_choice(ctx, prompt, 2)
+                    if choice is None:
+                        await qmessage.delete()
+                        return
+                    else:
+                        await qmessage.edit(embed=embedq('Queueing choice...'))
+                    url = (top_song['url'], top_video['url'])[choice-1]
 
             # Locate youtube equivalent if spotify link given
             if 'open.spotify.com' in url:
@@ -479,7 +531,7 @@ class Music(commands.Cog):
                     log('Spotify playlist detected.', verbose=True)
                     await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
 
-                    objlist = QueueItem.generate(spoofy.spotify_playlist(url), ctx.author)
+                    objlist = QueueItem.generate_from_list(spoofy.spotify_playlist(url), ctx.author)
                     if len(objlist) > SPOTIFY_PLAYLIST_LIMIT:
                         await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
                         return
@@ -487,7 +539,6 @@ class Music(commands.Cog):
                     queue_batch(ctx, objlist)
                     list_name = spoofy.sp.playlist(url)['name']
                     await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
-                    # TODO: remove this and have it funnel down to a later advance call
                     if not voice.is_playing():
                         log('Voice client is not playing; starting...')
                         await advance_queue(ctx)
@@ -505,7 +556,7 @@ class Music(commands.Cog):
                     log('Spotify album detected.', verbose=True)
                     album_info = spoofy.spotify_album(url)
                     url = spoofy.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
-                    if url == None:
+                    if url is None:
                         await qmessage.edit(embed=embedq('No match could be found.'))
                         return
             
@@ -513,7 +564,7 @@ class Music(commands.Cog):
             valid = ['playlist?list=', '/sets/', '/album/']
             if any(i in url for i in valid):
                 log('URL is a playlist.', verbose=True)
-                objlist = QueueItem.generate(url, ctx.author)
+                objlist = QueueItem.generate_from_list(url, ctx.author)
                 queue_batch(ctx, objlist)
                 await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
                 if not voice.is_playing():
@@ -530,58 +581,17 @@ class Music(commands.Cog):
                     await qmessage.edit(embed=embedq(f'Cannot queue items longer than {DURATION_LIMIT} hours.'))
                     return
 
-            # Search with text if no url is provided
-            if 'https://' not in ctx.message.content:
-                await qmessage.edit(embed=embedq('Searching by text...'))
-                log('Link not detected, searching by text', verbose=True)
-                log(f'Searching: "{url}"')
-
-                top_song, top_video = spoofy.search_ytmusic_text(url)
-
-                if top_song == top_video == None:
-                    await qmessage.edit(embed=embedq('No song or video match could be found for your query.'))
-                    return
-
-                if top_song is not None:
-                    top_song['url'] = 'https://www.youtube.com/watch?v='+top_song['videoId']
-                if top_video is not None:
-                    top_video['url'] = 'https://www.youtube.com/watch?v='+top_video['videoId']
-                
-                if top_song == None:
-                    log(f'No song result found; using video result...', verbose=True)
-                    url = top_video['url']
-                elif top_video == None:
-                    log(f'No video result found; using song result...', verbose=True)
-                    url = top_song['url']
-                elif top_song['url'] == top_video['url']:
-                    log(f'Song and video results were identical; using song result...', verbose=True)
-                    url = top_song['url']
-                else:
-                    log(f'Prompting user for song/video choice.', verbose=True)
-                    embed = discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
-                    embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
-                    embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
-
-                    prompt = await ctx.send(embed=embed)
-                    choice = await prompt_for_choice(ctx, prompt, 2)
-                    if choice == None:
-                        await qmessage.delete()
-                        return
-                    else:
-                        await qmessage.edit(embed=embedq('Queueing choice...'))
-                    url = (top_song['url'], top_video['url'])[choice-1]
-
             # Queue or start the player
             try:
                 log('Appending to queue...', verbose=True)
-                if not voice.is_playing() and player_queue.get(ctx) == []:
-                    player_queue.get(ctx).append(QueueItem(url, ctx.author))
+                if not voice.is_playing() and media_queue.get(ctx) == []:
+                    media_queue.get(ctx).append(QueueItem(url, ctx.author))
                     log('Voice client is not playing; starting...')
                     await advance_queue(ctx)
                 else:
-                    player_queue.get(ctx).append(QueueItem(url, ctx.author))
-                    title = player_queue.get(ctx)[-1].title
-                    await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(player_queue.get(ctx))}'))
+                    media_queue.get(ctx).append(QueueItem(url, ctx.author))
+                    title = media_queue.get(ctx)[-1].title
+                    await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(media_queue.get(ctx))}'))
             except Exception as e:
                 log_traceback(e)
 
@@ -589,12 +599,12 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def queue(self, ctx: commands.Context, page: int=1):
         """Displays the current queue, up to #10."""
-        if player_queue.get(ctx) == []:
+        if media_queue.get(ctx) == []:
             await ctx.send(embed=embedq('The queue is empty.'))
             return
 
         queue_time = 0
-        for i in player_queue.get(ctx):
+        for i in media_queue.get(ctx):
             queue_time += i.duration
         
         queue_time = timestamp_from_seconds(queue_time)
@@ -602,16 +612,16 @@ class Music(commands.Cog):
         embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=EMBED_COLOR)
         start = (10*page)-10
         end = (10*page)
-        if 10*page>len(player_queue.get(ctx)):
-            end = len(player_queue.get(ctx))
+        if 10*page>len(media_queue.get(ctx)):
+            end = len(media_queue.get(ctx))
         
-        for num, i in enumerate(player_queue.get(ctx)[start:end]):
+        for num, i in enumerate(media_queue.get(ctx)[start:end]):
             submitter_text = get_queued_by_text(i.user)
             length_text = f'[{timestamp_from_seconds(i.duration)}]' if timestamp_from_seconds(i.duration) != '00:00' else ''
             embed.add_field(name=f'#{num+1+start}. {i.title} {length_text}', value=f'Link: {i.url}{submitter_text}', inline=False)
 
         try:
-            embed.description = (f'Showing {start+1} to {end} of {len(player_queue.get(ctx))} items. Use -queue [page] to see more.')
+            embed.description = (f'Showing {start+1} to {end} of {len(media_queue.get(ctx))} items. Use -queue [page] to see more.')
         except Exception as e:
             raise e
         await ctx.send(embed=embed)
@@ -620,13 +630,13 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def remove(self, ctx: commands.Context, spot: int):
         """Removes an item from the queue. Use -q to get its number."""
-        await ctx.send(embed=embedq(f'Removed {player_queue.get(ctx).pop(spot-1).title} from the queue.'))
+        await ctx.send(embed=embedq(f'Removed {media_queue.get(ctx).pop(spot-1).title} from the queue.'))
 
     @commands.command(aliases=get_aliases('shuffle'))
     @commands.check(is_command_enabled)
     async def shuffle(self, ctx: commands.Context):
         """Randomizes the order of the queue."""
-        random.shuffle(player_queue.get(ctx))
+        random.shuffle(media_queue.get(ctx))
         await ctx.send(embed=embedq('Queue has been shuffled.'))
 
     @commands.command(aliases=get_aliases('skip'))
@@ -634,10 +644,10 @@ class Music(commands.Cog):
     async def skip(self, ctx: commands.Context):
         """Skips the currently playing media."""
         log('Trying to skip...', verbose=True)
-        if voice == None:
+        if voice is None:
             await ctx.send(embed=embedq('Not connected to a voice channel.'))
             return
-        elif not voice.is_playing() and len(player_queue.get(ctx)) == 0:
+        elif not voice.is_playing() and len(media_queue.get(ctx)) == 0:
             await ctx.send(embed=embedq('Nothing to skip.'))
             return
 
@@ -666,8 +676,8 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def stop(self, ctx: commands.Context):
         """Stops the player and clears the queue."""
-        global player_queue
-        player_queue.clear(ctx)
+        global media_queue
+        media_queue.clear(ctx)
         if voice.is_playing() or voice.is_paused():
             voice.stop()
             await ctx.send(embed=embedq('Player has been stopped.'))
@@ -868,7 +878,7 @@ class QueueItem:
         self.title = title if title is not None else title_from_url(url)
 
     @staticmethod
-    def generate(playlist: str|list, user: discord.Member, list_from_command: bool=False) -> list:
+    def generate_from_list(playlist: str|list, user: discord.Member, list_from_command: bool=False) -> list:
         """Creates a list of QueueItem instances from a valid playlist
 
         - `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
@@ -877,19 +887,14 @@ class QueueItem:
         """
         objlist = []
         # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
-        if type(playlist) == list:
-            if list_from_command:
-                objlist = []
-                for item in playlist:
-                    if 'open.spotify.com' in item:
-                        info = spoofy.spotify_track(item)
-                        objlist.append(QueueItem(info['url'], user, title=info['title'], duration=info.get('duration', 0)))
-                    else:
-                        info = ytdl.extract_info(item, download=False)
-                        objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
-                return objlist
-            else:
-                objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist]
+        if isinstance(playlist, list):
+            for item in playlist:
+                if 'open.spotify.com' in item:
+                    info = spoofy.spotify_track(item)
+                    objlist.append(QueueItem(info['url'], user, title=info['title'], duration=info.get('duration', 0)))
+                else:
+                    info = ytdl.extract_info(item, download=False)
+                    objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
             return objlist
         else:
             # Anything youtube-dl natively supports is probably a link
@@ -902,12 +907,12 @@ class QueueItem:
                 objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
             return objlist
 
-player_queue = MediaQueue()
+media_queue = MediaQueue()
 
 def queue_batch(ctx: commands.Context, batch: list[QueueItem]):
-    global player_queue
+    global media_queue
     for item in batch:
-        player_queue.get(ctx).append(item)
+        media_queue.get(ctx).append(item)
 
 now_playing: YTDLSource = None
 last_played: YTDLSource = None
@@ -975,7 +980,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
                 prompt = await ctx.send(embed=embed)
                 choice = await prompt_for_choice(ctx, prompt, len(spyt))
-                if choice == None:
+                if choice is None:
                     await advance_queue(ctx)
                     return
                 spyt = spyt[choice-1]
@@ -1053,12 +1058,12 @@ async def advance_queue(ctx: commands.Context, skip: bool=False):
 
         try:
             if not skip and loop_this and current_item is not None:
-                player_queue.get(ctx).insert(0, current_item)
+                media_queue.get(ctx).insert(0, current_item)
 
-            if player_queue.get(ctx) == []:
+            if media_queue.get(ctx) == []:
                 voice.stop()
             else:
-                next_item = player_queue.get(ctx).pop(0)
+                next_item = media_queue.get(ctx).pop(0)
                 await play_item(next_item, ctx)
             
             log('Tasks finished; unlocking...', verbose=True)

@@ -9,19 +9,31 @@
 
 ---
 
-viMusBot is a Discord music bot with support for Spotify Links, written in Python. You will need [FFmpeg](https://www.ffmpeg.org/) installed in order for the bot to function.
+viMusBot is a Discord music bot with support for Spotify links, written in Python. You will need [FFmpeg](https://www.ffmpeg.org/) installed in order for the bot to function - if you don't, this will be explained in [Setting Up: Required software](#setting-up-required-software).
 
 > *My intention for this README is to be as clear and understandable as possible for general users unfamiliar with Python and/or using the command line. If you find some sections are lacking information, poorly worded, or any other issues are present, feel free to [open a new issue](https://github.com/svioletg/viMusBot/issues) so I can get around to fixing it, thank you!*
 
 Start by downloading `Source code (zip)` from the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest), extract the contents wherever you choose, and then follow the instructions below as needed.
 
+## Section Links
+
+[Setting Up: Python](#setting-up-python)
+
+[Setting Up: Required software](#setting-up-required-software)
+
+[Setting Up: Discord](#setting-up-discord)
+
+[Setting Up: Spotify API](#setting-up-spotify-api)
+
+[Running & Updating](#running--updating)
+
 ## Setting up: Python
 
-You will need to install Python in order to run the bot, which can be gotten from https://www.python.org/downloads. As of writing this, viMusBot is fully compatible with the current latest version, that being Python 3.12. If using the Windows installer, make sure to tick the "Add Python 3.12 to PATH" checkbox near the bottom. You can confirm that Python was successfully installed by opening a command prompt, and running the `py` command.
+Having Python installed in order to run the bot, which can be gotten from https://www.python.org/downloads. As of writing this, viMusBot is fully compatible with the current latest version, that being Python 3.12. If using the Windows installer, make sure to tick the "Add Python 3.12 to PATH" checkbox near the bottom. You can confirm that Python was successfully installed by opening a command prompt, and running the `py` command.
 
 Next, you need to install viMusBot's required packages. If you're unfamiliar with using Python, the `envsetup.bat` file is included to automatically create a Python virtual enviornment (venv), and install the requirements there. A second batch file, `start.bat`, is also included which will run the main script using the newly created venv. Note that `.bat` files will only work on Windows.
 
-## Setting up: Non-Python dependencies
+## Setting up: Required software
 
 Aside from Python and its required packages (explained in the next section), you will only need one additional program for the bot and its voice channel-related functions to work: [FFmpeg](https://www.ffmpeg.org/).
 
@@ -45,7 +57,7 @@ You'll need to supply an API "client ID" and "client secret" in order for Spotif
 5. Click "View client secret" to reveal the string. The file `spotifysetup.bat` has been included with viMusBot to set up your config automatically — open it, and then paste in the requested information.
 ![Client ID and client secret fields](https://i.imgur.com/4AoWjWj.png)
 
-You can also manually create the required `spotify_config.json` file, and then paste in the following:
+*Alternatively*, you can also manually create the required `spotify_config.json` file, and then paste in the following:
 
 ```json
 {
