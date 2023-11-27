@@ -10,6 +10,7 @@ import asyncio
 import glob
 import importlib
 import logging
+import math
 import os
 import random
 import subprocess
@@ -84,7 +85,7 @@ def log_line():
     cf = currentframe()
     print('@ LINE ', cf.f_back.f_lineno)
 
-log(f'Running on version {VERSION}.')
+log(f'Running on version {VERSION}; checking for updates...')
 
 update_check_result = update.check()
 
@@ -96,7 +97,10 @@ if update_check_result[0] == False and update_check_result[1] == True:
     log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
     log('Use "update.py" to update.')
 else:
-    log(f'{plt.lime}You are up to date.')
+    if VERSION.startswith('dev.'):
+        log(f'{plt.yellow}NOTICE: You are running a development version.')
+    else:
+        log(f'{plt.lime}You are up to date.')
 
 log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
 
@@ -443,21 +447,21 @@ class Music(commands.Cog):
         global qmessage
         qmessage = await ctx.send(embed=embedq('Trying to queue...'))
 
-        # TODO: Issue #54: Multiple URLs in one command
-        # TODO: remove *args, change url to queries*, set url explicitly later instead of changing it
         multiple_urls = False
 
         url_count = text_count = 0
         for q in queries:
             if q.startswith('https://'):
                 url_count += 1
-                if url_count > 1 and re.match(r'(/sets/|playlist\?list=|/album/|/playlist/)', q) is not None:
-                    await qmessage.edit(embed=embedq('Cannot multiple album/playlists at once.'))
+                if url_count > 1 and re.search(r'(/sets/|playlist\?list=|/album/|/playlist/)', q) is not None:
+                    await qmessage.edit(embed=embedq('Cannot multiple albums or playlists at once.'))
+                    return
             else:
                 text_count += 1
         
         if url_count > 0 and text_count > 0:
             await qmessage.edit(embed=embedq('Queries must be either all URLs or a single text query.'))
+            return
         
         query_type = 'link' if url_count > 0 else 'text'
 
@@ -468,12 +472,15 @@ class Music(commands.Cog):
             if not multiple_urls:
                 # Prevent yt-dlp from grabbing the playlist the track is from
                 url = queries[0].split('&list=')[0]
+        
+        log(f'multiple? {multiple_urls}')
 
         async with ctx.typing():
             if multiple_urls:
                 if len(queries) > MAXIMUM_CONSECUTIVE_URLS:
                     await qmessage.edit(embed=embedq('Too many URLs were given.', f'Current limit is {MAXIMUM_CONSECUTIVE_URLS}.'+
                         'Edit `maximum-urls` in `config.yml` to change this.'))
+                    return
                 objlist = QueueItem.generate_from_list(queries, ctx.author)
                 queue_batch(ctx, objlist)
                 await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
@@ -525,7 +532,7 @@ class Music(commands.Cog):
 
             # Locate youtube equivalent if spotify link given
             if 'open.spotify.com' in url:
-                log('Spotify URL was received from play command.', verbose=True)
+                log('Spotify URL received from play command.', verbose=True)
                 log('Checking for playlist...', verbose=True)
                 if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:
                     log('Spotify playlist detected.', verbose=True)
@@ -598,32 +605,38 @@ class Music(commands.Cog):
     @commands.command(aliases=get_aliases('queue'))
     @commands.check(is_command_enabled)
     async def queue(self, ctx: commands.Context, page: int=1):
-        """Displays the current queue, up to #10."""
+        """Displays the current queue, up to 10 items per page."""
         if media_queue.get(ctx) == []:
             await ctx.send(embed=embedq('The queue is empty.'))
             return
 
+        total_pages = math.ceil(len(media_queue.get(ctx)) / 10)
+
+        if page > total_pages:
+            await ctx.send(embed=embedq(f'Out of range; the current queue has {total_pages} pages.', f'{len(media_queue.get(ctx))} items in total.'))
+            return
+
         queue_time = 0
-        for i in media_queue.get(ctx):
-            queue_time += i.duration
+        for item in media_queue.get(ctx):
+            queue_time += item.duration
         
         queue_time = timestamp_from_seconds(queue_time)
 
         embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=EMBED_COLOR)
         start = (10*page)-10
         end = (10*page)
-        if 10*page>len(media_queue.get(ctx)):
+        if 10*page > len(media_queue.get(ctx)):
             end = len(media_queue.get(ctx))
         
-        for num, i in enumerate(media_queue.get(ctx)[start:end]):
-            submitter_text = get_queued_by_text(i.user)
-            length_text = f'[{timestamp_from_seconds(i.duration)}]' if timestamp_from_seconds(i.duration) != '00:00' else ''
-            embed.add_field(name=f'#{num+1+start}. {i.title} {length_text}', value=f'Link: {i.url}{submitter_text}', inline=False)
+        for num, item in enumerate(media_queue.get(ctx)[start:end]):
+            submitter_text = get_queued_by_text(item.user)
+            length_text = f'[{timestamp_from_seconds(item.duration)}]' if timestamp_from_seconds(item.duration) != '00:00' else ''
+            embed.add_field(name=f'#{num+1+start}. {item.title} {length_text}', value=f'Link: {item.url}{submitter_text}', inline=False)
 
         try:
             embed.description = (f'Showing {start+1} to {end} of {len(media_queue.get(ctx))} items. Use -queue [page] to see more.')
         except Exception as e:
-            raise e
+            log_traceback(e)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=get_aliases('remove'))
@@ -878,7 +891,7 @@ class QueueItem:
         self.title = title if title is not None else title_from_url(url)
 
     @staticmethod
-    def generate_from_list(playlist: str|list, user: discord.Member, list_from_command: bool=False) -> list:
+    def generate_from_list(playlist: str|list|tuple, user: discord.Member, list_from_command: bool=False) -> list:
         """Creates a list of QueueItem instances from a valid playlist
 
         - `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
@@ -887,11 +900,10 @@ class QueueItem:
         """
         objlist = []
         # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
-        if isinstance(playlist, list):
+        if isinstance(playlist, (list, tuple)):
             for item in playlist:
-                if 'open.spotify.com' in item:
-                    info = spoofy.spotify_track(item)
-                    objlist.append(QueueItem(info['url'], user, title=info['title'], duration=info.get('duration', 0)))
+                if isinstance(item, dict) and 'open.spotify.com' in item['url']:
+                    objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
                 else:
                     info = ytdl.extract_info(item, download=False)
                     objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
@@ -944,6 +956,9 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
     last_played = now_playing
 
+    if npmessage is not None:
+        await npmessage.delete()
+
     log('Trying to start playing...')
 
     # Check if we need to match a Spotify link
@@ -951,7 +966,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         url = item.url
     else:
         log('Trying to match Spotify track...')
-        await qmessage.edit(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
+        npmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
         spyt = spoofy.spyt(item.url)
 
         log('Checking if unsure...', verbose=True)
@@ -986,7 +1001,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
                 spyt = spyt[choice-1]
         url = spyt['url']
         item.url = url
-        await qmessage.edit(embed=embedq('Match found! Queueing...'))
+        await npmessage.edit(embed=embedq('Match found! Playing...'))
 
     current_item = item
 
@@ -1029,8 +1044,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
     try:
         await qmessage.delete()
-    except UnboundLocalError as e:
-        log(e)
+    except Exception as e:
         pass
 
     submitter_text = get_queued_by_text(item.user)
@@ -1050,6 +1064,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 advance_lock = False
 
 async def advance_queue(ctx: commands.Context, skip: bool=False):
+    """Attempts to advance forward in the queue, if the bot is clear to do so."""
     # Triggers every time the player finishes
     global advance_lock
     if not advance_lock and (skip or not voice.is_playing()):
@@ -1073,7 +1088,7 @@ async def advance_queue(ctx: commands.Context, skip: bool=False):
             log('Error encountered; unlocking...', verbose=True)
             advance_lock = False
     elif advance_lock:
-        log('Attempted call while locked.', verbose=True)
+        log('Attempted call while locked; ignoring...', verbose=True)
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:
