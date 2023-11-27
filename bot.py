@@ -13,6 +13,7 @@ import logging
 import math
 import os
 import random
+import requests
 import subprocess
 import sys
 import time
@@ -531,7 +532,20 @@ class Music(commands.Cog):
                     url = (top_song['url'], top_video['url'])[choice-1]
 
             # Locate youtube equivalent if spotify link given
-            if 'open.spotify.com' in url:
+            if 'https://spotify.link/' in url:
+                # Resolve mobile share link to the usable URL
+                log(f'Resolve spotify.link URL... ({url})')
+                try:
+                    url = requests.get(url).url
+                    int('impossible!')
+                    log(f'Success! ({url})')
+                except Exception as e:
+                    log(f'Failed; aborting play command and showing traceback...')
+                    log_traceback(e)
+                    await qmessage.edit(embed=embedq('Failed to resolve Spotify link. Please use an "open.spotify.com" link instead of "spotify.link" if possible.'))
+                    return
+
+            if 'https://open.spotify.com' in url:
                 log('Spotify URL received from play command.', verbose=True)
                 log('Checking for playlist...', verbose=True)
                 if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:

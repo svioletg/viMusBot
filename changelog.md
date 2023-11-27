@@ -33,6 +33,8 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Features
 - `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
+- You can now queue multiple URLs at once when using the `-play` command
+- `https://spotify.link` URLs are now supported
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
     - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
 - The sidebar color on bot messages can now be customized
@@ -53,7 +55,8 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `auto-update-config` removed; no longer used
 - Changes in `requirements.txt`:
   - `python-benedict` is now required
-  - `inquirer` is no longer required, it is only used for the `vmb-wizard.py` script and not `bot.py` or `spoofy.py`
+  - `requests` is now required (to support [Issue #57](https://github.com/svioletg/viMusBot/issues/57))
+  - `inquirer` is no longer required, it is only used for `vmb-wizard.py` which is now deprecated
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 - Current timestamp has been added to the bot's logs, to aid in future debugging
