@@ -27,8 +27,6 @@ spoofy_*.py
 *.webm
 *.mp3
 *.part
-# deprecation
-setup-wizard/
 # other
 .vscode/
 .github/

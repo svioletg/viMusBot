@@ -1,8 +1,18 @@
 # viMusBot
 
-## FAQ & common issues
+## FAQ
 
 Firstly, check the [issues page](https://github.com/svioletg/viMusBot/issues) to see if your problem has already been reported or solved. Most bugs are kept track of there — this page is only for issues that I cannot seem to fix, and require workarounds.
+
+## Q: How can viMusBot support Spotify links if its audio is protected by DRM?
+
+A: viMusBot does not *directly* extract and play audio from a given Spotify link - instead, it simply uses the track info gathered from said link, and uses it to find the best possible match on YouTube Music (or standard YouTube, if the former fails). Feel free to dive into [spoofy.py](https://github.com/svioletg/viMusBot/blob/master/spoofy.py) to see how this is currently done — and if you're familiar with Python, don't hesitate to contribute any improvements if you see an opportunity!
+
+## Q: How can I change my bot's prefix, or set any other options?
+
+A: YAML files are made use of for user-changeable configuration & customization. Provided in viMusBot's source files is `config_default.yml`, which lists out every "key" you can change, and their default values — this file is used as a default to fall back on and will be overwritten on every update, so to set your own values (to *override* them, essentially) you must create a new file named `config.yml` and input your keys and desired values there, replicating the structure of the original keys in the default file. For more in-depth information, see [config.md](https://github.com/svioletg/viMusBot/blob/master/config.md).
+
+## Common issues
 
 ### Trying to queue a Spotify playlist results in a "Command raised an exception: SpotifyException: http status: 404..." message
 

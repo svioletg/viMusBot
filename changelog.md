@@ -18,7 +18,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `update_check` renamed to `update_check_result`
     - `play_url()` renamed to `play_item()`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
-    - Code has been updated to be compatible with `discord-pretty-help` version 2.0.5 and above, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
+    - Code has been updated to be compatible with `discord-pretty-help` version 2.0.1 and above, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
     - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
     - Startup file removal will now use `pathlib` to check extensions instead of regex
     - Calls to `os.path` replaced with `Path()`
@@ -33,8 +33,9 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ### Features
 - `config_default.yml` will now be used as a fallback when keys are missing from `config.yml`, so that you only have to write in what you actually want to change into your config (and to avoid having to put in new config keys every time they're added by an update)
-- You can now queue multiple URLs at once when using the `-play` command
-- `https://spotify.link` URLs are now supported
+- Multiple URLs can be queued at once when using the `-play` command
+    - Only multiple single-track URLs will work; multiple playlist/album URLs, or a mix of URLs and plain text terms, will be prevented from queueing
+- `https://spotify.link` URLs are now supported ([Issue #57](https://github.com/svioletg/viMusBot/issues/57))
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
     - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
 - The sidebar color on bot messages can now be customized
@@ -42,12 +43,13 @@ See [here](#versioning-info) for an explanation on categories and how my version
 ### Fixes
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
 - `customlog.py` did not actually ignore logs from the function names present in the `ignore-logs-from` config key due to an incorrectly typed expression, which has now been fixed
-- `pytube` can now retrieve data correctly, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
+- `pytube` can now retrieve data correctly most of the time, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 - Fixed [Issue #4](https://github.com/svioletg/viMusBot/issues/4): "Queueing a track right as one is finishing or starting skips the next in queue"
 - Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
 
 ### Other
 - A number of `.bat` scripts have been added to aid in the setup process for less Python and/or command line-experienced users
+- `vmb-wizard.py` has been deprecated and removed from the repository as a result of the above
 - The project's `README.md` has been completely rewritten, in hopes of providing a far more concise and understandable setup experience
 - Config changes:
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations

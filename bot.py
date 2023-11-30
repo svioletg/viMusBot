@@ -239,7 +239,6 @@ class General(commands.Cog):
     def __init__(self, bot: commands.bot.Bot):
         self.bot = bot
 
-    # Adapted from: https://stackoverflow.com/a/68599108/8108924
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.member.VoiceState, after):
         global voice
@@ -401,10 +400,9 @@ class Music(commands.Cog):
             await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
         except IndexError as e:
             await ctx.send(embed=embedq('The selected number is out of range.'))
-            raise e
         except Exception as e:
             await ctx.send(embed=embedq('An unexpected error occurred.'))
-            raise e
+            log_traceback(e)
 
     @commands.command(aliases=get_aliases('nowplaying'))
     @commands.check(is_command_enabled)
@@ -537,7 +535,6 @@ class Music(commands.Cog):
                 log(f'Resolve spotify.link URL... ({url})')
                 try:
                     url = requests.get(url).url
-                    int('impossible!')
                     log(f'Success! ({url})')
                 except Exception as e:
                     log(f'Failed; aborting play command and showing traceback...')
@@ -774,7 +771,7 @@ def cache_if_succeeded(key: str):
                     url_info_cache[url][key] = result
                     return result
             except Exception as e:
-                raise e
+                log_traceback(e)
         return cache_check
     return decorator
 
