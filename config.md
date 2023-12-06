@@ -39,20 +39,6 @@ vote-to-skip:
 
 Written in alphabetical order. All information below should be accurate as of version **1.9.0**.
 
-### `key-name`
-
-> Description
-
-**Valid options:**
-
-**Structure:**
-
-```yaml
-top-key:
-    nested-key:
-        key-name: # value here
-```
-
 ### `aliases`
 
 > Alternate names that commands can be triggered with.
@@ -72,7 +58,7 @@ aliases:
 
 > Allow or prevent the queueing of Spotify entire playlists.
 
-**Valid options:** `true`/`false`
+**Valid options:** `true` or `false`
 
 **Example:**
 
@@ -92,6 +78,20 @@ allow-spotify-playlists: true
 auto-remove:
     - ".mp3"
     - ".webm"
+```
+
+### `command-blacklist`
+
+> Disables any of the listed commands.
+
+**Valid options:** a list of command names (as strings)
+
+**Example:**
+
+```yaml
+command-blacklist:
+    - "clear"
+    - "join"
 ```
 
 ### `duration-limit`
@@ -122,7 +122,7 @@ embed-color: "ff00aa"
 
 > Forces the bot to think its not found any Spotify-YouTube match, thus bringing up the choice prompt every time. *This is primarily used for **debugging**, and should be left turned off in most cases.*
 
-**Valid options:** `true`/`false`
+**Valid options:** `true` or `false`
 
 **Example:**
 
@@ -134,7 +134,7 @@ force-no-match: false
 
 > A duration in **minutes** of bot inactivity (not actively playing any audio) that it should leave the voice channel after.
 
-**Valid options**: any positive number
+**Valid options:** any positive number
 
 **Example:**
 
@@ -142,11 +142,102 @@ force-no-match: false
 inactivity-timeout: 10
 ```
 
+### `logging-options`
+
+> A key containing various options regarding how the bot will log its status out to the console. All of these options are only for customizing what you see in your command prompt or terminal — regardless of what you set here, everything will be saved in `vimusbot.log` for troubleshooting.
+
+### `logging-options` → `show-console-logs`
+
+> Enables or disables printing logs to the console for `bot.py` and `spoofy.py` separately.
+
+**Valid options:** `true` or `false` for each file key
+
+**Example:**
+
+```yaml
+logging-options:
+    show-console-logs:
+        bot.py: true
+        spoofy.py: false
+```
+
+### `logging-options` → `show-verbose-logs`
+
+> Some logs are marked as "verbose", typically meaning they contain more detailed or specific information about a task being performed. These are useful for debugging and troubleshooting, however some may see them as clutter, so this allows you to disable such logs from appearing in the console. Verbose logs are still written to `vimusbot.log` regardless.
+
+**Valid options:** `true` or `false`
+
+**Example:**
+
+```yaml
+logging-options:
+    show-verbose-logs: false
+```
+
+### `logging-options` → `ignore-logs-from`
+
+> Allows you to specify functions that you wish to hide logs from in the console. Function names are shown in **blue** (by default) if your console supports color — they appear after the filename (e.g `[bot.py]`).
+
+**Valid options:** a list of strings containing valid function names
+
+**Example:**
+
+```yaml
+logging-options:
+    ignore-logs-from:
+        - "search_ytmusic"
+```
+
+### `logging-options` → `colors`
+
+> Allows you to specify colors for certain types of keywords within logs. Also contains the `no-color` key which will disable colored logging altogether.
+
+**Valid options:** a color name that is any of the following...
+
+```
+lime
+green
+yellow
+gold
+red
+darkred
+magenta
+darkmagenta
+blue
+darkblue
+```
+
+...for any of the keys listed in the example below.
+
+```yaml
+logging-options:
+    colors:
+        no-color: false # set to "true" to completely disable colored output
+        bot-py: "yellow" # only the text that reads [bot.py]
+        spoofy-py: "lime" # only the text that reads [spoofy.py]
+        warn: "gold" # non-urgent warnings and notices
+        error: "red" # used for tracebacks, and other complete failures
+        timer: "magenta" # used for the time since the last log shown at the end
+        function: "blue" # used for function names
+```
+
+### `maximum-urls`
+
+> Maximum number of links that can be queued with one `-play` command.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+maximum-urls: 3
+```
+
 ### `prefixes`
 
 > Set the bot's command prefix. Two options are given: *public*, and *developer*. Which one is used is determined by the `public` key described later.
 
-**Valid options**: any string for each `public`/`developer` key
+**Valid options:** any string for each `public`/`developer` key
 
 **Example:**
 
@@ -160,12 +251,36 @@ prefixes:
 
 > Currently only decides whether to use the public prefix (true), or the developer prefix (false).
 
-**Valid options:** `true`/`false`
+**Valid options:** `true` or `false`
 
 **Example:**
 
 ```yaml
 public: true
+```
+
+### `show-users-in-queue`
+
+> Enables or disables displaying who added what to the queue.
+
+**Valid options:** `true` or `false`
+
+**Example:**
+
+```yaml
+show-users-in-queue: true
+```
+
+### `spotify-playlist-limit`
+
+> Prevents queueing a Spotify playlist longer than this limit.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+spotify-playlist-limit: 20
 ```
 
 ### `token-file`
@@ -178,4 +293,84 @@ public: true
 
 ```yaml
 token-file: "token.txt"
+```
+
+### `use-top-match`
+
+> If enabled, the top result when trying to match a Spotify track to YouTube results will be used right away, otherwise if the bot isn't confident in its match, it will prompt the user to choose one from a list of top results.
+
+**Valid options:** `true` or `false`
+
+**Example:**
+
+```yaml
+use-top-match: true
+```
+
+### `use-url-cache`
+
+> Enables or disables the use of the bot's URL caching system, which can slightly speed up the process of queueing in general.
+
+**Valid options:** `true` or `false`
+
+**Example:**
+
+```yaml
+use-url-cache: true
+```
+
+### `vote-to-skip`
+
+> A category of keys relating to the vote-skip system.
+
+### `vote-to-skip` → `enabled`
+
+> Enables or disables vote-skipping. If disabled, the `-skip` command will skip tracks instantly.
+
+**Valid options:** `true` or `false`
+
+**Example:**
+
+```yaml
+vote-to-skip:
+    enabled: true
+```
+
+### `vote-to-skip` → `threshold-type`
+
+> How vote-skipping should function, by percentage or a defined total.
+
+**Valid options:** `"percentage"` or `"exact"`
+
+**Example:**
+
+```yaml
+vote-to-skip:
+    threshold-type: "percentage"
+```
+
+### `vote-to-skip` → `threshold-percentage`
+
+> The percentage of users (out of the total users present in the voice channel) that need to use `-skip` before the track will be skipped. Only needed if `threshold-type` is set to `"percentage"`.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+vote-to-skip:
+    threshold-percentage: 75
+```
+
+### `vote-to-skip` → `threshold-exact`
+
+> The exact number of users that need to use `-skip` before the track will be skipped. Only needed if `threshold-type` is set to `"exact"`.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+vote-to-skip:
+    threshold-exact: 4
 ```
