@@ -209,6 +209,8 @@ darkblue
 
 ...for any of the keys listed in the example below.
 
+**Example:**
+
 ```yaml
 logging-options:
     colors:

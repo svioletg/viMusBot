@@ -480,13 +480,16 @@ class Music(commands.Cog):
                     await qmessage.edit(embed=embedq('Too many URLs were given.', f'Current limit is {MAXIMUM_CONSECUTIVE_URLS}.'+
                         'Edit `maximum-urls` in `config.yml` to change this.'))
                     return
-                objlist = QueueItem.generate_from_list(queries, ctx.author)
-                queue_batch(ctx, objlist)
-                await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
-                if not voice.is_playing():
-                    log('Voice client is not playing; starting...')
-                    await advance_queue(ctx)
-                return
+                try:
+                    objlist = QueueItem.generate_from_list(queries, ctx.author)
+                    queue_batch(ctx, objlist)
+                    await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
+                    if not voice.is_playing():
+                        log('Voice client is not playing; starting...')
+                        await advance_queue(ctx)
+                    return
+                except Exception as e:
+                    log_traceback(e)
             
             # Search with text if no url is provided
             if query_type == 'text':
@@ -680,10 +683,7 @@ class Music(commands.Cog):
         global skip_votes_needed
         skip_votes_needed = int((len(voice.channel.members)) * (SKIP_VOTES_PERCENTAGE/100)) if SKIP_VOTES_TYPE == "percentage" else SKIP_VOTES_EXACT
 
-        if not VOTE_TO_SKIP:
-            await ctx.send(embed=embedq('Skipping...'))
-            await advance_queue(ctx, skip=True)
-        else:
+        if VOTE_TO_SKIP:
             if ctx.author not in skip_votes:
                 skip_votes.append(ctx.author)
             else:
@@ -693,8 +693,12 @@ class Music(commands.Cog):
             voteskip_message = await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
             if len(skip_votes) >= skip_votes_needed:
                 await voteskip_message.delete()
-                await ctx.send(embed=embedq('Skipping...'))
-                await advance_queue(ctx, skip=True)
+            else:
+                return
+        
+        voice.pause()
+        await ctx.send(embed=embedq('Skipping...'))
+        await advance_queue(ctx, skip=True)
 
     @commands.command(aliases=get_aliases('stop'))
     @commands.check(is_command_enabled)
@@ -902,17 +906,20 @@ class QueueItem:
         self.title = title if title is not None else title_from_url(url)
 
     @staticmethod
-    def generate_from_list(playlist: str|list|tuple, user: discord.Member, list_from_command: bool=False) -> list:
+    def generate_from_list(playlist: str|list|tuple, user: discord.Member) -> list:
         """Creates a list of QueueItem instances from a valid playlist
 
         - `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
         - `user`: A discord Member object of the user who queued the playlist
-        - `list_from_command` (bool): Set to True if the play command was called with multiple URL arguments, as in `-p [url] [url] [url]`
         """
         objlist = []
         # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
         if isinstance(playlist, (list, tuple)):
+            print(playlist)
             for item in playlist:
+                if isinstance(item, str) and 'open.spotify.com' in item:
+                    item = spoofy.spotify_track(item)
+                
                 if isinstance(item, dict) and 'open.spotify.com' in item['url']:
                     objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
                 else:
@@ -967,9 +974,12 @@ async def play_item(item: QueueItem, ctx: commands.Context):
 
     last_played = now_playing
 
-    if npmessage is not None:
-        await npmessage.delete()
-
+    try:
+        if npmessage is not None:
+            await npmessage.delete()
+    except discord.errors.NotFound:
+        log('Now-playing message wasn\'t found, ignoring and continuing...', verbose=True)
+    
     log('Trying to start playing...')
 
     # Check if we need to match a Spotify link
