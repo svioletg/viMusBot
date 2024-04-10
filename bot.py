@@ -129,7 +129,7 @@ VOTE_TO_SKIP          : bool = config.get('vote-to-skip.enabled', config_default
 SKIP_VOTES_TYPE       : str  = config.get('vote-to-skip.threshold-type', config_default['vote-to-skip.threshold-type'])
 SKIP_VOTES_EXACT      : int  = config.get('vote-to-skip.threshold-exact', config_default['vote-to-skip.threshold-exact'])
 SKIP_VOTES_PERCENTAGE : int  = config.get('vote-to-skip.threshold-percentage', config_default['vote-to-skip.threshold-percentage'])
-skip_votes_needed = 0
+skip_votes_remaining = 0
 skip_votes = []
 #endregion
 
@@ -262,7 +262,6 @@ class General(commands.Cog):
                     await voice.disconnect()
                 if not voice.is_connected():
                     log('Voice doesn\'t look connected, waiting three seconds...', verbose=True)
-                    # TODO: this seemed to work well in a live test! maybe adjust the timing a bit before release
                     await asyncio.sleep(3)
                     if not voice.is_connected():
                         log('Still disconnected. Setting `voice` to None...', verbose=True)
@@ -678,10 +677,10 @@ class Music(commands.Cog):
             await ctx.send(embed=embedq('Nothing to skip.'))
             return
 
-        # Update number skip votes required based on members joined in voice channel
+        # Update number of skip votes required based on members joined in voice channel
         global skip_votes
-        global skip_votes_needed
-        skip_votes_needed = int((len(voice.channel.members)) * (SKIP_VOTES_PERCENTAGE/100)) if SKIP_VOTES_TYPE == "percentage" else SKIP_VOTES_EXACT
+        global skip_votes_remaining
+        skip_votes_remaining = int((len(voice.channel.members)) * (SKIP_VOTES_PERCENTAGE/100)) if SKIP_VOTES_TYPE == "percentage" else SKIP_VOTES_EXACT
 
         if VOTE_TO_SKIP:
             if ctx.author not in skip_votes:
@@ -690,8 +689,8 @@ class Music(commands.Cog):
                 await ctx.send(embed=embedq('You have already voted to skip.'))
                 return
 
-            voteskip_message = await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_needed} needed.'))
-            if len(skip_votes) >= skip_votes_needed:
+            voteskip_message = await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_remaining} needed.'))
+            if len(skip_votes) >= skip_votes_remaining:
                 await voteskip_message.delete()
             else:
                 return
@@ -1059,9 +1058,15 @@ async def play_item(item: QueueItem, ctx: commands.Context):
     voice.stop()
     voice.play(now_playing, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
     audio_start_time = time.time()
-
+    print(time.time())
+    print('MSG: '+str(npmessage))
     if npmessage is not None:
-        await npmessage.delete()
+        try:
+            await npmessage.delete()
+        except:
+            # Sometimes this causes a 404 error and prevents a new "Now playing" message to show
+            # Just ignoring the error sends a message properly so, sure
+            pass
 
     try:
         await qmessage.delete()

@@ -13,23 +13,23 @@ colorama.init(autoreset=True)
 plt = Palette()
 
 def check() -> tuple[bool, dict]:
-    response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
-    latest = response.json()
-    latest_tag = latest['tag_name'].strip()
+    response: requests.Response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
+    latest: dict = response.json()
+    latest_tag: str = latest['tag_name'].strip()
 
     with open('version.txt', 'r') as f:
-        current = f.read().strip()
+        current: str = f.read().strip()
 
-    return current == latest_tag, {'current':current, 'latest':latest}
+    return current == latest_tag, {'current': current, 'latest': latest}
 
-def main():
+def main() -> None:
     print('Checking...')
 
     version_check = check()
     is_latest = version_check[0]
-    current = version_check[1]['current']
-    latest = version_check[1]['latest']
-    latest_tag = latest['tag_name']
+    current: str = version_check[1]['current']
+    latest: str = version_check[1]['latest']
+    latest_tag: str = latest['tag_name']
 
     if is_latest:
         print(f'{plt.yellow}{current}{plt.reset}=={plt.blue}{latest_tag}')

@@ -19,7 +19,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `play_url()` renamed to `play_item()`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
     - Code has been updated to be compatible with `discord-pretty-help` version 2.0.1 and above, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
-    - The "Command is not found" error is now properly caught and ignored, thus sending no message if the bot's prefix is used with a command it does not recognize — this was done mainly to suppress these messages when more than one bot in a server shares viMusBot's prefix
+    - The "Command is not found" error is now properly caught and ignored, as having the bot send a message in this scenario is unnecessary
     - Startup file removal will now use `pathlib` to check extensions instead of regex
     - Calls to `os.path` replaced with `Path()`
     - Simplified `log_traceback()`
