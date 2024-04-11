@@ -495,7 +495,9 @@ class Music(commands.Cog):
                         'Edit `maximum-urls` in `config.yml` to change this.'))
                     return
                 try:
+                    print(queries)
                     objlist = QueueItem.generate_from_list(queries, ctx.author)
+                    print(objlist)
                     queue_batch(ctx, objlist)
                     await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
                     if not voice.is_playing():
@@ -548,8 +550,8 @@ class Music(commands.Cog):
 
             # Locate youtube equivalent if spotify link given
             if 'https://spotify.link/' in url:
-                # Resolve mobile share link to the usable URL
-                log(f'Resolve spotify.link URL... ({url})')
+                # Resolve mobile share link to a usable URL
+                log(f'Resolving spotify.link URL... ({url})')
                 try:
                     url = requests.get(url).url
                     log(f'Success! ({url})')
@@ -945,6 +947,7 @@ class QueueItem:
                 if isinstance(item, dict) and 'open.spotify.com' in item['url']:
                     objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
                 else:
+                    item = item.split('&list=')[0] # Having the list part of the URL causes issues with getting info back
                     info = ytdl.extract_info(item, download=False)
                     objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
             return objlist
