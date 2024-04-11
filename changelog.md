@@ -6,7 +6,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 
 ## 1.9.0
 
-> *2023.12.xx / dev.33*
+> *2024.04.xx / dev.33*
 
 ### Developer
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
@@ -17,6 +17,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `player_queue` renamed to `media_queue`
     - `update_check` renamed to `update_check_result`
     - `play_url()` renamed to `play_item()`
+    - `get_aliases()` renamed to `command_aliases()`
     - The `get_queued_by_text()` function has been created, replacing the f-string that `submitter_text` gets set to, now that there's extra logic required for whether to use nicknames
     - Code has been updated to be compatible with `discord-pretty-help` version 2.0.1 and above, as versions prior to 2.0.1 are unavailable through pip, rendering the bot unusable if you have no way of installing an older version
     - The "Command is not found" error is now properly caught and ignored, as having the bot send a message in this scenario is unnecessary
@@ -36,11 +37,15 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Multiple URLs can be queued at once when using the `-play` command
     - Only multiple single-track URLs will work; multiple playlist/album URLs, or a mix of URLs and plain text terms, will be prevented from queueing
 - `https://spotify.link` URLs are now supported ([Issue #57](https://github.com/svioletg/viMusBot/issues/57))
+- A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal
+  - At present, the only valid command is "stop", which will cancel the console and bot tasks and exit out of the script
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
-    - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the new config key above
+    - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the `use-url-cache` config key (see the **Other** section below)
 - The sidebar color on bot messages can now be customized
 
 ### Fixes
+- The remaining queue time now factors in the remaining time of the currently playing track
+- Trying to queue a private Spotify playlist will now give a proper message in response informing the user of such
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
 - `customlog.py` did not actually ignore logs from the function names present in the `ignore-logs-from` config key due to an incorrectly typed expression, which has now been fixed
 - `pytube` can now retrieve data correctly most of the time, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
@@ -48,17 +53,17 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
 
 ### Other
-- A number of `.bat` scripts have been added to aid in the setup process for less Python and/or command line-experienced users
-- `vmb-wizard.py` has been deprecated and removed from the repository as a result of the above
-- The project's `README.md` has been completely rewritten, in hopes of providing a far more concise and understandable setup experience
 - Config changes:
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
     - `auto-update-config` removed; no longer used
+- A few `.bat` scripts have been added to make initial setup and use of the bot easier
+- `vmb-wizard.py` has been deprecated and removed from the repository as a result of the above
+- The project's `README.md` has been completely rewritten, in hopes of providing a far more concise and understandable setup experience
 - Changes in `requirements.txt`:
-  - `python-benedict` is now required
-  - `requests` is now required (to support [Issue #57](https://github.com/svioletg/viMusBot/issues/57))
-  - `inquirer` is no longer required, it is only used for `vmb-wizard.py` which is now deprecated
+    - `python-benedict` is now required
+    - `requests` is now required (to support [Issue #57](https://github.com/svioletg/viMusBot/issues/57))
+    - `inquirer` is no longer required, it is only used for `vmb-wizard.py` which is now deprecated
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 - Current timestamp has been added to the bot's logs, to aid in future debugging

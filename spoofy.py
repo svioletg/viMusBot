@@ -217,7 +217,7 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
     return description_dict
 
 def search_ytmusic_text(query: str) -> tuple:
-    # For plain-text searching
+    """Searches YTMusic with a plain-text query"""
     try:
         top_song = ytmusic.search(query=query, limit=1, filter='songs')[0]
     except IndexError:
@@ -280,8 +280,7 @@ def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=Fal
     }
     return relevant
 
-def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, 
-                   limit: int=10, fast_search: bool=False):
+def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: int=10, fast_search: bool=False):
     unsure = False
 
     query = f'{title} {artist} {album}'
@@ -383,8 +382,12 @@ def soundcloud_playlist(url: str) -> list:
 def get_uri(url: str) -> str:
     return url.split("/")[-1].split("?")[0]
 
-def spotify_playlist(url: str) -> list:
-    playlist = sp.playlist(url)['tracks']['items']
+def spotify_playlist(url: str) -> list|tuple:
+    try:
+        playlist = sp.playlist(url)['tracks']['items']
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve playlist. ({e})', verbose=True)
+        return (None, '404 -1')
     newlist = []
     for item in playlist:
         newlist.append({
