@@ -382,12 +382,12 @@ def soundcloud_playlist(url: str) -> list:
 def get_uri(url: str) -> str:
     return url.split("/")[-1].split("?")[0]
 
-def spotify_playlist(url: str) -> list|tuple:
+def spotify_playlist(url: str) -> list:
     try:
         playlist = sp.playlist(url)['tracks']['items']
     except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve playlist. ({e})', verbose=True)
-        return (None, '404 -1')
+        log(f'Failed to retrieve Spotify playlist: {e}', verbose=True)
+        return None, e
     newlist = []
     for item in playlist:
         newlist.append({
@@ -401,7 +401,12 @@ def spotify_playlist(url: str) -> list|tuple:
     return newlist
 
 def spotify_track(url: str) -> dict:
-    info = sp.track(url)
+    try:
+        info = sp.track(url)
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify track: {e}', verbose=True)
+        return None, e
+
     return {
         'title': info['name'],
         'artist': info['artists'][0]['name'],
@@ -412,7 +417,12 @@ def spotify_track(url: str) -> dict:
     }
 
 def spotify_album(url: str) -> dict:
-    info = sp.album(url)
+    try:
+        info = sp.album(url)
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify album: {e}', verbose=True)
+        return None, e
+
     return {
         'title':info['name'], 
         'artist':info['artists'][0]['name'],

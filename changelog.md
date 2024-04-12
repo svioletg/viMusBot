@@ -12,6 +12,9 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
 - Added type annotations to most functions and their parameters, as well as a few variables where it felt needed
 - `bot.py`
+    - The `test_play()` function has been added which will test some common queueing scenarios in succession
+      - This does not comprehensively cover every single base for testing
+      - It can be manually triggered by running `test play` in the new console
     - Most constants have been made uppercase
     - `generate_QueueItems()` has been renamed to `generate_from_list()` and is now a class method of the `QueueItem`
     - `player_queue` renamed to `media_queue`
