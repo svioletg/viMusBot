@@ -12,9 +12,9 @@ viMusBot is a Discord music bot with support for Spotify links, written in Pytho
 
 > *I'm always looking to improve these instructions. If you find there's missing information, things are unclear, or any other issues, please [open a new issue](https://github.com/svioletg/viMusBot/issues), and I'll try to address any problems when I'm able.*
 
-Start by downloading `Source code (zip)` from the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest), extract the contents wherever you want, and then follow the instructions below as needed.
+Start by downloading `Source code (zip)` from the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest), extract the contents wherever you want, and then follow the instructions below.
 
-## Section Links
+## Contents
 
 [Setting Up: Python](#setting-up-python)
 
@@ -107,7 +107,7 @@ Alternatively, you can manually create the required `spotify_config.json` file, 
 
 ## Running & Updating
 
-viMusBot should now be fully equipped to run — `bot.py` is the main Python script. If you used `envsetup.bat` earlier to set up a virtual enviornment, you can use `start.bat` to automatically run the bot within said enviornment. You can stop the bot at any time by typing `stop` into the command prompt or terminal window and hitting enter, by pressing `Ctrl` and `C` at the same time, or by closing the console window.
+viMusBot should now be fully equipped to run — `bot.py` is the main Python script. If you used `envsetup.bat` earlier to set up a virtual enviornment, you can use `start.bat` to run the bot within said enviornment. You can stop the bot at any time by typing `stop` into the command prompt or terminal window and hitting enter, by pressing `Ctrl` and `C` at the same time, or by closing the window.
 
 viMusBot will automatically check for new releases each time it starts. To update, run the `update.py` script, or open `update.bat`. The latter will also update the required Python packages — `update.py` will only update the bot's files, so it is recommended to manually update your packages afterwards by using `pip install -r requirements.txt`. Any changes to the required packages will be written into the changelog.
 

@@ -347,7 +347,7 @@ class Music(commands.Cog):
             value=data[i]
             # Change decimals to percentages
             # Exclude loudness
-            if type(data[i])==int or type(data[i])==float:
+            if isinstance(data[i], (int, float)):
                 if data[i]<1 and i!='loudness':
                     value=str(round(data[i]*100,2))+'%'
 
@@ -494,11 +494,16 @@ class Music(commands.Cog):
                     return
                 try:
                     objlist = QueueItem.generate_from_list(queries, ctx.author)
-                    queue_batch(ctx, objlist)
-                    await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items.'))
-                    if not voice.is_playing():
-                        log('Voice client is not playing; starting...')
-                        await advance_queue(ctx)
+                    if objlist[0] != []:
+                        queue_batch(ctx, objlist[0])
+                        await qmessage.edit(embed=embedq(f'Queued {len(objlist[0])} items.'))
+                        if objlist[1] != []:
+                            await qmessage.edit(embed=embedq(f'Failed to retrieve {len(objlist[1])} URL{'s' if len(objlist[1]) > 1 else ''}:', f'{'\n'.join(objlist[1])}'))
+                        if not voice.is_playing():
+                            log('Voice client is not playing; starting...')
+                            await advance_queue(ctx)
+                    else:
+                        await qmessage.edit(embed=embedq('Failed to retrieve all URLs; nothing added to the queue.'))
                     return
                 except Exception as e:
                     log_traceback(e)
@@ -569,13 +574,19 @@ class Music(commands.Cog):
                         code = playlist_result[1].http_status
                         match code:
                             case 400:
-                                await qmessage.edit(embed=embedq('Could not retrieve playlist; the URL seems invalid.'))
+                                log('Could not retrieve playlist; the URL seems invalid.')
+                                await qmessage.edit(embed=embedq('Could not retrieve playlist; the URL seems invalid. (HTTP 400)'))
                                 return
                             case 404:
-                                await qmessage.edit(embed=embedq('Could not retrieve playlist; the playlist is likely private.'))
+                                log('Could not retrieve playlist; the playlist is likely private.')
+                                await qmessage.edit(embed=embedq('Could not retrieve playlist; the playlist is likely private. (HTTP 404)'))
+                                return
+                            case _:
+                                log(f'Could not retrieve playlist; an unknown error occurred: HTTP {code}')
+                                await qmessage.edit(embed=embedq(f'Could not retrieve playlist; HTTP {code}'))
                                 return
 
-                    objlist = QueueItem.generate_from_list(playlist_result, ctx.author)
+                    objlist = QueueItem.generate_from_list(playlist_result, ctx.author)[0]
                     if len(objlist) > SPOTIFY_PLAYLIST_LIMIT:
                         await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
                         return
@@ -630,7 +641,7 @@ class Music(commands.Cog):
 
                 if isinstance(duration, tuple):
                     log(f'Couldn\'t retrieve duration; aborting play command: {duration[1]}', verbose=True)
-                    await qmessage.edit(embed=embedq('Could not retrieve video.'))
+                    await qmessage.edit(embed=embedq('Could not retrieve URL; the content may be unavailable, or the URL may be invalid.'))
                     return
 
                 if duration > DURATION_LIMIT*60*60:
@@ -830,7 +841,12 @@ def duration_from_url(url: str) -> int|float:
             log(f'pytube couldn\'t retrieve video length: "{traceback.format_exception(e)[-1]}"; Trying yt-dlp...', verbose=True)
             # Continues after this block so this isn't duplicated
     elif 'soundcloud.com' in url:
-        return round(spoofy.sc.resolve(url).duration / 1000)
+        try:
+            result = spoofy.sc.resolve(url).duration
+        except TypeError as e:
+            log(f'Failed to retrieve Soundcloud track: {e}')
+            return None, e
+        return round(result / 1000)
     elif 'open.spotify.com' in url:
         result = spoofy.spotify_track(url)
         if isinstance(result, tuple):
@@ -956,7 +972,7 @@ class QueueItem:
         self.title = title if title is not None else title_from_url(url)
 
     @staticmethod
-    def generate_from_list(playlist: str|list|tuple, user: discord.Member) -> list:
+    def generate_from_list(playlist: str|list|tuple, user: discord.Member) -> list | tuple[None, Exception]:
         """Creates a list of QueueItem instances from a valid playlist
 
         - `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
@@ -965,23 +981,39 @@ class QueueItem:
         objlist = []
         # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
         if isinstance(playlist, (list, tuple)):
+            failures = []
             for item in playlist:
                 if isinstance(item, str) and 'open.spotify.com' in item:
+                    url = item
                     item = spoofy.spotify_track(item)
+                    if isinstance(item, tuple):
+                        log(f'Failed to download video: {item[1]}')
+                        failures.append(url)
+                        continue
                 
                 if isinstance(item, dict) and 'open.spotify.com' in item['url']:
                     objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
                 else:
                     # Having the list part of the URL causes issues with getting info back
                     item = item.split('&list=')[0]
-                    info = ytdl.extract_info(item, download=False)
+                    
+                    try:
+                        info = ytdl.extract_info(item, download=False)
+                    except yt_dlp.utils.DownloadError as e:
+                        log(f'Failed to download video: {e}')
+                        failures.append(item)
+                        continue
                     objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
-            return objlist
+            return objlist, failures
         else:
             # Anything youtube-dl natively supports is probably a link
             if 'soundcloud.com' in playlist:
                 # SoundCloud playlists have to be processed differently
-                playlist_entries = spoofy.soundcloud_playlist(playlist)
+                try:
+                    playlist_entries = spoofy.soundcloud_playlist(playlist)
+                except TypeError as e:
+                    log(f'Failed to retrieve SoundCloud playlist: {e}')
+                    return None, e
                 objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
             else:
                 try:
@@ -1046,7 +1078,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         spyt = spoofy.spyt(item.url)
 
         log('Checking if unsure...', verbose=True)
-        if type(spyt) == tuple and spyt[0] == 'unsure':
+        if isinstance(spyt, tuple) and spyt[0] == 'unsure':
             # This indicates no match was found
             log('spyt returned unsure.', verbose=True)
             # Remove the warning, no longer needed
@@ -1240,71 +1272,77 @@ except FileNotFoundError:
     log(f'{plt.error}{f} does not exist; exiting.')
     raise SystemExit(0)
 
-# Begin main thread
-
-async def bot_thread():
-    log('Starting bot thread...')
-    async with bot:
-        await bot.add_cog(General(bot))
-        await bot.add_cog(Music(bot))
-        log('Logging in with token...')
-        await bot.start(token)
-
-async def console_thread():
-    async def test_play(source: str, valid: bool=True, multiple_urls: bool=False, playlist_or_album: bool|str=False) -> dict:
-        """NOT a completely comprehensive test, but covers most common bases"""
-        passed = False
-        arguments = {arg: value for arg, value in locals().items() if arg != 'self'}
-        conclusion = ''
-
-        test_urls = {
+class Tests:
+    test_sources = ['youtube', 'spotify', 'bandcamp', 'soundcloud']
+    test_urls = {
             'single': {
                 'valid': {
-                    'youtube':  ['https://www.youtube.com/watch?v=bNpEUbWOBiM', 'https://www.youtube.com/watch?v=3XAhEUHt3zY', 'https://www.youtube.com/watch?v=Q-i1XZc8ZwA'],
-                    'spotify':  ['https://open.spotify.com/track/1E2WTcYLP1dFe1tiGDwRmT?si=e83bb1fcb80640ad', 'https://open.spotify.com/track/0WHtcCpZnoyFlQg3Mf2cdN?si=73230e1b24084038', 'https://open.spotify.com/track/56k2ztFw7hQRzDeoe80pJo?si=90310e0adbf0472a'],
-                    'bandcamp': ['https://jeffrosenstock.bandcamp.com/track/graveyard-song', 'https://jeffrosenstock.bandcamp.com/track/9-10', 'https://jeffrosenstock.bandcamp.com/track/leave-it-in-the-sun']
+                    'youtube':    ['https://www.youtube.com/watch?v=bNpEUbWOBiM', 'https://www.youtube.com/watch?v=3XAhEUHt3zY', 'https://www.youtube.com/watch?v=Q-i1XZc8ZwA'],
+                    'spotify':    ['https://open.spotify.com/track/1E2WTcYLP1dFe1tiGDwRmT?si=e83bb1fcb80640ad', 'https://open.spotify.com/track/0WHtcCpZnoyFlQg3Mf2cdN?si=73230e1b24084038', 'https://open.spotify.com/track/56k2ztFw7hQRzDeoe80pJo?si=90310e0adbf0472a'],
+                    'bandcamp':   ['https://jeffrosenstock.bandcamp.com/track/graveyard-song', 'https://jeffrosenstock.bandcamp.com/track/9-10', 'https://jeffrosenstock.bandcamp.com/track/leave-it-in-the-sun'],
+                    'soundcloud': ['https://soundcloud.com/sethgibbsmusic/rain', 'https://soundcloud.com/weeppiko/like-a-thunder', 'https://soundcloud.com/griffinmcelroy/the-adventure-zone-ethersea-theme']
                 },
                 'invalid': {
-                    'youtube':  ['https://www.youtube.com/watch?v=THISISANINVALIDURLANDDOESNTEXIST'],
-                    'spotify':  ['https://open.spotify.com/track/THISISANINVALIDURLANDDOESNTEXIST'],
-                    'bandcamp': ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/track/THISISANINVALIDURLANDDOESNTEXIST']
+                    'youtube':    ['https://www.youtube.com/watch?v=THISISANINVALIDURLANDDOESNTEXIST'],
+                    'spotify':    ['https://open.spotify.com/track/THISISANINVALIDURLANDDOESNTEXIST'],
+                    'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/track/THISISANINVALIDURLANDDOESNTEXIST'],
+                    'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/THISISANINVALIDURLANDDOESNTEXIST']
                 }
             },
             'playlist': {
                 'valid': {
-                    'youtube':  ['https://www.youtube.com/playlist?list=PL0uKqjIajhzGshCt76OeXLspFh5MmM-Vu', 'https://www.youtube.com/playlist?list=PL67cMGyeB5sEh3ZjGgo8oXzIrbDggG1gs', 'https://www.youtube.com/playlist?list=OLAK5uy_m-FE5IenHYY2Fd1M2RX-k11yKohFrvZi0'],
-                    'spotify':  ['https://open.spotify.com/playlist/7IjLgeYeUkFzNvBirgfsAf?si=c55c2848887249da', 'https://open.spotify.com/playlist/1FkZjVP9O80Chh37YhyKaU?si=d12241575b444d45', 'https://open.spotify.com/playlist/3jlpvgHatDehrSrR72DYVq?si=932b79272c7c4a30'],
-                    'bandcamp': ['https://jeffrosenstock.bandcamp.com/album/hellmode', 'https://jeffrosenstock.bandcamp.com/album/post', 'https://jeffrosenstock.bandcamp.com/album/no-dream']
+                    'youtube':    ['https://www.youtube.com/playlist?list=PL0uKqjIajhzGshCt76OeXLspFh5MmM-Vu', 'https://www.youtube.com/playlist?list=PL67cMGyeB5sEh3ZjGgo8oXzIrbDggG1gs', 'https://www.youtube.com/playlist?list=OLAK5uy_m-FE5IenHYY2Fd1M2RX-k11yKohFrvZi0'],
+                    'spotify':    ['https://open.spotify.com/playlist/7IjLgeYeUkFzNvBirgfsAf?si=c55c2848887249da', 'https://open.spotify.com/playlist/1FkZjVP9O80Chh37YhyKaU?si=d12241575b444d45', 'https://open.spotify.com/playlist/3jlpvgHatDehrSrR72DYVq?si=932b79272c7c4a30'],
+                    'bandcamp':   ['https://jeffrosenstock.bandcamp.com/album/hellmode', 'https://jeffrosenstock.bandcamp.com/album/post', 'https://jeffrosenstock.bandcamp.com/album/no-dream'],
+                    'soundcloud': ['https://soundcloud.com/sethgibbsmusic/sets/2019-releases', 'https://soundcloud.com/sethgibbsmusic/sets/original-tracks-2020', 'https://soundcloud.com/sethgibbsmusic/sets/remixes']
                 },
                 'invalid': {
-                    'youtube':  ['https://www.youtube.com/playlist?list=THISISANINVALIDURLANDDOESNTEXIST'],
-                    'spotify':  ['https://open.spotify.com/playlist/THISISANINVALIDURLANDDOESNTEXIST'],
-                    'bandcamp': ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST']
+                    'youtube':    ['https://www.youtube.com/playlist?list=THISISANINVALIDURLANDDOESNTEXIST'],
+                    'spotify':    ['https://open.spotify.com/playlist/THISISANINVALIDURLANDDOESNTEXIST'],
+                    'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST'],
+                    'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/sets/THISISANINVALIDURLANDDOESNTEXIST']
                 }
             },
             'album': {
                 'valid': {
-                    'youtube': ['https://music.youtube.com/playlist?list=OLAK5uy_lQT8aLCDHiFu4_NkoxHt1VSfUBpjSIwHY', 'https://music.youtube.com/playlist?list=OLAK5uy_kb8kfsyt08s2Z29752CH_lelHdl_JDwgg', 'https://music.youtube.com/playlist?list=OLAK5uy_mp-RVdXLFGSC62WMsBlrqlF3RlZatyowA'],
-                    'spotify': ['https://open.spotify.com/album/1KMfjy6MmPorahRjxhTnxm?si=CS0F1ZFsQqSsn0xH_ahDiA', 'https://open.spotify.com/album/3bChCUtpRC1NaCLYD4unbD?si=J8CeALv1Q7mNHOgS4pdJpA', 'https://open.spotify.com/album/3fn4HfVz5dhmE0PG24rh6h?si=tFUiBS7iSq6QGg-rNNgXkg'],
-                    'bandcamp': ['https://jeffrosenstock.bandcamp.com/album/hellmode', 'https://jeffrosenstock.bandcamp.com/album/post', 'https://jeffrosenstock.bandcamp.com/album/no-dream']
+                    'youtube':    ['https://music.youtube.com/playlist?list=OLAK5uy_lQT8aLCDHiFu4_NkoxHt1VSfUBpjSIwHY', 'https://music.youtube.com/playlist?list=OLAK5uy_kb8kfsyt08s2Z29752CH_lelHdl_JDwgg', 'https://music.youtube.com/playlist?list=OLAK5uy_mp-RVdXLFGSC62WMsBlrqlF3RlZatyowA'],
+                    'spotify':    ['https://open.spotify.com/album/1KMfjy6MmPorahRjxhTnxm?si=CS0F1ZFsQqSsn0xH_ahDiA', 'https://open.spotify.com/album/74QTwjBLo1eLqpjL320rXX?si=1ehOqrxBR8WjHftNReHAtw', 'https://open.spotify.com/album/3fn4HfVz5dhmE0PG24rh6h?si=tFUiBS7iSq6QGg-rNNgXkg'],
+                    'bandcamp':   ['https://jeffrosenstock.bandcamp.com/album/hellmode', 'https://jeffrosenstock.bandcamp.com/album/post', 'https://jeffrosenstock.bandcamp.com/album/no-dream'],
+                    'soundcloud': ['https://soundcloud.com/sethgibbsmusic/sets/2019-releases', 'https://soundcloud.com/sethgibbsmusic/sets/original-tracks-2020', 'https://soundcloud.com/sethgibbsmusic/sets/remixes']
                 },
                 'invalid': {
-                    'youtube': ['https://music.youtube.com/playlist?list=WROOOOOOOOONGLIIIIIIIIIIIINK'],
-                    'spotify': ['https://open.spotify.com/album/THISISALSOINCORRECTNOTAREALALBUM'],
-                    'bandcamp': ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST']
+                    'youtube':    ['https://music.youtube.com/playlist?list=WROOOOOOOOONGLIIIIIIIIIIIINK'],
+                    'spotify':    ['https://open.spotify.com/album/THISISALSOINCORRECTNOTAREALALBUM'],
+                    'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST'],
+                    'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/sets/THISISANINVALIDURLANDDOESNTEXIST']
                 }
             }
         }
+
+    @classmethod
+    async def test_play(self, source: str, valid: bool=True, multiple_urls: bool=False, playlist_or_album: bool|str=False) -> dict:
+        """NOT a completely comprehensive test, but covers most common bases"""
+        if debugctx is None:
+            log(f'{plt.error}Debug context is not set; cannot run test. Use the "dctx" bot command while in a voice channel to grab one.')
+            return
+
+        passed = False
+        arguments = {arg: value for arg, value in locals().items() if arg != 'self'}
+        conclusion = ''
+
         log(f'{plt.gold}### START TEST! play command; SOURCE? {source} | VALID? {valid} | MULTIPLE? {multiple_urls} | PLAYLIST/ALBUM? {playlist_or_album}')
-        if source == 'any':
-            source = random.choice(['youtube', 'spotify', 'bandcamp'])
+        
+        src = source
+
+        if source in ['any', 'mixed']:
+            src = random.choice(self.test_sources)
         
         # Can't be a playlist and an album at the same time, prioritize checking the album
         url_type = playlist_or_album if playlist_or_album else 'single'
 
         await Music.ensure_voice(Music, debugctx)
         if not multiple_urls:
-            await Music.play(Music, debugctx, random.choice(test_urls[url_type]['valid' if valid else 'invalid'][source]))
+            await Music.play(Music, debugctx, random.choice(self.test_urls[url_type]['valid' if valid else 'invalid'][src]))
             if voice.is_playing():
                 conclusion = f'voice client is playing. Test likely {plt.green}passed.'
                 log(conclusion); passed = True
@@ -1318,10 +1356,10 @@ async def console_thread():
         else:
             urls = []
             if source == 'mixed':
-                for src in ['youtube', 'spotify', 'bandcamp']:
-                    urls.append(random.choice(test_urls[url_type]['valid' if valid else 'invalid'][src]))
+                for src in self.test_sources:
+                    urls.append(random.choice(self.test_urls[url_type]['valid' if valid else 'invalid'][src]))
             else:
-                urls = test_urls[url_type]['valid' if valid else 'invalid'][source]
+                urls = self.test_urls[url_type]['valid' if valid else 'invalid'][src]
             
             await Music.play(Music, debugctx, *urls)
             if voice.is_playing() and media_queue.get(debugctx) != []:
@@ -1351,6 +1389,9 @@ async def console_thread():
         log(f'{plt.gold}### END TEST!')
         return {'passed': passed, 'arguments': arguments, 'conclusion': conclusion}
 
+# Begin main thread
+
+async def console_thread():
     log('Console is active.')
     while True:
         try:
@@ -1359,69 +1400,89 @@ async def console_thread():
             if user_input == '':
                 continue
 
-            match user_input:
-                case 'test play':
-                    if PUBLIC:
-                        print('Debugging commands are disabled in public mode.')
-                        continue
-                    
-                    if debugctx is None:
-                        log(f'{plt.warn}Debug context is not set; cannot run test. Use the "dctx" bot command while in a voice channel to grab one.')
-                        continue
-                    test_results: dict[str, list] = {'pass': [], 'fail': []}
-                    test_result_string: str = ''
-                    def add_test_result(result: tuple[bool, dict]):
-                        nonlocal test_results, test_result_string
-                        test_result_string += f'{f'{plt.green}PASS' if result['passed'] else f'{plt.red}FAIL'} | ARGS: {result['arguments']}\n'
-                        if result['passed']:
-                            test_results['pass'].append((result['arguments'], result['conclusion']))
-                        else: 
-                            test_results['fail'].append((result['arguments'], result['conclusion']))
-                    
-                    test_sources: list = ['youtube', 'spotify', 'bandcamp', 'soundcloud', 'any', 'mixed']
-                    total_tests: int = len(test_sources) * 16
-                    log(f'About to run {plt.blue}{total_tests}{plt.reset} tests...')
-                    test_start: float = time.time()
-                    tests_run: int = 0
-                    try:
-                        for src in test_sources:
-                            for valid in [False, True]:
-                                for multiple_urls in [False, True]:
-                                    for playlist_or_album in [False, 'playlist', 'album']:
-                                            add_test_result(await test_play(src, valid, multiple_urls, playlist_or_album))
-                                            tests_run += 1
-                                            log(f'{plt.blue}{tests_run} of {total_tests}{plt.reset} tests run...', verbose=True)
-                    except Exception as e:
-                        log_traceback(e)
-                        log(f'{plt.red}Traceback encountered, tests aborted.')
+            # Console debugging commands
+            if user_input.startswith('test'):
+                if PUBLIC:
+                    print('Debugging commands are disabled in public mode.')
+                    continue
+                
+                params = user_input.split()
+                print(params)
+                if params[1] == 'play':
+                    if params[2] != 'all':
+                        test_args = [params[2], False, False, False]
+                        for n, p in enumerate(params[3:], 1):
+                            if n == 3:
+                                # 3 will be playlist_or_album
+                                test_args[n] = False if p == '0' else p
+                            test_args[n] = False if p == '0' else True
+                        result = await Tests.test_play(*test_args)
+                        if result is None:
+                            continue
+                        print(f'{plt.gold}ARGS: {result["arguments"]} {plt.reset}\n{result["conclusion"]}')
+                    elif params[2] == 'all':
+                        test_results: dict[str, list] = {'pass': [], 'fail': []}
+                        test_result_string: str = ''
+                        def add_test_result(result: tuple[bool, dict]):
+                            nonlocal test_results, test_result_string
+                            test_result_string += f'{f'{plt.green}PASS' if result['passed'] else f'{plt.red}FAIL'} | ARGS: {result['arguments']}\n'
+                            if result['passed']:
+                                test_results['pass'].append((result['arguments'], result['conclusion']))
+                            else: 
+                                test_results['fail'].append((result['arguments'], result['conclusion']))
+                        
+                        test_sources: list = ['youtube', 'spotify', 'bandcamp', 'soundcloud', 'any', 'mixed']
+                        test_start: float = time.time()
+                        tests_run: int = 0
+                        try:
+                            for src in test_sources:
+                                for valid in [False, True]:
+                                    for multiple_urls in [False, True]:
+                                        for playlist_or_album in [False, 'playlist', 'album']:
+                                                add_test_result(await Tests.test_play(src, valid, multiple_urls, playlist_or_album))
+                                                tests_run += 1
+                                                log(f'{plt.blue}{tests_run}{plt.reset} tests run...', verbose=True)
+                        except Exception as e:
+                            log_traceback(e)
+                            log(f'{plt.red}Traceback encountered, tests aborted.')
 
-                    test_end: float = time.time()
-                    test_duration: float = math.floor(test_end - test_start)
+                        test_end: float = time.time()
+                        test_duration: float = math.floor(test_end - test_start)
 
-                    print(f'Finished {plt.red if tests_run != total_tests else plt.green}{tests_run}{plt.reset} out of {total_tests} tests.')
-                    # print(test_result_string)
-                    print(f'FINISHED IN {plt.magenta}{test_duration}s{plt.reset} | PASS/FAIL: {plt.green}{len(test_results['pass'])}{plt.reset}/{plt.red}{len(test_results['fail'])}')
-                    if test_results['fail'] != []:
-                        print('FAILED TESTS:')
-                        for arguments, conclusion in test_results['fail']:
-                            print(f'ARGS: {plt.gold}{arguments}\n{conclusion}')
-                    else:
-                        print(f'{plt.green}ALL TESTS PASSED')
-                case 'stop':
-                    log('Leaving voice if connected...')
-                    try:
-                        await voice.disconnect()
-                    except:
-                        pass
-                    log('Cancelling bot task...')
-                    bot_task.cancel()
-                    log('Cancelling console task...')
-                    console_task.cancel()
-                case _:
-                    log(f'Unrecognized command "{user_input}"')
+                        print(f'Finished {plt.blue}{tests_run}{plt.reset} tests.')
+                        # print(test_result_string)
+                        print(f'FINISHED IN {plt.magenta}{timestamp_from_seconds(test_duration)} or {test_duration}s{plt.reset} | PASS/FAIL: {plt.green}{len(test_results['pass'])}{plt.reset}/{plt.red}{len(test_results['fail'])}')
+                        if test_results['fail'] != []:
+                            print('FAILED TESTS:')
+                            for arguments, conclusion in test_results['fail']:
+                                print(f'ARGS: {plt.gold}{arguments}\n{plt.reset}{conclusion}')
+                        else:
+                            print(f'{plt.green}ALL TESTS PASSED')
+            else:
+                match user_input:
+                    case 'stop':
+                        log('Leaving voice if connected...')
+                        try:
+                            await voice.disconnect()
+                        except:
+                            pass
+                        log('Cancelling bot task...')
+                        bot_task.cancel()
+                        log('Cancelling console task...')
+                        console_task.cancel()
+                    case _:
+                        log(f'Unrecognized command "{user_input}"')
         except Exception as e:
             log('Error encountered in console thread!')
             log_traceback(e)
+
+async def bot_thread():
+    log('Starting bot thread...')
+    async with bot:
+        await bot.add_cog(General(bot))
+        await bot.add_cog(Music(bot))
+        log('Logging in with token...')
+        await bot.start(token)
 
 async def main():
     global bot_task, console_task

@@ -471,7 +471,7 @@ def spyt(url: str, limit: int=20, **kwargs) -> dict|tuple:
     """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
     track = spotify_track(url)
     result = search_ytmusic(title=track['title'], artist=track['artist'], album=track['album'], isrc=track['isrc'], limit=limit, **kwargs)
-    if type(result) == tuple and result[0] == 'unsure':
+    if isinstance(result, tuple) and result[0] == 'unsure':
         log('Returning as unsure.')
         return result
     return result
