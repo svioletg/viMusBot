@@ -40,13 +40,18 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Multiple URLs can be queued at once when using the `-play` command
     - Only multiple single-track URLs will work; multiple playlist/album URLs, or a mix of URLs and plain text terms, will be prevented from queueing
 - `https://spotify.link` URLs are now supported ([Issue #57](https://github.com/svioletg/viMusBot/issues/57))
-- A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal
-  - At present, the only valid command is "stop", which will cancel the console and bot tasks and exit out of the script
+- A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal; available commands can be found at [console.md](https://github.com/svioletg/viMusBot/blob/master/console.md), newly added ones listed below
+    - `stop`
+        - Cancels the console & bot threads and quits out of the script
+    - `test play <source> [valid] [multiple_urls] [playlist_or_album]`
+        - **Only works when not running in "public" mode**, see your configuration file to change this
+        - Uses
 - Things like track titles and lengths are now cached for as long as the bot is running, avoiding duplicate requests and slightly speeding up queue times
     - Should the cache cause problems for you, you can clear it out with the new `-clearcache` command, or disable it entirely with the `use-url-cache` config key (see the **Other** section below)
 - The sidebar color on bot messages can now be customized
 
 ### Fixes
+- Too many to list individually, but lots of `-play`-related errors have been either fixed or at least properly caught and dealt with, thanks to the new tests
 - The remaining queue time now factors in the remaining time of the currently playing track
 - Trying to queue a private Spotify playlist will now give a proper message in response informing the user of such
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)

@@ -56,6 +56,7 @@ import customlog
 import spoofy
 import update
 from palette import Palette
+import itertools
 
 _here = Path(__file__).name
 
@@ -443,7 +444,7 @@ class Music(commands.Cog):
     
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
-    async def play(self, ctx: commands.Context, *queries):
+    async def play(self, ctx: commands.Context, *queries: str):
         """Adds a link to the queue. Plays immediately if the queue is empty."""
         if len(queries) == 0:
             if voice.is_paused():
@@ -483,7 +484,7 @@ class Music(commands.Cog):
             if not multiple_urls:
                 # Prevent yt-dlp from grabbing the playlist the track is from
                 url = queries[0].split('&list=')[0]
-        
+
         log('Found multiple URLs.' if multiple_urls else 'Found a single URL or query.')
 
         async with ctx.typing():
@@ -975,7 +976,7 @@ class QueueItem:
     def generate_from_list(playlist: str|list|tuple, user: discord.Member) -> list | tuple[None, Exception]:
         """Creates a list of QueueItem instances from a valid playlist
 
-        - `playlist` (str, list): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
+        - `playlist` (str, list, tuple): Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
         - `user`: A discord Member object of the user who queued the playlist
         """
         objlist = []
@@ -1039,12 +1040,12 @@ current_item: QueueItem = None
 npmessage: discord.Message = None
 qmessage: discord.Message = None
 
-audio_start_time = 0
-audio_time_elapsed = 0
-paused_at = 0
-paused_for = 0
+audio_start_time: int = 0
+audio_time_elapsed: int = 0
+paused_at: int = 0
+paused_for: int = 0
 
-loop_this = False
+loop_this: bool = False
 
 async def play_item(item: QueueItem, ctx: commands.Context):
     global audio_start_time, audio_time_elapsed, paused_at, paused_for
@@ -1218,7 +1219,7 @@ intents.reactions = True
 intents.guilds = True
 intents.members = True
 
-# Use separate dev and public mode prefixes
+# Set prefix
 command_prefix = PUBLIC_PREFIX if PUBLIC else DEV_PREFIX
 
 bot = commands.Bot(
@@ -1244,7 +1245,6 @@ async def on_command_error(ctx: commands.Context, error):
         pass
     elif isinstance(error, yt_dlp.utils.DownloadError):
         await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
-    # TODO: add custom message for yt_dlp errors like private videos
     else:
         log(f'Error encountered in command `{ctx.command}`.')
         log(error)
@@ -1323,7 +1323,7 @@ class Tests:
     async def test_play(self, source: str, valid: bool=True, multiple_urls: bool=False, playlist_or_album: bool|str=False) -> dict:
         """NOT a completely comprehensive test, but covers most common bases"""
         if debugctx is None:
-            log(f'{plt.error}Debug context is not set; cannot run test. Use the "dctx" bot command while in a voice channel to grab one.')
+            log(f'{plt.warn}Debug context is not set; cannot run test. Use the "dctx" bot command while in a voice channel to grab one.')
             return
 
         passed = False
@@ -1407,9 +1407,9 @@ async def console_thread():
                     continue
                 
                 params = user_input.split()
-                print(params)
                 if params[1] == 'play':
                     if params[2] != 'all':
+                        # TODO: Handle this like a function instead with unpacked args, like how the discord commands work
                         test_args = [params[2], False, False, False]
                         for n, p in enumerate(params[3:], 1):
                             if n == 3:
@@ -1421,6 +1421,12 @@ async def console_thread():
                             continue
                         print(f'{plt.gold}ARGS: {result["arguments"]} {plt.reset}\n{result["conclusion"]}')
                     elif params[2] == 'all':
+                        # Run full test suite of all combinations
+                        confirmation = await aioconsole.ainput('> About to run every combination of -play test. This could take several minutes. Continue? (y/n) ')
+                        if confirmation.lower() != 'y':
+                            print('> Aborted.')
+                            continue
+
                         test_results: dict[str, list] = {'pass': [], 'fail': []}
                         test_result_string: str = ''
                         def add_test_result(result: tuple[bool, dict]):
@@ -1431,17 +1437,23 @@ async def console_thread():
                             else: 
                                 test_results['fail'].append((result['arguments'], result['conclusion']))
                         
-                        test_sources: list = ['youtube', 'spotify', 'bandcamp', 'soundcloud', 'any', 'mixed']
+                        test_sources: list[str] = Tests.test_sources + ['any', 'mixed']
                         test_start: float = time.time()
                         tests_run: int = 0
                         try:
-                            for src in test_sources:
-                                for valid in [False, True]:
-                                    for multiple_urls in [False, True]:
-                                        for playlist_or_album in [False, 'playlist', 'album']:
-                                                add_test_result(await Tests.test_play(src, valid, multiple_urls, playlist_or_album))
-                                                tests_run += 1
-                                                log(f'{plt.blue}{tests_run}{plt.reset} tests run...', verbose=True)
+                            test_conditions = itertools.product(
+                                test_sources, 
+                                [False, True], 
+                                [False, True], 
+                                [False, 'playlist', 'album']
+                            )
+                            for src, valid, multiple_urls, playlist_or_album in test_conditions:
+                                add_test_result(await Tests.test_play(src, valid, multiple_urls, playlist_or_album))
+                                tests_run += 1
+                                log(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
+                                    f'{plt.green}{len(test_results['pass'])} have passed, and'+
+                                    f'{plt.green}{len(test_results['fail'])} have failed.', verbose=True
+                                )
                         except Exception as e:
                             log_traceback(e)
                             log(f'{plt.red}Traceback encountered, tests aborted.')

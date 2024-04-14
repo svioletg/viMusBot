@@ -23,11 +23,15 @@ test_*.py
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py
-# log files, downloaded media files from bot testing
+# log files & downloaded media files from bot testing
 *.log
-*.webm
-*.mp3
 *.part
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.mp4
+*.webm
 # other
 .vscode/
 .github/
