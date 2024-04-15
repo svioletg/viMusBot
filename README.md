@@ -2,17 +2,15 @@
 
 ## You are on the `dev` branch. Switch to the `master` branch here: https://github.com/svioletg/viMusBot/tree/master
 
-### Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md)
+Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md)
 
-### See progress on bug fixes and new features here: [viMusBot Taskboard](https://github.com/users/svioletg/projects/1/views/1)
+See progress on bug fixes and new features here: [viMusBot Taskboard](https://github.com/users/svioletg/projects/1/views/1)
 
 ---
 
 viMusBot is a Discord music bot with support for Spotify links, written in Python.
 
-> *I'm always looking to improve these instructions. If you find there's missing information, things are unclear, or any other issues, please [open a new issue](https://github.com/svioletg/viMusBot/issues), and I'll try to address any problems when I'm able.*
-
-Start by downloading `Source code (zip)` from the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest), extract the contents wherever you want, and then follow the instructions below.
+Start by downloading the `Source code (zip)` file under **Assets** from the bottom of the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest) page. Extract the contents into a folder anywhere, then follow the instructions below.
 
 ## Contents
 
@@ -28,19 +26,19 @@ Start by downloading `Source code (zip)` from the [latest stable release](https:
 
 ## Setting up: Python
 
-viMusBot needs Python in order to run. The [Python homepage](https://www.python.org/downloads) can point you to installers for Windows or MacOS — most Linux distros should have it available in your package manager, or you can download the source from the same link mentioned. As of writing this, viMusBot is fully compatible with Python 3.12, the currently latest major version.
+viMusBot needs Python in order to run. The [Python homepage](https://www.python.org/downloads) can point you to installers for Windows or MacOS, while most Linux distros should have it available in your package manager. As of writing this, the most recent major version is Python 3.12, which viMusBot is being written and tested in, and thus this version is recommended.
 
-If you're using the Windows installer, **make sure to tick the "Add Python 3.12 to PATH" checkbox**. It may say "Add Python to enviornment variables" instead, still check the box regardless.
+If you're using the Windows installer, ***make sure to tick the "Add Python 3.12 to PATH" checkbox***. It may say "Add Python to enviornment variables" instead, still check the box regardless.
 
-Next, you need to install viMusBot's required packages. For a quick and automatic setup on Windows, the `envsetup.bat` script is included which will automatically create a Python virtual enviornment (venv), and install the requirements there. `start.bat` is also included which will run the main script using the newly created venv, as well as `update.bat` which will attempt to automatically update viMusBot itself and its Python dependencies\*. `.bat` files can be run just by double-clicking them.
+Next, you need to install viMusBot's required packages. For a quick and automatic setup on Windows, the `envsetup.bat` script is included which will automatically create a Python virtual enviornment (venv) in your viMusBot folder, and install any requirements within it. `start.bat` is also included which will run the main script using the newly created venv, as well as `update.bat` which will attempt to automatically update viMusBot itself and its Python dependencies. `.bat` files are run like any other program - just by double-clicking them.
 
 Otherwise, you can install any requirements by running the command `pip install -r requirements.txt` from within your viMusBot directory. Using a venv isn't required, but is recommended to keep everything self-contained.
 
 ## Setting up: Required software
 
-viMusBot requires [FFmpeg and FFprobe](https://www.ffmpeg.org/) to function properly. On Windows, the `getff.bat` script will try to grab the needed files automatically. Otherwise, you can download them manually as described below.
+viMusBot requires [FFmpeg and FFprobe](https://www.ffmpeg.org/) to function properly.
 
-For **Windows**, go to [this page](https://github.com/BtbN/FFmpeg-Builds/releases) and download `ffmpeg-master-latest-win64-gpl.zip` ([direct link](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip)), attached to the top release on the page. Extract this anywhere you'd like, and move or copy `ffmpeg.exe` and `ffprobe.exe` from within `bin` to the same folder as `bot.py`.
+For **Windows**, go to [this page](https://github.com/BtbN/FFmpeg-Builds/releases) and download `ffmpeg-master-latest-win64-gpl.zip` ([direct link](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip)), attached to the top release on the page. Extract this anywhere you'd like, and move or copy `ffmpeg.exe` and `ffprobe.exe` from within the `bin` folder over to the same folder as `bot.py`.
 
 For **Mac**, go to [this page](https://evermeet.cx/ffmpeg/) and download the archives for both `FFmpeg` and `FFprobe`. They should each have a single file within named `ffmpeg` and `ffprobe` respectively, drop them inside the same folder as `bot.py`.
 
@@ -50,13 +48,13 @@ If you already have FFmpeg and FFprobe added to your system's enviornment variab
 
 ## Setting up: Discord
 
-Go to the [Discord Developer Portal](https://discord.com/developers/applications/) and login with your Discord account. You should land on your "Applications" page — click the blue "**New Application**" button near the top right of the screen, enter any name of your choosing and tick the box to agree to Discord's terms, then finally click "**Create**".
+Go to the [Discord Developer Portal](https://discord.com/developers/applications/) and login with your Discord account. You should land on your "Applications" page — click the blue "**New Application**" button near the top right of the screen, enter a name, and hit "**Create**". The application does *not* have to be named "viMusBot".
 
-You should now be at the "General Information" page for your app. Using the left-hand sidebar, go to the "**Bot**" page. Here, you can change the username and profile picture that your bot will appear as in your server, which can of course be whatever you choose.
+You should now be at the "General Information" page for your app. Using the left-hand sidebar, go to the "**Bot**" page. Here, you can change the username and profile picture that your bot will appear as in your server.
 
-You should see a blue button labelled "**Reset Token**" — click it, and after confirming you'll get a new long string of random letters and numbers. Copy this string, create a new file called `token.txt` within the same folder as `bot.py`, paste your copied string into it, then save and close the file.
+You should see a blue button labelled "**Reset Token**" — click it, and after confirming you'll get a new long string of random letters and numbers. Copy this string, create a new file called `token.txt` within your viMusBot folder, paste your copied string into it, then save and close the file.
 
-The last thing you'll need to do on the Discord side of things is give the bot its required permissions and "intents". Under the "Privilaged Gateway Intents" section, turn **on** the switches next to "**Server Members Intent**" and "**Message Content Intent**". Below this section, you'll see a "Bot Permissions" box with many checkboxes. viMusBot currently only requires the following to function:
+The last thing you'll need to do on the Discord side of things is give the bot its required permissions and "intents". Under the "Privileged Gateway Intents" section, turn **on** the switches next to "**Server Members Intent**" and "**Message Content Intent**". Below this section, you'll see a "Bot Permissions" box with many checkboxes. viMusBot currently only requires the following to function:
 
 *General Permissions*
 
@@ -83,7 +81,7 @@ You'll need to supply an API "client ID" and "client secret" in order for Spotif
 
 1. Start by going to your [Spotify for Developers Dashboard](https://developer.spotify.com/dashboard). Once you're logged in and at this page, you should see a blue "**Create app**" button, which you should click.
 2. Fill in the Name and Description fields with whatever you want; the "Website" field can be left blank. The Redirect URI field is required, although it will not actually be used by the bot, so you can just enter `localhost`.
-3. Under "Which API/SDKs are you planning to use?", select "Web API". Click the checkbox below to agree to Spotify's terms, then hit "Save".
+3. Under "Which API/SDKs are you planning to use?", select "Web API", then hit "Save".
 ![Spotify app setup page](https://i.imgur.com/hoPjBKE.png)
 4. You should now be sent to your app's dashboard with some graphs displayed. On the right side of the screen, click "Settings".
 5. Click "View client secret" to reveal the string.

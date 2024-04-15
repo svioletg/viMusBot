@@ -1,6 +1,6 @@
-# Changelog
+# viMusBot
 
-See [here](#versioning-info) for an explanation on categories and how my versioning works for this project
+## Changelog
 
 ---
 
@@ -56,7 +56,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Trying to queue a private Spotify playlist will now give a proper message in response informing the user of such
 - The `search_ytmusic_text()` function had a typo for a *very* long time that meant the top video result wasn't actually being checked; both the top song and top video results should now return correctly, and the user will be shown a prompt to decide which to queue (as was always intended to be the case)
 - `customlog.py` did not actually ignore logs from the function names present in the `ignore-logs-from` config key due to an incorrectly typed expression, which has now been fixed
-- `pytube` can now retrieve data correctly most of the time, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
+- `pytube` should now retrieve data correctly most of the time, `bypass_age_gate()` must be used to load in the description (as described in [pytube issue #1674](https://github.com/pytube/pytube/issues/1674))
 - Fixed [Issue #4](https://github.com/svioletg/viMusBot/issues/4): "Queueing a track right as one is finishing or starting skips the next in queue"
 - Fixed [Issue #41](https://github.com/svioletg/viMusBot/issues/41): "Looping does not function"
 
@@ -65,13 +65,12 @@ See [here](#versioning-info) for an explanation on categories and how my version
     - `use-url-cache` (boolean) added; determines whether to cache information retrieved from URLs like titles and durations
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
     - `auto-update-config` removed; no longer used
-- A few `.bat` scripts have been added to make initial setup and use of the bot easier
-- `vmb-wizard.py` has been deprecated and removed from the repository as a result of the above
-- The project's `README.md` has been completely rewritten, in hopes of providing a far more concise and understandable setup experience
 - Changes in `requirements.txt`:
     - `python-benedict` is now required
     - `requests` is now required (to support [Issue #57](https://github.com/svioletg/viMusBot/issues/57))
     - `inquirer` is no longer required, it is only used for `vmb-wizard.py` which is now deprecated
+- A few `.bat` scripts have been added to make initial setup and use of the bot easier
+- `vmb-wizard.py` has been removed
 - If one is set, the queue will now display the nicknames of users instead of account names
 - The note added to queue messages regarding problems with SoundCloud ([Issue #16](https://github.com/svioletg/viMusBot/issues/16)) was removed as it hasn't caused problems recently, and was more likely an API issue on their end
 - Current timestamp has been added to the bot's logs, to aid in future debugging
@@ -570,58 +569,35 @@ This would likely be fixed by having a faster method of queueing up Spotify trac
 
 ### Public Release Versions
 Versions are numbered as X.Y.Z, where:
-- X is the **project version**, which should always remain at 1 unless the project is re-written almost entirely
-- Y is the **major version**, for all-new functionality or other large changes
-- Z is the **minor version**, for things like bugfixes or minor improvements to the code
-
-Version numbers do *not* roll over into the next highest spot, e.g if the last update was `1.0.9`, the next update would not be `1.1.0` - it would be labelled as `1.0.10`.
-
-Each version has a date below it, which is when it was made public. Next to the date is a dev number, which is used only in the `dev` branch introduced after 1.6.5's release, and denotes the *total* number of updates, separately from the "official" version number. [Hotfix versions](#hotfix-versions) do not count towards this number.
+- X is reserved for huge, fundamental structural changes to the code, and is almost never increased
+- Y represents a "major version", typically coinciding with new features, or a very large number of bugfixes / internal improvements
+- Z is the "minor version", usually just representing handfuls of bugfixes or small improvements/additions
 
 ### Hotfix Versions
-On the rare occassion that the latest update must be amended straight away, without waiting for the next update in development to be finished, a "hotfix" for the last version will be released. Hotfix versions will append a letter in alphabetical order to the end of the version, so if 1.6.2 for example needed a hotfix, the new release would be 1.6.2a.
-
-The non-hotfixed version (in this example, 1.6.2) would then be removed from the releases page, as well. Any following hotfixes would be 1.6.2b, 1.6.2c, 1.6.2d, etc., and previous hotfixes would continue to be removed so that only the fixed version remains.
-This is largely to avoid having to change the dev number during development of a new major or minor version.
-
-Hotfix changelogs are only included on the relevant release page for that version.
+Hotfixes are different from normal releases in that they *replace* their respective version's release instead of simply adding onto the list. This is normally done for security vulnerabilities, or for any issues in the original version that completely prevent usage of the bot. Hotfixes simply add a letter to the end of their version number, e.g 1.8.3's first hotfix was 1.8.3a, its second hotfix became 1.8.3b, and so on. If a hotfix is released, it is usually recommended to update right away.
 
 ### Development Versions
-The `dev` branch contains code that is actively being worked on for the next coming update, and due to the frequency of these updates in contrast to public releases, it uses a different numbering system.
-Development versions are numbered as dev.X.Y, where:
-- X is the total number of updates, plus one (previously mentioned as the dev number)
-- Y is the Nth commit that involves any changed Python code
-    - It is not updated if any files other than `*.py` are updated, such as README.md, changelog.md, or fixing typos or other errors in configuration
-    - Y is never 0
+The `dev` branch is used for tracking work on new versions, and its code is never considered stable or suitable for general usage. When new versions are being worked on, a separate version system is used — in this case, a single incrementing number is used for each new version being worked on. Public release version numbers are usually decided right upon their release, and the scope of an update may change drastically, so one number is used instead of trying to predict the next public version number. `1.0.0` would have been `dev.1` although this system wasn't in place at that time, and `1.8.3` was `dev.32`, as an example. Since `dev.34` each new development version gets its own branch.
 
-For example, take "dev.28.4":
-- The last public release before starting this version would be 1.6.5, the 27th release since 1.0.0. Thus, during development the next update will be 28, with a public version being decided at release.
-- This would've been the 4th commit containing changed Python code
+## Release Note Categories
 
-## Categories
-
-Each version will contain categories for its changes, which are:
+Each release will contain categories for its changes, which are:
 
 ### Developer
-Changes that are only applicable to developers, and that usually make diagnosing problems easier, like improving the logging system.
+Changes that are generally only relevant to developers; internal changes, performance improvements, renamed or moved symbols, etc.
 
 ### Features
-All-new functionality not previously present in the project. This usually coincides with a new **major version**, for example [1.3.0](#130) with its implementation of playlist/album support.
+All-new functionality not previously present in the project. This usually (but not always) coincides with a new **major version**, for example [1.3.0](#130) with its implementation of playlist/album support.
 
 ### Fixes
-Fixed bugs or other unintended behavior.
-
-### Improvements (no longer used)
-General improvements to the either the user or developer experience, like making a command simpler to use, reducing the amount of code needed for something, or otherwise making existing functionality more efficient.
-
-This category is no longer used, and notes of this nature will be put into **Other** or **Features** instead.
+Bugs or other unintended behavior that have been fixed.
 
 ### Other
-Any changes that do not directly fit into any other category. Usually this is something that could potentially go into "Improvements", but is more of a temporary solution or workaround.
+Any changes that do not directly fit into any other category.
 
 ### Notes
 Usually unused, any additional notes regarding the release. Listed last, out of alphabetical order.
 
 ---
 
-This changelog was started at 1.3.0, so versions prior do not have a proper changelog accompanying them. I've added their dates based off of commits, at least.
+This changelog was started at 1.3.0, so versions prior do not have a proper changelog accompanying them. I've added their dates based off of commits.

@@ -22,7 +22,7 @@ Added in v1.9.0, the **console** lets you type and run commands into the termina
 
 ### (dev) `test play <source> [flags]`
 
-> Tests the "play" command with a variety of scenarios.
+> Tests the "play" Discord command with a variety of scenarios.
 
 *Parameters:*
 - `source`
