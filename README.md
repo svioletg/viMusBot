@@ -117,10 +117,10 @@ If you experience any issues with the bot, or you want a new feature added, you'
 
 Extra pages of information are stored inside this repository's `docs` directory. It currently contains the following:
 
-[Changelog](https://github.com/svioleg/viMusBot/blob/master/docs/changelog.md)
+[Changelog](https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md)
 
-[FAQ](https://github.com/svioleg/viMusBot/blob/master/docs/faq.md)
+[FAQ](https://github.com/svioletg/viMusBot/blob/master/docs/faq.md)
 
-[Using `config.yml` for configuration & customization](https://github.com/svioleg/viMusBot/blob/master/docs/config.md)
+[Using `config.yml` for configuration & customization](https://github.com/svioletg/viMusBot/blob/master/docs/config.md)
 
-[Using the Console](https://github.com/svioleg/viMusBot/blob/master/docs/console.md)
+[Using the Console](https://github.com/svioletg/viMusBot/blob/master/docs/console.md)
