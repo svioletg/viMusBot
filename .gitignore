@@ -32,6 +32,7 @@ spoofy_*.py
 *.m4a
 *.mp4
 *.webm
+*.opus
 # other
 .vscode/
 .github/

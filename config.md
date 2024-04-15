@@ -237,7 +237,7 @@ maximum-urls: 3
 
 ### `prefixes`
 
-> Set the bot's command prefix. Two options are given: *public*, and *developer*. Which one is used is determined by the `public` key described later.
+> Set the bot's command prefixes for public and developer mode.
 
 **Valid options:** any string for each `public`/`developer` key
 
@@ -251,7 +251,7 @@ prefixes:
 
 ### `public`
 
-> Currently only decides whether to use the public prefix (true), or the developer prefix (false).
+> Starts the bot in "public" mode if set to true, or "developer" mode if set to false. Developer mode will make the bot use the [developer prefix](https://github.com/svioletg/viMusBot/blob/master/config.md#prefixes), and will enable developer-only [console commands](https://github.com/svioletg/viMusBot/blob/master/console.md).
 
 **Valid options:** `true` or `false`
 

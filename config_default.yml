@@ -51,6 +51,7 @@ auto-remove:
     - ".m4a"
     - ".mp4"
     - ".webm"
+    - ".opus"
 
 # Allows queueing entire Spotify playlists
 allow-spotify-playlists: yes

@@ -55,22 +55,23 @@ class Palette:
 
         return string
 
+    def preview(self):
+        column = 0
+        for k, v in vars(self).items():
+            if column >= 3:
+                column = 0
+            if k == 'colors':
+                # Skip self.colors since its just the vars of Palette's attributes
+                # We want to show what warn, error, etc. are so we won't just use self.colors
+                continue
+            if isinstance(v, dict):
+                for k2, v2 in v.items():
+                    print(f'{v2}{k}[\'{k2}\']', end=' ')
+            else:
+                print(v+k, end=' ')
+
 palette = Palette()
 
-def test():
-    column = 0
-    for k, v in vars(palette).items():
-        if column >= 3:
-            column = 0
-        if k == 'colors':
-            # Skip self.colors since its just the vars of Palette's attributes
-            continue
-        if isinstance(v, dict):
-            for k2, v2 in v.items():
-                print(f'{v2}{k}[\'{k2}\']', end=' ')
-        else:
-            print(v+k, end=' ')
-    input('\nPress ENTER to continue.')
-
 if __name__ == '__main__':
-    test()
+    palette.preview()
+    input('\nPress ENTER to continue.')

@@ -5,7 +5,7 @@ print('Python ' + sys.version)
 
 import asyncio
 import glob
-import importlib
+import itertools
 import logging
 import math
 import os
@@ -49,14 +49,12 @@ with open('config.yml','r') as f:
     config = benedict(yaml.safe_load(f))
 
 print('Importing local packages...')
-import aioconsole
 
 # Import local files after main packages, and after validating config
 import customlog
 import spoofy
 import update
-from palette import Palette
-import itertools
+import palette
 
 _here = Path(__file__).name
 
@@ -70,7 +68,7 @@ discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
 # Setup bot logging
 colorama.init(autoreset=True)
-plt = Palette()
+plt = palette.Palette()
 
 last_logtime = time.time()
 
@@ -1320,34 +1318,49 @@ class Tests:
         }
 
     @classmethod
-    async def test_play(self, source: str, valid: bool=True, multiple_urls: bool=False, playlist_or_album: bool|str=False) -> dict:
-        """NOT a completely comprehensive test, but covers most common bases"""
-        if debugctx is None:
-            log(f'{plt.warn}Debug context is not set; cannot run test. Use the "dctx" bot command while in a voice channel to grab one.')
+    async def test_play(self, source: str, bypass_ctx: bool=False, flags: list[str]=[]) -> dict:
+        """NOT a completely comprehensive test, but covers most common bases
+        
+        Valid flags:
+        - `invalid` = Use an intentionally invalid URL
+        - `multiple` = Use multiple URLs
+        - `playlist` = Use a playlist URL
+        - `album` = Use an album URL
+
+        "playlist" and "album" can't be used together
+        """
+        if (not bypass_ctx) and (debugctx is None):
+            log(f'{plt.warn}Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
+            return
+        if source not in self.test_sources:
+            log(f'{plt.warn}Invalid source; aborting test. Valid sources are: {', '.join(self.test_sources)}')
             return
 
-        passed = False
-        arguments = {arg: value for arg, value in locals().items() if arg != 'self'}
-        conclusion = ''
+        valid: str|bool = 'invalid' if 'invalid' in flags else 'valid'
+        playlist_or_album: str|bool = 'playlist' if 'playlist' in flags else 'album' if 'album' in flags else False
+        multiple_urls: bool = 'multiple' in flags
 
-        log(f'{plt.gold}### START TEST! play command; SOURCE? {source} | VALID? {valid} | MULTIPLE? {multiple_urls} | PLAYLIST/ALBUM? {playlist_or_album}')
-        
-        src = source
+        passed: bool = False
+        conclusion: str = ''
+        arguments: str = f'SOURCE? {source} | VALID? {valid} | MULTIPLE? {multiple_urls} | PLAYLIST/ALBUM? {playlist_or_album}'
 
-        if source in ['any', 'mixed']:
-            src = random.choice(self.test_sources)
-        
-        # Can't be a playlist and an album at the same time, prioritize checking the album
+        log(f'{plt.gold}### START TEST! play command; {arguments}')
+
+        if 'playlist' in flags and 'album' in flags:
+            log(f'{plt.warn}Invalid flags; aborting test. The "playlist" and "album" flags cannot be used together.')
+            return
+
+        src = random.choice(self.test_sources) if source in ['any', 'mixed'] else source
         url_type = playlist_or_album if playlist_or_album else 'single'
 
         await Music.ensure_voice(Music, debugctx)
         if not multiple_urls:
-            await Music.play(Music, debugctx, random.choice(self.test_urls[url_type]['valid' if valid else 'invalid'][src]))
+            await Music.play(Music, debugctx, random.choice(self.test_urls[url_type][valid][src]))
             if voice.is_playing():
                 conclusion = f'voice client is playing. Test likely {plt.green}passed.'
                 log(conclusion); passed = True
             else:
-                if not valid:
+                if valid == 'invalid':
                     conclusion = f'voice client is not playing, and an intentionally invalid URL was used. Test likely {plt.green}passed.'
                     log(conclusion); passed = True
                 else:
@@ -1356,27 +1369,27 @@ class Tests:
         else:
             urls = []
             if source == 'mixed':
-                for src in self.test_sources:
-                    urls.append(random.choice(self.test_urls[url_type]['valid' if valid else 'invalid'][src]))
+                for s in self.test_sources:
+                    urls.append(random.choice(self.test_urls[url_type][valid][s]))
             else:
-                urls = self.test_urls[url_type]['valid' if valid else 'invalid'][src]
+                urls = self.test_urls[url_type][valid][src]
             
             await Music.play(Music, debugctx, *urls)
             if voice.is_playing() and media_queue.get(debugctx) != []:
-                conclusion = f'voice client is playing and the queue is not empty. Test likely {plt.green}passed.'
+                conclusion = f'Voice client is playing and the queue is not empty. Test likely {plt.green}passed.'
                 log(conclusion); passed = True
             else:
-                if not valid:
-                    conclusion = f'voice client is not playing, and an intentionally invalid URL was used. Test likely {plt.green}passed.'
+                if valid == 'invalid':
+                    conclusion = f'Voice client is not playing, and an intentionally invalid URL was used. Test likely {plt.green}passed.'
+                    log(conclusion); passed = True
+                elif playlist_or_album:
+                    conclusion = f'Voice client is not playing, all URLs were valid, but multiple {playlist_or_album} URLs were used. Test likely {plt.green}passed.'
                     log(conclusion); passed = True
                 elif media_queue.get(debugctx) != []:
-                    conclusion = f'voice client is not playing, but the queue is not empty. Test likely {plt.red}failed.'
+                    conclusion = f'Voice client is not playing, but the queue is not empty. Test likely {plt.red}failed.'
                     log(conclusion)
-                elif valid and playlist_or_album:
-                    conclusion = f'voice client is not playing, all URLs were valid, but multiple {playlist_or_album} URLs were used. Test likely {plt.green}passed.'
-                    log(conclusion); passed = True
                 else:
-                    conclusion = f'voice client is not playing, but all valid URLs were used. Test likely {plt.red}failed.'
+                    conclusion = f'Voice client is not playing, but all valid URLs were used. Test likely {plt.red}failed.'
                     log(conclusion)
         
         log(f'Waiting 2 seconds...')
@@ -1391,7 +1404,7 @@ class Tests:
 
 # Begin main thread
 
-async def console_thread():
+async def console():
     log('Console is active.')
     while True:
         try:
@@ -1406,20 +1419,23 @@ async def console_thread():
                     print('Debugging commands are disabled in public mode.')
                     continue
                 
+                # TODO: Some sort of help command would be good
                 params = user_input.split()
+
                 if params[1] == 'play':
+                    if len(params) < 3:
+                        print('Not enough arguments. Usage: test play <source> [flags] (available flags: invalid, multiple, playlist, album)')
+                        print('You can also use "test play all" to run every combination of this test. This can take several minutes.')
+                        continue
                     if params[2] != 'all':
-                        # TODO: Handle this like a function instead with unpacked args, like how the discord commands work
-                        test_args = [params[2], False, False, False]
-                        for n, p in enumerate(params[3:], 1):
-                            if n == 3:
-                                # 3 will be playlist_or_album
-                                test_args[n] = False if p == '0' else p
-                            test_args[n] = False if p == '0' else True
-                        result = await Tests.test_play(*test_args)
+                        test_start = time.time()
+                        result = await Tests.test_play(params[2], flags=params[3:])
                         if result is None:
+                            # Returns None if the test was aborted
                             continue
                         print(f'{plt.gold}ARGS: {result["arguments"]} {plt.reset}\n{result["conclusion"]}')
+                        test_end = time.time()
+                        print(f'Test finished in {plt.magenta}{test_end - test_start}s')
                     elif params[2] == 'all':
                         # Run full test suite of all combinations
                         confirmation = await aioconsole.ainput('> About to run every combination of -play test. This could take several minutes. Continue? (y/n) ')
@@ -1440,20 +1456,23 @@ async def console_thread():
                         test_sources: list[str] = Tests.test_sources + ['any', 'mixed']
                         test_start: float = time.time()
                         tests_run: int = 0
+                        # Go through all test combinations
                         try:
+                            # 'invalid', 'single', and 'no-list' will be skipped over by the test function
+                            # They're just here to make generating the combinations easier
                             test_conditions = itertools.product(
                                 test_sources, 
-                                [False, True], 
-                                [False, True], 
-                                [False, 'playlist', 'album']
-                            )
+                                ['valid', 'invalid'], 
+                                ['single', 'multiple'], 
+                                ['no-list', 'playlist', 'album']
+                                )
                             for src, valid, multiple_urls, playlist_or_album in test_conditions:
-                                add_test_result(await Tests.test_play(src, valid, multiple_urls, playlist_or_album))
+                                add_test_result(await Tests.test_play(src, [valid, multiple_urls, playlist_or_album]))
                                 tests_run += 1
                                 log(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
                                     f'{plt.green}{len(test_results['pass'])} have passed, and'+
                                     f'{plt.green}{len(test_results['fail'])} have failed.', verbose=True
-                                )
+                                    )
                         except Exception as e:
                             log_traceback(e)
                             log(f'{plt.red}Traceback encountered, tests aborted.')
@@ -1472,6 +1491,8 @@ async def console_thread():
                             print(f'{plt.green}ALL TESTS PASSED')
             else:
                 match user_input:
+                    case 'colors':
+                        plt.preview(); print()
                     case 'stop':
                         log('Leaving voice if connected...')
                         try:
@@ -1500,7 +1521,7 @@ async def main():
     global bot_task, console_task
 
     bot_task = asyncio.create_task(bot_thread())
-    console_task = asyncio.create_task(console_thread())
+    console_task = asyncio.create_task(console())
     await asyncio.gather(bot_task, console_task)
 
 if __name__ == '__main__':
