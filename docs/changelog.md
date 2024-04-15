@@ -40,7 +40,7 @@ See [here](#versioning-info) for an explanation on categories and how my version
 - Multiple URLs can be queued at once when using the `-play` command
     - Only multiple single-track URLs will work; multiple playlist/album URLs, or a mix of URLs and plain text terms, will be prevented from queueing
 - `https://spotify.link` URLs are now supported ([Issue #57](https://github.com/svioletg/viMusBot/issues/57))
-- A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal; available commands can be found at [console.md](https://github.com/svioletg/viMusBot/blob/master/console.md), newly added ones listed below
+- A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal; available commands can be found at [console.md](https://github.com/svioletg/viMusBot/blob/master/docs/console.md), newly added ones listed below
     - `stop`
         - Cancels the console & bot threads and quits out of the script
     - `test play <source> [valid] [multiple_urls] [playlist_or_album]`

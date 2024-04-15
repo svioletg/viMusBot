@@ -103,7 +103,7 @@ if __name__ == '__main__':
         else:
             log(f'{plt.lime}You are up to date.')
 
-    log('Changelog: https://github.com/svioletg/viMusBot/blob/master/changelog.md')
+    log('Changelog: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md')
 
 log('Parsing config...')
 
@@ -288,7 +288,7 @@ class General(commands.Cog):
     async def changelog(self, ctx: commands.Context):
         """Returns a link to the changelog, and displays most recent version."""
         await ctx.send(embed=embedq(
-            'Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/changelog.md', 
+            'Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md', 
             f'Current version: {VERSION}',
             color=EMBED_COLOR
             ))

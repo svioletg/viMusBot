@@ -251,7 +251,7 @@ prefixes:
 
 ### `public`
 
-> Starts the bot in "public" mode if set to true, or "developer" mode if set to false. Developer mode will make the bot use the [developer prefix](https://github.com/svioletg/viMusBot/blob/master/config.md#prefixes), and will enable developer-only [console commands](https://github.com/svioletg/viMusBot/blob/master/console.md).
+> Starts the bot in "public" mode if set to true, or "developer" mode if set to false. Developer mode will make the bot use the [developer prefix](#prefixes), and will enable developer-only [console commands](https://github.com/svioletg/viMusBot/blob/master/docs/console.md).
 
 **Valid options:** `true` or `false`
 
