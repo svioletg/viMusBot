@@ -24,6 +24,8 @@ Start by downloading the `Source code (zip)` file under **Assets** from the bott
 
 [Running & Updating](#running--updating)
 
+[Documentation & Guides](#documentation--guides)
+
 ## Setting up: Python
 
 viMusBot needs Python in order to run. The [Python homepage](https://www.python.org/downloads) can point you to installers for Windows or MacOS, while most Linux distros should have it available in your package manager. As of writing this, the most recent major version is Python 3.12, which viMusBot is being written and tested in, and thus this version is recommended.
@@ -110,3 +112,15 @@ viMusBot should now be fully equipped to run — `bot.py` is the main Python scr
 viMusBot will automatically check for new releases each time it starts. To update, run the `update.py` script, or open `update.bat`. The latter will also update the required Python packages — `update.py` will only update the bot's files, so it is recommended to manually update your packages afterwards by using `pip install -r requirements.txt`. Any changes to the required packages will be written into the changelog.
 
 If you experience any issues with the bot, or you want a new feature added, you're free to [open a new issue](https://github.com/svioletg/viMusBot/issues) so I can look into it when possible.
+
+## Documentation & Guides
+
+Extra pages of information are stored inside this repository's `docs` directory. It currently contains the following:
+
+[Changelog](https://github.com/svioleg/viMusBot/blob/master/docs/changelog.md)
+
+[FAQ](https://github.com/svioleg/viMusBot/blob/master/docs/faq.md)
+
+[Using `config.yml` for configuration & customization](https://github.com/svioleg/viMusBot/blob/master/docs/config.md)
+
+[Using the Console](https://github.com/svioleg/viMusBot/blob/master/docs/console.md)
