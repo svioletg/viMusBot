@@ -16,11 +16,13 @@ Added in v1.9.0, the **console** lets you type and run commands into the termina
 
 ### `colors`
 
-*Paramters: N/A*
+> Displays the current console logging color palette: default color names followed by the customizable colors (warn, error, etc.)
 
-Displays the current console logging color palette: default color names followed by the customizable colors (warn, error, etc.)
+*Parameters: N/A*
 
 ### (dev) `test play <source> [flags]`
+
+> Tests the "play" command with a variety of scenarios.
 
 *Parameters:*
 - `source`

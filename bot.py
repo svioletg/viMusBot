@@ -1332,7 +1332,8 @@ class Tests:
         if (not bypass_ctx) and (debugctx is None):
             log(f'{plt.warn}Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
             return
-        if source not in self.test_sources:
+        
+        if source not in self.test_sources + ['any', 'mixed']:
             log(f'{plt.warn}Invalid source; aborting test. Valid sources are: {', '.join(self.test_sources)}')
             return
 
@@ -1467,11 +1468,11 @@ async def console():
                                 ['no-list', 'playlist', 'album']
                                 )
                             for src, valid, multiple_urls, playlist_or_album in test_conditions:
-                                add_test_result(await Tests.test_play(src, [valid, multiple_urls, playlist_or_album]))
+                                add_test_result(await Tests.test_play(src, flags=[valid, multiple_urls, playlist_or_album]))
                                 tests_run += 1
                                 log(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
-                                    f'{plt.green}{len(test_results['pass'])} have passed, and'+
-                                    f'{plt.green}{len(test_results['fail'])} have failed.', verbose=True
+                                    f'{plt.green}{len(test_results['pass'])} have passed, and '+
+                                    f'{plt.red}{len(test_results['fail'])} have failed.', verbose=True
                                     )
                         except Exception as e:
                             log_traceback(e)
