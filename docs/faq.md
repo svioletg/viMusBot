@@ -6,7 +6,7 @@ Firstly, check the [issues page](https://github.com/svioletg/viMusBot/issues) to
 
 ## How can viMusBot support Spotify links if its audio is protected by DRM?
 
-viMusBot does not *directly* extract and play audio from a given Spotify link - instead, it simply uses the track info gathered from said link, and uses it to find the best possible match on YouTube Music (or standard YouTube, if the former fails). Feel free to dive into [spoofy.py](https://github.com/svioletg/viMusBot/blob/master/spoofy.py) to see how this is currently done — and if you're familiar with Python, don't hesitate to contribute any improvements if you see an opportunity!
+viMusBot does not *directly* extract and play audio from a given Spotify link - instead, it simply uses the track info gathered from said link, and uses it to find the best possible match on YouTube Music (or standard YouTube, if the former fails).
 
 ## How can I change my bot's prefix, or set any other options?
 
