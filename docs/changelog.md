@@ -4,7 +4,7 @@
 
 ## 1.9.0
 
-> *2024.04.xx / dev.33*
+> *2024.04.16 / dev.33*
 
 Developer
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
