@@ -20,7 +20,13 @@ Added in v1.9.0, the **console** lets you type and run commands into the termina
 
 *Parameters: N/A*
 
-### (dev) `test play <source> [flags]`
+### `stop`
+
+*Parameters: N/A*
+
+Attempts to cancel the currently running bot & console threads, and exits the script.
+
+### (dev) (ctx) `test play <source> [flags]`
 
 > Tests the "play" Discord command with a variety of scenarios.
 
@@ -49,9 +55,3 @@ Added in v1.9.0, the **console** lets you type and run commands into the termina
 ```
 test play spotify playlist
 ```
-
-### `stop`
-
-*Parameters: N/A*
-
-Attempts to cancel the currently running bot & console threads, and exits the script.
