@@ -1,3 +1,4 @@
+.*/
 __pycache__/
 bin/
 past-versions/
@@ -12,34 +13,33 @@ config_old.yml
 configtest.yml
 # credentials
 spotify_config.json
+test_spotify_config.json
 headers_auth.json
 # misc testing files
 yttesting.py
 quickstart.sh
 *.pickle
-.vscode/
+test_*.py
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py
-# log files, downloaded media files from bot testing
+# log files & downloaded media files from bot testing
 *.log
-*.webm
-*.mp3
-<<<<<<< HEAD
-<<<<<<< HEAD
-# other
-=======
-=======
->>>>>>> dev
 *.part
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.mp4
+*.webm
+*.opus
 # other
+.vscode/
+.github/
 build/
 dist/
 venv/
 *.spec
-<<<<<<< HEAD
->>>>>>> dev
-=======
->>>>>>> dev
 versioningconvention.txt
 new-release.bat
+.markdownlint.json
