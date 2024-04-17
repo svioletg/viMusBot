@@ -10,9 +10,10 @@ Developer
 - Improved some error handling and logic for text searching in both `bot.py` and `spoofy.py`
 - Added type annotations to most functions and their parameters, as well as a few variables where it felt needed
 - `bot.py`
-    - The `test_play()` function has been added which will test some common queueing scenarios in succession
-        - This does not comprehensively cover every single base for testing
-        - It can be manually triggered by running `test play` in the new console
+    - The `Tests` class has been added
+        - The `test_play()` function has been added which will test some common queueing scenarios in succession
+            - This does not comprehensively cover every single base for testing
+            - It can be manually triggered by running `test play` in the new console
     - Most constants have been made uppercase
     - `generate_QueueItems()` has been renamed to `generate_from_list()` and is now a class method of the `QueueItem`
     - `player_queue` renamed to `media_queue`
@@ -39,6 +40,8 @@ Features
     - Only multiple single-track URLs will work; multiple playlist/album URLs, or a mix of URLs and plain text terms, will be prevented from queueing
 - `https://spotify.link` URLs are now supported ([Issue #57](https://github.com/svioletg/viMusBot/issues/57))
 - A "console" now runs concurrently with the bot, allowing user input for basic commands into the command prompt or terminal; available commands can be found at [console.md](https://github.com/svioletg/viMusBot/blob/master/docs/console.md), newly added ones listed below
+    - `colors`
+        - Prints out every available color option & displays what the customizable colors are set to
     - `stop`
         - Cancels the console & bot threads and quits out of the script
     - `test play <source> [valid] [multiple_urls] [playlist_or_album]`
