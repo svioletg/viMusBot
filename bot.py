@@ -1,3 +1,4 @@
+# Standard libraries
 import sys
 
 print('Getting ready...')
@@ -18,6 +19,7 @@ import urllib.request
 from inspect import currentframe
 from pathlib import Path
 
+# Third-party libraries
 import aioconsole
 import colorama
 import discord
@@ -42,19 +44,14 @@ if not Path('config.yml').is_file():
     with open('config.yml', 'w') as f:
         f.write('')
 
-with open('config_default.yml','r') as f:
-    config_default = benedict(yaml.safe_load(f))
-
-with open('config.yml','r') as f:
-    config = benedict(yaml.safe_load(f))
-
 print('Importing local packages...')
 
-# Import local files after main packages, and after validating config
-import customlog
-import spoofy
-import update
-import palette
+# Local modules
+import updater
+import vmbutils.configuration as config
+import vmbutils.palette as palette
+import vmbutils.spoofy as spoofy
+from vmbutils.customlog import log, log_traceback
 
 _here = Path(__file__).name
 
@@ -70,25 +67,10 @@ discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 colorama.init(autoreset=True)
 plt = palette.Palette()
 
-last_logtime = time.time()
-
-def log(msg: str, verbose: bool=False):
-    global last_logtime
-    customlog.newlog(msg=msg, last_logtime=last_logtime, called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
-    last_logtime = time.time()
-
-def log_traceback(error: BaseException):
-    trace=traceback.format_exception(error)
-    log(f'Full traceback below.\n\n{plt.error}{"".join(trace)}')
-
-def log_line():
-    cf = currentframe()
-    print('@ LINE ', cf.f_back.f_lineno)
-
 if __name__ == '__main__':
     log(f'Running on version {VERSION}; checking for updates...')
 
-    update_check_result = update.check()
+    update_check_result = updater.check()
 
     # Check for an outdated version.txt
     if update_check_result[0] == False and update_check_result[1] == True:
@@ -108,27 +90,27 @@ if __name__ == '__main__':
 log('Parsing config...')
 
 #region CONFIGURATION FROM YAML
-PUBLIC             : bool = config.get('public', config_default['public'])
-TOKEN_FILE_PATH    : str  = config.get('token-file', config_default['token-file'])
-PUBLIC_PREFIX      : str  = config.get('prefixes.public', config_default['prefixes.public'])
-DEV_PREFIX         : str  = config.get('prefixes.developer', config_default['prefixes.developer'])
-EMBED_COLOR        : int  = int(config.get('embed-color', config_default['embed-color']), 16)
-INACTIVITY_TIMEOUT : int  = config.get('inactivity-timeout', config_default['inactivity-timeout'])
-CLEANUP_EXTENSIONS : list = config.get('auto-remove', config_default['auto-remove'])
-DISABLED_COMMANDS  : list = config.get('command-blacklist', config_default['command-blacklist'])
+PUBLIC             : bool = config.get('public')
+TOKEN_FILE_PATH    : str  = config.get('token-file')
+PUBLIC_PREFIX      : str  = config.get('prefixes.public')
+DEV_PREFIX         : str  = config.get('prefixes.developer')
+EMBED_COLOR        : int  = int(config.get('embed-color'), 16)
+INACTIVITY_TIMEOUT : int  = config.get('inactivity-timeout')
+CLEANUP_EXTENSIONS : list = config.get('auto-remove')
+DISABLED_COMMANDS  : list = config.get('command-blacklist')
 
-SHOW_USERS_IN_QUEUE      : bool = config.get('show-users-in-queue', config_default['show-users-in-queue'])
-ALLOW_SPOTIFY_PLAYLISTS  : bool = config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])
-USE_TOP_MATCH            : bool = config.get('use-top-match', config_default['use-top-match'])
-USE_URL_CACHE            : bool = config.get('use-url-cache', config_default['use-url-cache'])
-SPOTIFY_PLAYLIST_LIMIT   : int  = config.get('spotify-playlist-limit', config_default['spotify-playlist-limit'])
-DURATION_LIMIT           : int  = config.get('duration-limit', config_default['duration-limit'])
-MAXIMUM_CONSECUTIVE_URLS : int  = config.get('maximum-urls', config_default['maximum-urls'])
+SHOW_USERS_IN_QUEUE      : bool = config.get('show-users-in-queue')
+ALLOW_SPOTIFY_PLAYLISTS  : bool = config.get('allow-spotify-playlists')
+USE_TOP_MATCH            : bool = config.get('use-top-match')
+USE_URL_CACHE            : bool = config.get('use-url-cache')
+SPOTIFY_PLAYLIST_LIMIT   : int  = config.get('spotify-playlist-limit')
+DURATION_LIMIT           : int  = config.get('duration-limit')
+MAXIMUM_CONSECUTIVE_URLS : int  = config.get('maximum-urls')
 
-VOTE_TO_SKIP          : bool = config.get('vote-to-skip.enabled', config_default['vote-to-skip.enabled'])
-SKIP_VOTES_TYPE       : str  = config.get('vote-to-skip.threshold-type', config_default['vote-to-skip.threshold-type'])
-SKIP_VOTES_EXACT      : int  = config.get('vote-to-skip.threshold-exact', config_default['vote-to-skip.threshold-exact'])
-SKIP_VOTES_PERCENTAGE : int  = config.get('vote-to-skip.threshold-percentage', config_default['vote-to-skip.threshold-percentage'])
+VOTE_TO_SKIP          : bool = config.get('vote-to-skip.enabled')
+SKIP_VOTES_TYPE       : str  = config.get('vote-to-skip.threshold-type')
+SKIP_VOTES_EXACT      : int  = config.get('vote-to-skip.threshold-exact')
+SKIP_VOTES_PERCENTAGE : int  = config.get('vote-to-skip.threshold-percentage')
 #endregion
 
 skip_votes_remaining = 0

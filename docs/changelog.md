@@ -2,6 +2,20 @@
 
 ## Changelog
 
+## 2.0.0
+
+> *2024.x.x / dev.34*
+
+Developer
+- `vmbutils` directory added to contain helper modules
+    - `spoofy.py`, `customlog.py`, and `palette.py` moved into `vmbutils`
+    - `configuration.py` added to `vmbutils` to reduce the amount of duplicated code regarding configuration across this project
+        - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
+- The individual `log()` functions in `bot.py` and `spoofy.py` have been moved into `customlog`, and they will now import it from that module instead
+    - As a result, the elapsed time at the end of each log is no longer specific to each module, and represents the time elapsed between any log printed
+- Replaced calls to `sys._getframe()` in `log()` functions with `inspect.currentframe()`
+- `update.py` renamed to `updater.py`
+
 ## 1.9.0
 
 > *2024.04.16 / dev.33*

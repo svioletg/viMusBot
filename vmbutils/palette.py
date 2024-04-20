@@ -11,7 +11,7 @@ with open('config_default.yml', 'r') as f:
 with open('config.yml', 'r') as f:
     config = benedict(yaml.safe_load(f))
 
-NO_COLOR: bool = config.get('logging-options.colors.no-color', config_default['logging-options.colors.no-color'])
+NO_COLOR: bool = config.get('logging-options.colors.no-color')
 
 def get_color_config(key: str):
     return config.get(f'logging-options.colors.{key}', config_default[f'logging-options.colors.{key}'])

@@ -1,10 +1,13 @@
+# pylint: disable=unused-import, global-statement
+
+# Standard libraries
+import inspect
 import json
 import os
-import sys
 import time
 import traceback
-from inspect import currentframe, getframeinfo
 
+# Third-party libraries
 import colorama
 import pytube
 import regex as re
@@ -18,9 +21,9 @@ from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
-# Local files
-import customlog
-from palette import Palette
+# Local modules
+import vmbutils.customlog as customlog
+from vmbutils.palette import Palette
 
 _here = os.path.basename(__file__)
 
@@ -32,13 +35,8 @@ last_logtime = time.time()
 
 def log(msg: str, verbose=False):
     global last_logtime
-    customlog.newlog(msg=msg, last_logtime=last_logtime, 
-                     called_from=sys._getframe().f_back.f_code.co_name, verbose=verbose)
+    customlog.newlog(msg, last_logtime, function_source=inspect.currentframe().f_back.f_code.co_name, verbose=verbose)
     last_logtime = time.time()
-
-def log_line():
-    cf = currentframe()
-    print('@ LINE ', cf.f_back.f_lineno)
 
 # Parse config from YAML
 with open('config_default.yml','r') as f:
@@ -47,9 +45,9 @@ with open('config_default.yml','r') as f:
 with open('config.yml','r') as f:
     config = benedict(yaml.safe_load(f))
 
-FORCE_NO_MATCH         : bool = config.get('force-no-match', config_default['force-no-match'])
-SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit', config_default['spotify-playlist-limit'])
-DURATION_LIMIT         : int  = config.get('duration-limit', config_default['duration-limit'])
+FORCE_NO_MATCH         : bool = config.get('force-no-match')
+SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit')
+DURATION_LIMIT         : int  = config.get('duration-limit')
 
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
@@ -73,23 +71,25 @@ ytdl_format_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
-# API Objects
+#region API CONNECTIONS
 
 # Connect to youtube music API
 ytmusic = YTMusic()
 
 # Connect to spotify API
-with open('spotify_config.json', 'r') as f:
+with open('spotify_config.json', 'r', encoding='utf-8') as f:
     scred = json.loads(f.read())['spotify']
 
 client_credentials_manager = SpotifyClientCredentials(
-    client_id=scred['client_id'],
-    client_secret=scred['client_secret']
+    client_id = scred['client_id'],
+    client_secret = scred['client_secret']
 )
 sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
 # Connect to soundcloud API
 sc = sclib.SoundcloudAPI()
+
+#endregion
 
 # For analyze()
 keytable = {

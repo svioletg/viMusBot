@@ -1,13 +1,16 @@
+# Standard libraries
 import os
 import shutil
 import urllib.request
 from pathlib import Path
 from zipfile import ZipFile
 
+# Third-party libraries
 import colorama
 import requests
 
-from palette import Palette
+# Local modules
+from vmbutils.palette import Palette
 
 colorama.init(autoreset=True)
 plt = Palette()
