@@ -64,6 +64,7 @@ Other
     - `embed-color` (string) added; specifies the color of the sidebar on bot messages, must be a hex code (e.g "ff00ff")
     - `auto-update-config` removed; no longer used
 - Changes in `requirements.txt`:
+    - `aioconsole` is now required
     - `python-benedict` is now required
     - `requests` is now required (to support [Issue #57](https://github.com/svioletg/viMusBot/issues/57))
     - `inquirer` is no longer required, it is only used for `vmb-wizard.py` which is now deprecated
