@@ -11,6 +11,7 @@ import yaml
 from benedict import benedict
 
 # Local modules
+import vmbutils.configuration as config
 from vmbutils.palette import Palette
 
 plt = Palette()
@@ -21,12 +22,6 @@ except FileNotFoundError:
     pass
 
 logfile = open('vimusbot.log', 'w', encoding='utf-8')
-
-with open('config_default.yml', 'r', encoding='utf-8') as f:
-    config_default = benedict(yaml.safe_load(f))
-
-with open('config.yml', 'r') as f:
-    config = benedict(yaml.safe_load(f))
 
 LOG_BLACKLIST: list = config.get('logging-options.ignore-logs-from')
 
@@ -39,12 +34,21 @@ def newlog(msg: str='', last_logtime: int|float=time.time(), function_source: st
     elapsed = time.time() - last_logtime
     timestamp = datetime.now().strftime('%H:%M:%S')
     logstring = f'[{timestamp}] {plt.file[module_source]}[{module_source}]{plt.reset}{plt.func} {function_source}:{plt.reset} {msg}{plt.reset} {plt.timer} {round(elapsed,3)}s'
+    # Logs always get written to the logfile regardless of whether console logs are enabled
     logfile.write(plt.strip_color(logstring)+'\n')
+
+    # Allow warnings and errors to get logged to console regardless of function blacklists
+    # TODO: This is currently done by detecting colorama's color codes, probably better to use something more explicit
+    # TODO: Better yet, is this really necessary at all?
     blacklist_exceptions = [plt.warn, plt.error]
+
+    # If showing logs is disabled, don't print anything to console
     if not config.get('logging-options.show-console-logs'):
         return
+    # If the function this log originates from is blacklisted, AND if any warning of error color codes aren't present, don't print to console
     elif function_source in LOG_BLACKLIST and not any(i in logstring for i in blacklist_exceptions):
         return
+    # If the log is marked as verbose, and printing verbose logs is disabled, don't print to console
     elif verbose and not config.get('logging-options.show-verbose-logs'):
         return
     else:

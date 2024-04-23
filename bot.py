@@ -208,7 +208,7 @@ def is_command_enabled(ctx: commands.Context):
     return not ctx.command.name in DISABLED_COMMANDS
 
 def command_aliases(command: str):
-    return config.get(f'aliases.{command}', config_default.get(f'aliases.{command}', []))
+    return config.get(f'aliases.{command}')
 
 #
 #
