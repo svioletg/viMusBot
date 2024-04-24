@@ -1,4 +1,5 @@
-# pylint: disable=unused-import, global-statement
+"""Primarily provides methods for searching and returning 
+standardized results from various sources."""
 
 # Standard libraries
 import inspect
@@ -159,9 +160,9 @@ def is_matching(reference: dict, ytresult: dict,
     # 'strict' = checking for strings in other strings, how matching was done beforehand
 
     # overrides the fuzzy matching threshold, default is 75%
-    title_threshold = kwargs.get('title_threshold',threshold)
-    artist_threshold = kwargs.get('artist_threshold',threshold)
-    album_threshold = kwargs.get('album_threshold',threshold)
+    title_threshold = kwargs.get('title_threshold', threshold)
+    artist_threshold = kwargs.get('artist_threshold', threshold)
+    album_threshold = kwargs.get('album_threshold', threshold)
 
     ref_title, ref_artist, ref_album = reference['title'], reference['artist'], reference['album']
     yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
@@ -246,7 +247,7 @@ def search_ytmusic_text(query: str) -> tuple:
 
     return top_song, top_video
 
-def search_ytmusic_album(title: str, artist: str, year: str, upc: str=None) -> str|None:
+def search_ytmusic_album(title: str, artist: str, year: str, upc: str='') -> str|None:
     if FORCE_NO_MATCH:
         log(f'{plt.warn}force_no_match is set to True.'); return None
 
