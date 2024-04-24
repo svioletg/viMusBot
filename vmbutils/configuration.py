@@ -1,6 +1,10 @@
 import yaml
 from benedict import benedict
 
+from typing import TypedDict
+
+# TODO: Maybe figure out some way to make this compatible with type checking?
+# Could potentially be done with a TypedDict, but I don't think I can use that with benedict
 with open('config_default.yml','r') as f:
     config_default = benedict(yaml.safe_load(f))
 

@@ -32,9 +32,58 @@ def log(msg: str, verbose=False):
     customlog.newlog(msg, last_logtime, function_source=inspect.currentframe().f_back.f_code.co_name, verbose=verbose)
     last_logtime = time.time()
 
-FORCE_NO_MATCH         : bool = config.get('force-no-match')
-SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit')
-DURATION_LIMIT         : int  = config.get('duration-limit')
+FORCE_NO_MATCH         : bool = config.get('force-no-match') # type: ignore
+SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit') # type: ignore
+DURATION_LIMIT         : int  = config.get('duration-limit') # type: ignore
+
+# For typing, no functional difference
+class MediaSource(str):
+    pass
+
+YOUTUBE    = MediaSource('youtube')
+SPOTIFY    = MediaSource('spotify')
+SOUNDCLOUD = MediaSource('soundcloud')
+
+class VimusbotErrors:
+    class FormattingError(Exception):
+        pass
+
+class MediaInfo:
+    # def length_of_list(tracks: 'list[TrackInfo]') -> int:
+    #     # TODO: Implement
+    #     pass
+    pass
+
+class TrackInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, artist: str, album_name: str, isrc: str, url: str, length_seconds: int):
+        self.source = source
+        self.title = title
+        self.artist = artist
+        self.album_name = album_name
+        self.isrc = isrc
+        self.url = url
+        self.length_seconds = length_seconds
+
+class AlbumInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, artist: str, contents: list[TrackInfo], upc: str, url: str, length_seconds: int = 0):
+        self.source = source
+        self.title = title
+        self.artist = artist
+        self.contents = contents
+        self.upc = upc
+        self.url = url
+        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+
+class PlaylistInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, contents: list[TrackInfo], url: str, length_seconds: int = 0):
+        self.source = source
+        self.title = title
+        self.contents = contents
+        self.url = url
+        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+
+def length_of_media_list(track_list: list[TrackInfo]) -> int:
+    return sum(track.length_seconds for track in track_list)
 
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
@@ -78,51 +127,6 @@ sc = sclib.SoundcloudAPI()
 
 #endregion
 
-# For typing, no functional difference
-class MediaSource(str):
-    pass
-
-YOUTUBE    = MediaSource('youtube')
-SPOTIFY    = MediaSource('spotify')
-SOUNDCLOUD = MediaSource('soundcloud')
-
-class MediaInfo:
-    # def length_of_list(tracks: 'list[TrackInfo]') -> int:
-    #     # TODO: Implement
-    #     pass
-    pass
-
-class TrackInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, artist: str, album_name: str, isrc: str, url: str, length_seconds: int):
-        self.source = source
-        self.title = title
-        self.artist = artist
-        self.album_name = album_name
-        self.isrc = isrc
-        self.url = url
-        self.length_seconds = length_seconds
-
-class AlbumInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, artist: str, contents: list[TrackInfo], upc: str, url: str, length_seconds: int = None):
-        self.source = source
-        self.title = title
-        self.artist = artist
-        self.contents = contents
-        self.upc = upc
-        self.url = url
-        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
-
-class PlaylistInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, contents: list[TrackInfo], url: str, length_seconds: int = None):
-        self.source = source
-        self.title = title
-        self.contents = contents
-        self.url = url
-        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
-
-def length_of_media_list(track_list: list[TrackInfo]) -> int:
-    return sum(track.length_seconds for track in track_list)
-
 # For analyze()
 keytable = {
     0: 'C major (A minor)',
@@ -142,24 +146,22 @@ keytable = {
 ### SETUP FINISH
 
 # Define matching logic
-def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
+def is_matching(reference: dict, ytresult: dict,
+                mode: Literal['fuzz', 'strict'] = 'fuzz',
+                threshold: int = 75, 
+                ignore_title: bool = False, 
+                ignore_artist: bool = False, 
+                ignore_album: bool = False,
+                **kwargs) -> bool:
     # TODO: Review this!
     # mode is how exactly the code will determine a match
     # 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
     # 'strict' = checking for strings in other strings, how matching was done beforehand
-    if mode not in ['fuzz', 'strict']: 
-        log(f'{mode} is not a valid mode.')
-        return
 
     # overrides the fuzzy matching threshold, default is 75%
-    threshold = kwargs.get('threshold',75)
     title_threshold = kwargs.get('title_threshold',threshold)
     artist_threshold = kwargs.get('artist_threshold',threshold)
     album_threshold = kwargs.get('album_threshold',threshold)
-
-    ignore_title = kwargs.get('ignore_title', False)
-    ignore_artist = kwargs.get('ignore_artist', False)
-    ignore_album = kwargs.get('ignore_album', False)
 
     ref_title, ref_artist, ref_album = reference['title'], reference['artist'], reference['album']
     yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
@@ -198,27 +200,6 @@ def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
         and (alternate_check)
 
 # Youtube
-def isrc_search_test(playlist):
-    # For testing, generally not a useful function
-    tracks = spotify_playlist(playlist)
-    yes=0
-    no=0
-    log('STARTING')
-    for i in tracks:
-        isrc = i['isrc']
-        # For whatever reason, pytube seems to be more accurate here
-        isrc_match = pytube.Search(isrc).results
-        for match in isrc_match:
-            print(plt.blue+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
-            if fuzz.ratio(match.title, i['title']) > 75:
-                log(f'{plt.green} {tracks.index(i)+1}/{len(tracks)}: Cleared. {isrc}')
-                yes+=1
-                break
-            elif isrc_match.index(match)==len(isrc_match)-1:
-                no+=1
-                log(f'{plt.error} {tracks.index(i)+1}/{len(tracks)}: Not cleared. {isrc}')
-    log(f'{yes} successes / {no} fails')
-
 def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
     # This must be done in order for the description to load in
     try:
@@ -227,12 +208,14 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
     except Exception as e:
         log(f'pytube description retrieval failed; using ytdl...', verbose=True)
         log(f'Cause of the above: {e}')
-        description_list = ytdl.extract_info(pytube_object.watch_url)['description'].split('\n')
+        ytdl_info = ytdl.extract_info(pytube_object.watch_url)
+        if not ytdl_info:
+            raise ValueError('ytdl.extract_info() returned None.')
+        description_list: list[str] = ytdl_info['description'].split('\n')
 
     if 'Provided to YouTube by' not in description_list[0]:
         # This function won't work if it doesn't follow the auto-generated template on most official song uploads
-        log(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
-        return None
+        raise VimusbotErrors.FormattingError(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
 
     for item in description_list.copy():
         if item == '':
