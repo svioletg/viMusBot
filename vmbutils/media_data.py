@@ -3,20 +3,16 @@
 # Standard libraries
 import inspect
 import json
-import os
 import time
 import traceback
+from typing import TypedDict, Literal
 
 # Third-party libraries
-import colorama
 import pytube
 import regex as re
 import sclib
 import spotipy
-import yaml
 import yt_dlp
-from benedict import benedict
-from colorama import Back, Fore, Style
 from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
@@ -24,26 +20,17 @@ from ytmusicapi import YTMusic
 # Local modules
 import vmbutils.customlog as customlog
 from vmbutils.palette import Palette
+import vmbutils.configuration as config
 
-_here = os.path.basename(__file__)
-
-# Personal debug logging
-colorama.init(autoreset=True)
 plt = Palette()
 
 last_logtime = time.time()
 
+# TODO: Remove/update this for refactor
 def log(msg: str, verbose=False):
     global last_logtime
     customlog.newlog(msg, last_logtime, function_source=inspect.currentframe().f_back.f_code.co_name, verbose=verbose)
     last_logtime = time.time()
-
-# Parse config from YAML
-with open('config_default.yml','r') as f:
-    config_default = benedict(yaml.safe_load(f))
-
-with open('config.yml','r') as f:
-    config = benedict(yaml.safe_load(f))
 
 FORCE_NO_MATCH         : bool = config.get('force-no-match')
 SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit')
@@ -91,26 +78,72 @@ sc = sclib.SoundcloudAPI()
 
 #endregion
 
+# For typing, no functional difference
+class MediaSource(str):
+    pass
+
+YOUTUBE    = MediaSource('youtube')
+SPOTIFY    = MediaSource('spotify')
+SOUNDCLOUD = MediaSource('soundcloud')
+
+class MediaInfo:
+    # def length_of_list(tracks: 'list[TrackInfo]') -> int:
+    #     # TODO: Implement
+    #     pass
+    pass
+
+class TrackInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, artist: str, album_name: str, isrc: str, url: str, length_seconds: int):
+        self.source = source
+        self.title = title
+        self.artist = artist
+        self.album_name = album_name
+        self.isrc = isrc
+        self.url = url
+        self.length_seconds = length_seconds
+
+class AlbumInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, artist: str, contents: list[TrackInfo], upc: str, url: str, length_seconds: int = None):
+        self.source = source
+        self.title = title
+        self.artist = artist
+        self.contents = contents
+        self.upc = upc
+        self.url = url
+        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+
+class PlaylistInfo(MediaInfo):
+    def __init__(self, source: MediaSource, title: str, contents: list[TrackInfo], url: str, length_seconds: int = None):
+        self.source = source
+        self.title = title
+        self.contents = contents
+        self.url = url
+        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+
+def length_of_media_list(track_list: list[TrackInfo]) -> int:
+    return sum(track.length_seconds for track in track_list)
+
 # For analyze()
 keytable = {
-    0: 'C major or A minor',
-    1: 'C#/Db major or A#/Bb minor',
-    2: 'D major or B minor',
-    3: 'D#/Eb major or C minor',
-    4: 'E major or C#/Db minor',
-    5: 'F major or D minor',
-    6: 'F#/Gb major or D#/Eb minor',
-    7: 'G major or E minor',
-    8: 'G#/Ab major or F minor',
-    9: 'A major or F#/Gb minor',
-    10: 'A#/Bb major or G minor',
-    11: 'B major or G#/Ab minor',
+    0: 'C major (A minor)',
+    1: 'C#/Db major (A#/Bb minor)',
+    2: 'D major (B minor)',
+    3: 'D#/Eb major (C minor)',
+    4: 'E major (C#/Db minor)',
+    5: 'F major (D minor)',
+    6: 'F#/Gb major (D#/Eb minor)',
+    7: 'G major (E minor)',
+    8: 'G#/Ab major (F minor)',
+    9: 'A major (F#/Gb minor)',
+    10: 'A#/Bb major (G minor)',
+    11: 'B major (G#/Ab minor)',
 }
 
 ### SETUP FINISH
 
 # Define matching logic
 def is_matching(reference: dict, ytresult: dict, mode='fuzz', **kwargs) -> bool:
+    # TODO: Review this!
     # mode is how exactly the code will determine a match
     # 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
     # 'strict' = checking for strings in other strings, how matching was done beforehand
@@ -176,7 +209,7 @@ def isrc_search_test(playlist):
         # For whatever reason, pytube seems to be more accurate here
         isrc_match = pytube.Search(isrc).results
         for match in isrc_match:
-            print(Fore.CYAN+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
+            print(plt.blue+i['title']+f'{plt.reset} ... {plt.warn}'+match.title)
             if fuzz.ratio(match.title, i['title']) > 75:
                 log(f'{plt.green} {tracks.index(i)+1}/{len(tracks)}: Cleared. {isrc}')
                 yes+=1
@@ -390,31 +423,33 @@ def spotify_playlist(url: str) -> list:
         return None, e
     newlist = []
     for item in playlist:
-        newlist.append({
-            'title': item['track']['name'],
-            'artist': item['track']['artists'][0]['name'],
-            'album': item['track']['album']['name'],
-            'isrc': item['track']['external_ids'].get('isrc', None),
-            'url': item['track']['external_urls']['spotify'],
-            'duration': round(item['track']['duration_ms'] / 1000)
-        })
+        item = item['track']
+        newlist.append(TrackInfo(
+                title  = item['name'],
+                artist = item['artists'][0]['name'],
+                album_name  = item['album']['name'],
+                isrc   = item['external_ids'].get('isrc', None),
+                url    = item['external_urls']['spotify'],
+                length_seconds = item['duration_ms'] // 1000
+            ))
     return newlist
 
-def spotify_track(url: str) -> dict:
+def spotify_track(url: str) -> TrackInfo:
     try:
         info = sp.track(url)
     except spotipy.exceptions.SpotifyException as e:
         log(f'Failed to retrieve Spotify track: {e}', verbose=True)
-        return None, e
+        return e
 
-    return {
-        'title': info['name'],
-        'artist': info['artists'][0]['name'],
-        'album': info['album']['name'],
-        'isrc': info['external_ids'].get('isrc', None),
-        'url': info['external_urls']['spotify'],
-        'duration': round(info['duration_ms'] / 1000)
-    }
+    return TrackInfo(
+        source = SPOTIFY,
+        title  = info['name'],
+        artist = info['artists'][0]['name'],
+        album_name  = info['album']['name'],
+        isrc   = info['external_ids'].get('isrc', None),
+        url    = info['external_urls']['spotify'],
+        length_seconds = info['duration_ms'] // 1000
+    )
 
 def spotify_album(url: str) -> dict:
     try:
@@ -423,12 +458,12 @@ def spotify_album(url: str) -> dict:
         log(f'Failed to retrieve Spotify album: {e}', verbose=True)
         return None, e
 
-    return {
-        'title':info['name'], 
-        'artist':info['artists'][0]['name'],
-        'year':info['release_date'].split('-')[0],
-        'upc':info['external_ids']['upc']
-    }
+    return AlbumInfo(
+        title = info['name'], 
+        artist = info['artists'][0]['name'],
+        year = info['release_date'].split('-')[0],
+        upc = info['external_ids']['upc']
+    )
 
 def analyze_track(url: str) -> tuple:
     uri = get_uri(url)
