@@ -22,6 +22,7 @@ quickstart.sh
 test.py
 test_*.py
 *.prof
+*.lprof
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py

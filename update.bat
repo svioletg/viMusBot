@@ -1,6 +1,6 @@
 echo Checking for updated files...
 
-.vmbvenv\scripts\python update.py
+.vmbvenv\scripts\python updater.py
 
 echo Updating dependencies, if needed...
 

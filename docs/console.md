@@ -1,6 +1,4 @@
-# viMusBot
-
-## Using the Console
+# viMusBot / Using the Console
 
 Added in v1.9.0, the **console** lets you type and run commands into the terminal or window the bot is running in. Note that these "commands" are entirely separate from the "commands" you would use on Discord itself — most of them are just for getting some basic information, or for developer debugging usage. A few notes about using them:
 

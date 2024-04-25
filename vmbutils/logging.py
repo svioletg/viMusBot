@@ -33,7 +33,6 @@ class Log:
         self.last_logtime: float = 0
 
     def log(self, msg: str,
-            last_logtime: float = time.time(),
             function_source: str = inspect.currentframe().f_back.f_code.co_name, # type: ignore
             verbose: bool = False):
         """Constructs a log string, writes it to the log file, and returns the string"""
@@ -42,8 +41,10 @@ class Log:
             if frame.filename[0] != '<':
                 module_source = re.search(r'([^\/\\]+$)', frame.filename).group(0) # type: ignore
                 break
-
-        elapsed = time.time() - last_logtime
+        
+        if self.last_logtime == 0:
+            self.last_logtime = time.time()
+        elapsed = time.time() - self.last_logtime
         timestamp = datetime.now().strftime('%H:%M:%S')
         log_string = f'[{timestamp}] {plt.file(module_source)}[{module_source}] '+\
             f'{plt.func}{function_source}:{plt.reset} {msg}{plt.reset} '+\

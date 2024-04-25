@@ -162,11 +162,13 @@ def length_of_media_list(track_list: list[TrackInfo]) -> int:
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
     """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
     # TODO: Make compatible with all sources
+    # TODO: This can take a while, maybe find a way to report status back to bot.py?
     object_list: list[TrackInfo] = []
     track_list: list[Any] = []
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
-        for track in track_list:
+        for n, track in enumerate(track_list):
+            # print(f'Getting track {n+1} out of {len(track_list)}...')
             if isinstance(group_object, AlbumInfo):
                 object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
             elif isinstance(group_object, PlaylistInfo):

@@ -1,6 +1,4 @@
-# viMusBot
-
-## Using `config.yml` for configuration & customization
+# viMusBot / Configuration
 
 Your viMusBot folder will come with a `config_default.yml` file, which contains various settings needed for the bot to run. Most of what is provided are simply user preferences — things like the bot's command prefix, the color of its embed sidebar, aliases for commands, and limiting the duration of what can be played.
 
