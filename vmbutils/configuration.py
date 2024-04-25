@@ -1,18 +1,21 @@
 """Handles loading default and user configuration from YAML."""
 
-from pathlib import Path
 from typing import Any, Literal
 
 import yaml
 from benedict import benedict
 
-parent_dir = Path(__file__).parent.parent
+CONFIG_PATHS: dict[str, str] = {
+    'user': 'config.yml', 
+    'default': 'config_default.yml'
+}
 
-with open(Path(parent_dir, 'config_default.yml'), 'r', encoding='utf-8') as f:
+with open(CONFIG_PATHS['default'], 'r', encoding='utf-8') as f:
     config_default = benedict(yaml.safe_load(f))
 
-with open(Path(parent_dir, 'config.yml'), 'r', encoding='utf-8') as f:
-    config = benedict(yaml.safe_load(f))
+with open(CONFIG_PATHS['user'], 'r', encoding='utf-8') as f:
+    config_yaml = yaml.safe_load(f)
+    config = benedict(config_yaml) if config_yaml else benedict({})
 
 def get(key: str) -> Any:
     """Looks for the given key in the user config, returns the default value if none is set"""

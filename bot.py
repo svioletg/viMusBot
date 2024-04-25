@@ -50,7 +50,7 @@ print('Importing local packages...')
 import updater
 import vmbutils.configuration as config
 import vmbutils.palette as palette
-import vmbutils.media_data as media_data
+import vmbutils.media as media
 from vmbutils.logging import log, log_traceback
 
 _here = Path(__file__).name
@@ -304,10 +304,10 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def analyze(self, ctx: commands.Context, spotifyurl: str):
         """Returns spotify API information regarding a track."""
-        info = media_data.spotify_track(spotifyurl)
+        info = media.spotify_track(spotifyurl)
         title = info['title']
         artist = info['artist']
-        result = media_data.analyze_track(spotifyurl)
+        result = media.analyze_track(spotifyurl)
         data = result[0]
         skip = result[1]
         # Assemble embed object
@@ -495,7 +495,7 @@ class Music(commands.Cog):
                 log('Link not detected, searching by text', verbose=True)
                 log(f'Searching: "{query}"')
 
-                top_song, top_video = media_data.search_ytmusic_text(query)
+                top_song, top_video = media.search_ytmusic_text(query)
 
                 if (top_song is None) and (top_video is None):
                     await qmessage.edit(embed=embedq('No song or video match could be found for your query.'))
@@ -549,7 +549,7 @@ class Music(commands.Cog):
                 if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:
                     log('Spotify playlist detected.', verbose=True)
                     await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
-                    playlist_result = media_data.spotify_playlist(url)
+                    playlist_result = media.spotify_playlist(url)
 
                     if isinstance(playlist_result, tuple):
                         code = playlist_result[1].http_status
@@ -573,7 +573,7 @@ class Music(commands.Cog):
                         return
                     
                     queue_batch(ctx, objlist)
-                    list_name = media_data.sp.playlist(url)['name']
+                    list_name = media.sp.playlist(url)['name']
                     await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
                     if not voice.is_playing():
                         log('Voice client is not playing; starting...')
@@ -590,13 +590,13 @@ class Music(commands.Cog):
                 log('Checking for album...', verbose=True)
                 if 'https://open.spotify.com/album/' in url:
                     log('Spotify album detected.', verbose=True)
-                    album_info = media_data.spotify_album(url)
+                    album_info = media.spotify_album(url)
 
                     if isinstance(album_info, tuple):
                         await qmessage.edit(embed=embedq('Could not retrieve album; the URL seems invalid.'))
                         return
 
-                    url = media_data.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
+                    url = media.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
                     if url is None:
                         await qmessage.edit(embed=embedq('No match could be found.'))
                         return
@@ -823,13 +823,13 @@ def duration_from_url(url: str) -> int|float:
             # Continues after this block so this isn't duplicated
     elif 'soundcloud.com' in url:
         try:
-            result = media_data.sc.resolve(url).duration
+            result = media.sc.resolve(url).duration
         except TypeError as e:
             log(f'Failed to retrieve Soundcloud track: {e}')
             return None, e
         return round(result / 1000)
     elif 'open.spotify.com' in url:
-        result = media_data.spotify_track(url)
+        result = media.spotify_track(url)
         if isinstance(result, tuple):
             log(f'Failed to retrieve Spotify track: {result[1]}')
             return None, result[1]
@@ -854,9 +854,9 @@ def title_from_url(url: str) -> str:
             log(f'pytube encountered "{traceback.format_exception(e)[-1]}" during title retrieval. Falling back on yt-dlp.', verbose=True)
             # Continues after this block so this isn't duplicated
     elif 'soundcloud.com' in url:
-        return media_data.sc.resolve(url).title
+        return media.sc.resolve(url).title
     elif 'open.spotify.com' in url:
-        return media_data.spotify_track(url)['title']
+        return media.spotify_track(url)['title']
     
     # yt-dlp should handle most other URLs
     try:
@@ -966,7 +966,7 @@ class QueueItem:
             for item in playlist:
                 if isinstance(item, str) and 'open.spotify.com' in item:
                     url = item
-                    item = media_data.spotify_track(item)
+                    item = media.spotify_track(item)
                     if isinstance(item, tuple):
                         log(f'Failed to download video: {item[1]}')
                         failures.append(url)
@@ -991,7 +991,7 @@ class QueueItem:
             if 'soundcloud.com' in playlist:
                 # SoundCloud playlists have to be processed differently
                 try:
-                    playlist_entries = media_data.soundcloud_playlist(playlist)
+                    playlist_entries = media.soundcloud_set(playlist)
                 except TypeError as e:
                     log(f'Failed to retrieve SoundCloud playlist: {e}')
                     return None, e
@@ -1056,7 +1056,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
     else:
         log('Trying to match Spotify track...')
         npmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
-        spyt = media_data.spyt(item.url)
+        spyt = media.spyt(item.url)
 
         log('Checking if unsure...', verbose=True)
         if isinstance(spyt, tuple) and spyt[0] == 'unsure':

@@ -6,7 +6,7 @@ import inspect
 import json
 import time
 import traceback
-from typing import TypedDict, Literal, cast
+from typing import Any, TypedDict, Literal, cast
 
 # Third-party libraries
 import pytube
@@ -54,8 +54,9 @@ class MediaInfo:
     pass
 
 class TrackInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info_dict: dict):
+    def __init__(self, source: MediaSource, info: Any):
         self.source = source
+        self.url: str
         self.title: str
         self.artist: str
         self.album_name: str
@@ -64,29 +65,34 @@ class TrackInfo(MediaInfo):
 
         match source:
             case 'spotify':
-                self.title          = cast(str, info_dict['name'])
-                self.artist         = cast(str, info_dict['artists'][0]['name'])
-                self.album_name     = cast(str, info_dict['album']['name'])
-                self.isrc           = cast(str, info_dict['external_ids'].get('isrc', None))
-                self.length_seconds = cast(int, info_dict['duration_ms'] // 1000)
+                self.url            = cast(str, info['external_urls']['spotify'])
+                self.title          = cast(str, info['name'])
+                self.artist         = cast(str, info['artists'][0]['name'])
+                self.album_name     = cast(str, info['album']['name'])
+                self.isrc           = cast(str, info['external_ids'].get('isrc', None))
+                self.length_seconds = cast(int, info['duration_ms'] // 1000)
             case 'souncloud':
                 pass
             case 'youtube':
                 pass
 
 class AlbumInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info_dict: dict):
+    def __init__(self, source: MediaSource, info: Any):
         self.source = source
-        self.info_dict = info_dict
+        self.url: str
+        self.title: str
+        self.artist: str
+        self.upc: str
         self.contents: list[TrackInfo]
         self.length_seconds: int
 
         match source:
             case 'spotify':
-                self.title = info_dict['name']
-                self.artist = info_dict['artists'][0]['name']
-                self.upc = info_dict['external_ids']['upc']
-                self.contents = self.get_contents()
+                self.url            = cast(str, info['external_urls']['spotify'])
+                self.title          = cast(str, info['name'])
+                self.artist         = cast(str, info['artists'][0]['name'])
+                self.upc            = cast(str, info['external_ids']['upc'])
+                self.contents       = self.get_contents()
                 self.length_seconds = length_of_media_list(self.contents)
             case 'soundcloud':
                 pass
@@ -97,12 +103,22 @@ class AlbumInfo(MediaInfo):
         """Retrieves a list of TrackInfo objects based on the URLs found within this album."""
         # TODO: Make compatible with all sources
         object_list: list[TrackInfo] = []
-        match self.source:
-            case 'spotify':
-                track_list: list[dict] = cast(list[dict], self.info_dict['tracks']['items'])
-                for track in track_list:
-                    object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
-                return object_list
+        track_list: list[Any] = []
+        if self.source == SPOTIFY:
+            track_list = cast(list[dict], self.info['tracks']['items'])
+            for track in track_list:
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
+            return object_list
+
+        if self.source == SOUNDCLOUD:
+            track_list = self.info.tracks
+            for track in track_list:
+                object_list.append(TrackInfo(SOUNDCLOUD, track))
+            return object_list
+
+        if self.source == YOUTUBE:
+            pass
+
 
 class PlaylistInfo(MediaInfo):
     def __init__(self, source: MediaSource, info_dict: dict):
@@ -440,9 +456,12 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
             return 'unsure', results
 
 # SoundCloud
-def soundcloud_playlist(url: str) -> list:
-    playlist = sc.resolve(url).tracks
-    return playlist
+def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
+    """Retrieves a SoundCloud set and returns either a PlaylistInfo or AlbumInfo where applicable."""
+    # Soundcloud playlists and albums use the same URL format, a set
+    response: Any = sc.resolve(url)
+    return AlbumInfo(SOUNDCLOUD, response.tracks) if response.is_album \
+        else PlaylistInfo(SOUNDCLOUD, response.tracks)
 
 # Spotify
 def spotify_track(url: str) -> TrackInfo | Exception:
@@ -479,7 +498,7 @@ def spotify_album(url: str) -> AlbumInfo | Exception:
         log(f'Failed to retrieve Spotify album: {e}')
         return e
 
-    return AlbumInfo(source = SPOTIFY, info_dict = album)
+    return AlbumInfo(source = SPOTIFY, info = album)
 
 def analyze_track(url: str) -> tuple:
     # TODO: Rewrite with MediaInfo objects
