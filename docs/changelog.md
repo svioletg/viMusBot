@@ -13,8 +13,9 @@ Developer
     - Changes in `media_data.py`:
         - `MediaInfo` class added to standardize expected results and improve typing
             - Additionally, `MediaInfo` has three subclasses: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
-    - `configuration.py` added to `vmbutils` to reduce the amount of duplicated code regarding configuration across this project
+    - `configuration.py` created to reduce the amount of duplicated code regarding configuration across this project
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
+        - This was not added to the `vmbutils` directory since there were some issues with getting the YAML file paths otherwise
 - The individual `log()` functions in `bot.py` and `media_data.py` have been moved into `customlog`, and they will now import it from that module instead
     - As a result, the elapsed time at the end of each log is no longer specific to each module, and represents the time elapsed between any log printed
 - Replaced calls to `sys._getframe()` in `log()` functions with `inspect.currentframe()`

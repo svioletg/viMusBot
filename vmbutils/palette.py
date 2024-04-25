@@ -1,20 +1,27 @@
+"""Provides shorthand variables mapped to colorama's color codes, for easier and quicker usage"""
+
+import re
+
 import colorama
-import yaml
-from benedict import benedict
 from colorama import Back, Fore, Style
+
+import vmbutils.configuration as config
 
 colorama.init(autoreset=True)
 
-with open('config_default.yml', 'r') as f:
-    config_default = benedict(yaml.safe_load(f))
-
-with open('config.yml', 'r') as f:
-    config = benedict(yaml.safe_load(f))
-
 NO_COLOR: bool = config.get('logging-options.colors.no-color')
 
-def get_color_config(key: str):
-    return config.get(f'logging-options.colors.{key}', config_default[f'logging-options.colors.{key}'])
+def get_color_config(key: str) -> str:
+    """Shorthand for retrieving colors from configuration"""
+    try:
+        color = config.get(f'logging-options.colors.{key}')
+        return color if color else ''
+    except KeyError:
+        return ''
+
+def get_filename_color(filename: str) -> str:
+    """Retrieves the custom color set for a filename if it exists"""
+    return get_color_config(filename.replace('.', '-'))
 
 class Palette:
     def __init__(self):
@@ -33,45 +40,24 @@ class Palette:
         # Make dictionary for config usage
         self.colors = vars(self)
         # User-defined
-        self.file = {
-            'bot.py': self.colors[get_color_config('bot-py')],
-            'spoofy.py': self.colors[get_color_config('spoofy-py')],
-        }
-        self.warn  = self.colors[get_color_config('warn')]
-        self.error = self.colors[get_color_config('error')]
-        self.timer = self.colors[get_color_config('timer')]
-        self.func  = self.colors[get_color_config('function')]
+        self.file = get_filename_color
+        self.warn: str = self.colors[get_color_config('warn')] #type: ignore
+        self.error: str = self.colors[get_color_config('error')] #type: ignore
+        self.timer: str = self.colors[get_color_config('timer')] #type: ignore
+        self.func: str = self.colors[get_color_config('function')] #type: ignore
 
-    def strip_color(self, string):
-        for k, v in vars(self).items():
-            if k == 'colors':
-                # Skip the colors dictionary
-                continue
-            elif type(v) == dict:
-                for k2, v2 in v.items():
-                    string = string.replace(v2, '')
-            else:
-                string = string.replace(v, '')
-
-        return string
+    def strip_color(self, string) -> str:
+        """Uses regex to strip color codes from a string"""
+        return re.compile(r'(\x1b\[.*?m)').sub('', string)
 
     def preview(self):
-        column = 0
+        """Prints out every color attribute painted in its own color code"""
         for k, v in vars(self).items():
-            if column >= 3:
-                column = 0
-            if k == 'colors':
-                # Skip self.colors since its just the vars of Palette's attributes
-                # We want to show what warn, error, etc. are so we won't just use self.colors
+            if k in ['colors', 'file']:
                 continue
             if isinstance(v, dict):
                 for k2, v2 in v.items():
                     print(f'{v2}{k}[\'{k2}\']', end=' ')
             else:
                 print(v+k, end=' ')
-
-palette = Palette()
-
-if __name__ == '__main__':
-    palette.preview()
-    input('\nPress ENTER to continue.')
+            print()

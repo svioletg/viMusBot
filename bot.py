@@ -51,7 +51,7 @@ import updater
 import vmbutils.configuration as config
 import vmbutils.palette as palette
 import vmbutils.media_data as media_data
-from vmbutils.customlog import log, log_traceback
+from vmbutils.logging import log, log_traceback
 
 _here = Path(__file__).name
 

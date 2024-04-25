@@ -6,7 +6,7 @@ import inspect
 import json
 import time
 import traceback
-from typing import TypedDict, Literal
+from typing import TypedDict, Literal, cast
 
 # Third-party libraries
 import pytube
@@ -19,7 +19,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
 # Local modules
-import vmbutils.customlog as customlog
+from vmbutils.logging import Log
 from vmbutils.palette import Palette
 import vmbutils.configuration as config
 
@@ -28,10 +28,8 @@ plt = Palette()
 last_logtime = time.time()
 
 # TODO: Remove/update this for refactor
-def log(msg: str, verbose=False):
-    global last_logtime
-    customlog.newlog(msg, last_logtime, function_source=inspect.currentframe().f_back.f_code.co_name, verbose=verbose)
-    last_logtime = time.time()
+logger = Log()
+log = logger.log
 
 FORCE_NO_MATCH         : bool = config.get('force-no-match') # type: ignore
 SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit') # type: ignore
@@ -56,32 +54,83 @@ class MediaInfo:
     pass
 
 class TrackInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, artist: str, album_name: str, isrc: str, url: str, length_seconds: int):
+    def __init__(self, source: MediaSource, info_dict: dict):
         self.source = source
-        self.title = title
-        self.artist = artist
-        self.album_name = album_name
-        self.isrc = isrc
-        self.url = url
-        self.length_seconds = length_seconds
+        self.title: str
+        self.artist: str
+        self.album_name: str
+        self.isrc: str
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.title          = cast(str, info_dict['name'])
+                self.artist         = cast(str, info_dict['artists'][0]['name'])
+                self.album_name     = cast(str, info_dict['album']['name'])
+                self.isrc           = cast(str, info_dict['external_ids'].get('isrc', None))
+                self.length_seconds = cast(int, info_dict['duration_ms'] // 1000)
+            case 'souncloud':
+                pass
+            case 'youtube':
+                pass
 
 class AlbumInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, artist: str, contents: list[TrackInfo], upc: str, url: str, length_seconds: int = 0):
+    def __init__(self, source: MediaSource, info_dict: dict):
         self.source = source
-        self.title = title
-        self.artist = artist
-        self.contents = contents
-        self.upc = upc
-        self.url = url
-        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+        self.info_dict = info_dict
+        self.contents: list[TrackInfo]
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.title = info_dict['name']
+                self.artist = info_dict['artists'][0]['name']
+                self.upc = info_dict['external_ids']['upc']
+                self.contents = self.get_contents()
+                self.length_seconds = length_of_media_list(self.contents)
+            case 'soundcloud':
+                pass
+            case 'youtube':
+                pass
+    
+    def get_contents(self) -> list[TrackInfo]:
+        """Retrieves a list of TrackInfo objects based on the URLs found within this album"""
+        # TODO: Make compatible with all sources
+        object_list: list[TrackInfo] = []
+        match self.source:
+            case 'spotify':
+                track_list: list[dict] = cast(list[dict], self.info_dict['tracks']['items'])
+                for track in track_list:
+                    object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
+                return object_list
 
 class PlaylistInfo(MediaInfo):
-    def __init__(self, source: MediaSource, title: str, contents: list[TrackInfo], url: str, length_seconds: int = 0):
+    def __init__(self, source: MediaSource, info_dict: dict):
         self.source = source
-        self.title = title
-        self.contents = contents
-        self.url = url
-        self.length_seconds = length_seconds if length_seconds else length_of_media_list(contents)
+        self.info_dict = info_dict
+        self.contents: list[TrackInfo]
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.title = info_dict['name']
+                self.contents = self.get_contents()
+                self.length_seconds = length_of_media_list(self.contents)
+            case 'soundcloud':
+                pass
+            case 'youtube':
+                pass
+    
+    def get_contents(self) -> list[TrackInfo]:
+        """Retrieves a list of TrackInfo objects based on the URLs found within this album"""
+        # TODO: Make compatible with all sources
+        object_list: list[TrackInfo] = []
+        match self.source:
+            case 'spotify':
+                track_list: list[dict] = cast(list[dict], self.info_dict['tracks']['items'])
+                for track in track_list:
+                    object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
+                return object_list
 
 def length_of_media_list(track_list: list[TrackInfo]) -> int:
     return sum(track.length_seconds for track in track_list)
@@ -399,55 +448,36 @@ def soundcloud_playlist(url: str) -> list:
 def get_uri(url: str) -> str:
     return url.split("/")[-1].split("?")[0]
 
-def spotify_playlist(url: str) -> list:
+def spotify_playlist(url: str) -> PlaylistInfo:
     try:
         playlist = sp.playlist(url)['tracks']['items']
     except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify playlist: {e}', verbose=True)
+        log(f'Failed to retrieve Spotify playlist: {e}')
         return None, e
     newlist = []
     for item in playlist:
         item = item['track']
-        newlist.append(TrackInfo(
-                title  = item['name'],
-                artist = item['artists'][0]['name'],
-                album_name  = item['album']['name'],
-                isrc   = item['external_ids'].get('isrc', None),
-                url    = item['external_urls']['spotify'],
-                length_seconds = item['duration_ms'] // 1000
+        newlist.append(PlaylistInfo(
+                source = SPOTIFY,
+                url    = item['external_urls']['spotify']
             ))
     return newlist
 
 def spotify_track(url: str) -> TrackInfo:
     try:
-        info = sp.track(url)
+        info: dict = cast(dict, sp.track(url))
     except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify track: {e}', verbose=True)
-        return e
+        log(f'Failed to retrieve Spotify track: {e}')
 
-    return TrackInfo(
-        source = SPOTIFY,
-        title  = info['name'],
-        artist = info['artists'][0]['name'],
-        album_name  = info['album']['name'],
-        isrc   = info['external_ids'].get('isrc', None),
-        url    = info['external_urls']['spotify'],
-        length_seconds = info['duration_ms'] // 1000
-    )
+    return TrackInfo(source = SPOTIFY, info_dict = info)
 
-def spotify_album(url: str) -> dict:
+def spotify_album(url: str) -> AlbumInfo:
     try:
-        info = sp.album(url)
+        info: dict = cast(dict, sp.album(url))
     except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify album: {e}', verbose=True)
-        return None, e
+        log(f'Failed to retrieve Spotify album: {e}')
 
-    return AlbumInfo(
-        title = info['name'], 
-        artist = info['artists'][0]['name'],
-        year = info['release_date'].split('-')[0],
-        upc = info['external_ids']['upc']
-    )
+    return AlbumInfo(source = SPOTIFY, info_dict = info)
 
 def analyze_track(url: str) -> tuple:
     uri = get_uri(url)

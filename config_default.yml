@@ -132,5 +132,5 @@ logging-options:
         spoofy-py: "lime" # For logs from spoofy.py
         warn: "gold" # For non-serious warning messages
         error: "red" # For tracebacks and/or fatal errors
-        timer: "magenta" # The time between logs at the end of each message
+        timer: "darkmagenta" # The time between logs at the end of each message
         function: "blue" # For function names
