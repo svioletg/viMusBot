@@ -21,6 +21,7 @@ quickstart.sh
 *.pickle
 test.py
 test_*.py
+*.prof
 # backups of files in case i need to roll back after a big change
 bot_*.py
 spoofy_*.py

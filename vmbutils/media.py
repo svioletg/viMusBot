@@ -47,110 +47,6 @@ class VimusbotErrors:
     class FormattingError(Exception):
         pass
 
-class MediaInfo:
-    # def length_of_list(tracks: 'list[TrackInfo]') -> int:
-    #     # TODO: Implement
-    #     pass
-    pass
-
-class TrackInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info: Any):
-        self.source = source
-        self.url: str
-        self.title: str
-        self.artist: str
-        self.album_name: str
-        self.isrc: str
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.url            = cast(str, info['external_urls']['spotify'])
-                self.title          = cast(str, info['name'])
-                self.artist         = cast(str, info['artists'][0]['name'])
-                self.album_name     = cast(str, info['album']['name'])
-                self.isrc           = cast(str, info['external_ids'].get('isrc', None))
-                self.length_seconds = cast(int, info['duration_ms'] // 1000)
-            case 'souncloud':
-                pass
-            case 'youtube':
-                pass
-
-class AlbumInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info: Any):
-        self.source = source
-        self.url: str
-        self.title: str
-        self.artist: str
-        self.upc: str
-        self.contents: list[TrackInfo]
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.url            = cast(str, info['external_urls']['spotify'])
-                self.title          = cast(str, info['name'])
-                self.artist         = cast(str, info['artists'][0]['name'])
-                self.upc            = cast(str, info['external_ids']['upc'])
-                self.contents       = self.get_contents()
-                self.length_seconds = length_of_media_list(self.contents)
-            case 'soundcloud':
-                pass
-            case 'youtube':
-                pass
-    
-    def get_contents(self) -> list[TrackInfo]:
-        """Retrieves a list of TrackInfo objects based on the URLs found within this album."""
-        # TODO: Make compatible with all sources
-        object_list: list[TrackInfo] = []
-        track_list: list[Any] = []
-        if self.source == SPOTIFY:
-            track_list = cast(list[dict], self.info['tracks']['items'])
-            for track in track_list:
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
-            return object_list
-
-        if self.source == SOUNDCLOUD:
-            track_list = self.info.tracks
-            for track in track_list:
-                object_list.append(TrackInfo(SOUNDCLOUD, track))
-            return object_list
-
-        if self.source == YOUTUBE:
-            pass
-
-
-class PlaylistInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info_dict: dict):
-        self.source = source
-        self.info_dict = info_dict
-        self.contents: list[TrackInfo]
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.title = info_dict['name']
-                self.contents = self.get_contents()
-                self.length_seconds = length_of_media_list(self.contents)
-            case 'soundcloud':
-                pass
-            case 'youtube':
-                pass
-    
-    def get_contents(self) -> list[TrackInfo]:
-        """Retrieves a list of TrackInfo objects based on the URLs found within this album."""
-        # TODO: Make compatible with all sources
-        object_list: list[TrackInfo] = []
-        match self.source:
-            case 'spotify':
-                track_list: list[dict] = cast(list[dict], self.info_dict['tracks']['items'])
-                for track in track_list:
-                    object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
-                return object_list
-
-def length_of_media_list(track_list: list[TrackInfo]) -> int:
-    return sum(track.length_seconds for track in track_list)
-
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
     log(f'{plt.warn}NOTICE: force_no_match is set to True.')
@@ -192,6 +88,144 @@ sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 sc = sclib.SoundcloudAPI()
 
 #endregion
+
+class MediaInfo:
+    pass
+
+class TrackInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        self.source = source
+        self.url: str
+        self.title: str
+        self.artist: str
+        self.album_name: str
+        self.isrc: str
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.url            = cast(str, info['external_urls']['spotify'])
+                self.title          = cast(str, info['name'])
+                self.artist         = cast(str, info['artists'][0]['name'])
+                self.album_name     = cast(str, info['album']['name'])
+                self.isrc           = cast(str, info['external_ids'].get('isrc', None))
+                self.length_seconds = cast(int, info['duration_ms'] // 1000)
+            case 'souncloud':
+                pass
+            case 'youtube':
+                pass
+
+class AlbumInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        self.source = source
+        self.info = info
+        self.url: str
+        self.title: str
+        self.artist: str
+        self.upc: str
+        self.contents: list[TrackInfo]
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.url            = cast(str, info['external_urls']['spotify'])
+                self.title          = cast(str, info['name'])
+                self.artist         = cast(str, info['artists'][0]['name'])
+                self.upc            = cast(str, info['external_ids']['upc'])
+                self.contents       = get_group_contents(self)
+                self.length_seconds = length_of_media_list(self.contents)
+            case 'soundcloud':
+                pass
+            case 'youtube':
+                pass
+
+class PlaylistInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        self.source = source
+        self.info = info
+        self.contents: list[TrackInfo]
+        self.length_seconds: int
+
+        match source:
+            case 'spotify':
+                self.title = info['name']
+                self.contents = get_group_contents(self)
+                self.length_seconds = length_of_media_list(self.contents)
+            case 'soundcloud':
+                pass
+            case 'youtube':
+                pass
+
+def length_of_media_list(track_list: list[TrackInfo]) -> int:
+    return sum(track.length_seconds for track in track_list)
+
+def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
+    """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
+    # TODO: Make compatible with all sources
+    object_list: list[TrackInfo] = []
+    track_list: list[Any] = []
+    if group_object.source == SPOTIFY:
+        track_list = cast(list[dict], group_object.info['tracks']['items'])
+        for track in track_list:
+            if isinstance(group_object, AlbumInfo):
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
+            elif isinstance(group_object, PlaylistInfo):
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
+        return object_list
+
+    if group_object.source == SOUNDCLOUD:
+        track_list = group_object.info.tracks
+        for track in track_list:
+            object_list.append(TrackInfo(SOUNDCLOUD, track))
+        return object_list
+
+    if group_object.source == YOUTUBE:
+        pass
+
+# SoundCloud
+def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
+    """Retrieves a SoundCloud set and returns either a PlaylistInfo or AlbumInfo where applicable."""
+    # Soundcloud playlists and albums use the same URL format, a set
+    response: Any = sc.resolve(url)
+    return AlbumInfo(SOUNDCLOUD, response.tracks) if response.is_album \
+        else PlaylistInfo(SOUNDCLOUD, response.tracks)
+
+# Spotify
+def spotify_track(url: str) -> TrackInfo | Exception:
+    """Retrieves a Spotify track and returns it as a TrackInfo object.
+
+    Returns a SpotifyException if retrieval fails."""
+    try:
+        track: dict = cast(dict, sp.track(url))
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify track: {e}')
+        return e
+
+    return TrackInfo(source = SPOTIFY, info = track)
+
+def spotify_playlist(url: str) -> PlaylistInfo | Exception:
+    """Retrieves a Spotify track and returns it as a PlaylistInfo object.
+
+    Returns a SpotifyException if retrieval fails."""
+    try:
+        playlist: dict = cast(dict, sp.playlist(url))
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify playlist: {e}')
+        return e
+
+    return PlaylistInfo(source = SPOTIFY, info = playlist)
+
+def spotify_album(url: str) -> AlbumInfo | Exception:
+    """Retrieves a Spotify track and returns it as a AlbumInfo object.
+
+    Returns a SpotifyException if retrieval fails."""
+    try:
+        album: dict = cast(dict, sp.album(url))
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify album: {e}')
+        return e
+
+    return AlbumInfo(source = SPOTIFY, info = album)
 
 # For analyze()
 keytable = {
@@ -454,51 +488,6 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
         if unsure:
             log('Returning as unsure.')
             return 'unsure', results
-
-# SoundCloud
-def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
-    """Retrieves a SoundCloud set and returns either a PlaylistInfo or AlbumInfo where applicable."""
-    # Soundcloud playlists and albums use the same URL format, a set
-    response: Any = sc.resolve(url)
-    return AlbumInfo(SOUNDCLOUD, response.tracks) if response.is_album \
-        else PlaylistInfo(SOUNDCLOUD, response.tracks)
-
-# Spotify
-def spotify_track(url: str) -> TrackInfo | Exception:
-    """Retrieves a Spotify track and returns it as a TrackInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
-    try:
-        track: dict = cast(dict, sp.track(url))
-    except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify track: {e}')
-        return e
-
-    return TrackInfo(source = SPOTIFY, info_dict = track)
-
-def spotify_playlist(url: str) -> PlaylistInfo | Exception:
-    """Retrieves a Spotify track and returns it as a PlaylistInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
-    try:
-        playlist: dict = cast(dict, sp.playlist(url))
-    except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify playlist: {e}')
-        return e
-
-    return PlaylistInfo(source = SPOTIFY, info_dict = playlist)
-
-def spotify_album(url: str) -> AlbumInfo | Exception:
-    """Retrieves a Spotify track and returns it as a AlbumInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
-    try:
-        album: dict = cast(dict, sp.album(url))
-    except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify album: {e}')
-        return e
-
-    return AlbumInfo(source = SPOTIFY, info = album)
 
 def analyze_track(url: str) -> tuple:
     # TODO: Rewrite with MediaInfo objects
