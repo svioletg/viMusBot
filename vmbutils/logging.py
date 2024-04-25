@@ -1,4 +1,4 @@
-"""Custom logging module for viMusBot"""
+"""Custom logging module for viMusBot."""
 
 # Standard libraries
 import inspect
@@ -28,7 +28,7 @@ except FileNotFoundError:
     pass
 
 class Log:
-    """Inner class to actually handle the logging"""
+    """Inner class to actually handle the logging."""
     def __init__(self):
         self.last_logtime: float = 0
 
@@ -68,6 +68,6 @@ class Log:
         self.last_logtime = time.time()
 
     def log_traceback(self, error: BaseException):
-        """Logs the traceback of a given exception to the file, and the console if applicable"""
+        """Logs the traceback of a given exception to the file, and the console if applicable."""
         trace = traceback.format_exception(error)
         self.log(f'Full traceback below.\n\n{plt.error}{''.join(trace)}')

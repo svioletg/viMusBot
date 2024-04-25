@@ -11,6 +11,7 @@ Developer
     - `spoofy.py` renamed to `media_data.py`, and will be referred to as such for the rest of this changelog
     - `media_data.py`, `customlog.py`, and `palette.py` moved into `vmbutils`
     - Changes in `media_data.py`:
+        - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used
         - `MediaInfo` class added to standardize expected results and improve typing
             - Additionally, `MediaInfo` has three subclasses: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
     - `configuration.py` created to reduce the amount of duplicated code regarding configuration across this project

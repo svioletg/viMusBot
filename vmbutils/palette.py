@@ -1,9 +1,9 @@
-"""Provides shorthand variables mapped to colorama's color codes, for easier and quicker usage"""
+"""Provides shorthand variables mapped to colorama's color codes, for easier and quicker usage."""
 
 import re
 
 import colorama
-from colorama import Back, Fore, Style
+from colorama import Fore, Style
 
 import vmbutils.configuration as config
 
@@ -12,7 +12,7 @@ colorama.init(autoreset=True)
 NO_COLOR: bool = config.get('logging-options.colors.no-color')
 
 def get_color_config(key: str) -> str:
-    """Shorthand for retrieving colors from configuration"""
+    """Shorthand for retrieving colors from configuration."""
     try:
         color = config.get(f'logging-options.colors.{key}')
         return color if color else ''
@@ -20,7 +20,7 @@ def get_color_config(key: str) -> str:
         return ''
 
 def get_filename_color(filename: str) -> str:
-    """Retrieves the custom color set for a filename if it exists"""
+    """Retrieves the custom color set for a filename if it exists."""
     return get_color_config(filename.replace('.', '-'))
 
 class Palette:
@@ -47,11 +47,11 @@ class Palette:
         self.func: str = self.colors[get_color_config('function')] #type: ignore
 
     def strip_color(self, string) -> str:
-        """Uses regex to strip color codes from a string"""
+        """Uses regex to strip color codes from a string."""
         return re.compile(r'(\x1b\[.*?m)').sub('', string)
 
     def preview(self):
-        """Prints out every color attribute painted in its own color code"""
+        """Prints out every color attribute painted in its own color code."""
         for k, v in vars(self).items():
             if k in ['colors', 'file']:
                 continue

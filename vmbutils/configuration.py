@@ -8,8 +8,6 @@ from benedict import benedict
 
 parent_dir = Path(__file__).parent.parent
 
-# TODO: Maybe figure out some way to make this compatible with type checking?
-# Could potentially be done with a TypedDict, but I don't think I can use that with benedict
 with open(Path(parent_dir, 'config_default.yml'), 'r', encoding='utf-8') as f:
     config_default = benedict(yaml.safe_load(f))
 

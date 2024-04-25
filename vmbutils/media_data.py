@@ -94,7 +94,7 @@ class AlbumInfo(MediaInfo):
                 pass
     
     def get_contents(self) -> list[TrackInfo]:
-        """Retrieves a list of TrackInfo objects based on the URLs found within this album"""
+        """Retrieves a list of TrackInfo objects based on the URLs found within this album."""
         # TODO: Make compatible with all sources
         object_list: list[TrackInfo] = []
         match self.source:
@@ -122,7 +122,7 @@ class PlaylistInfo(MediaInfo):
                 pass
     
     def get_contents(self) -> list[TrackInfo]:
-        """Retrieves a list of TrackInfo objects based on the URLs found within this album"""
+        """Retrieves a list of TrackInfo objects based on the URLs found within this album."""
         # TODO: Make compatible with all sources
         object_list: list[TrackInfo] = []
         match self.source:
@@ -283,7 +283,7 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
     return description_dict
 
 def search_ytmusic_text(query: str) -> tuple:
-    """Searches YTMusic with a plain-text query"""
+    """Searches YTMusic with a plain-text query."""
     try:
         top_song = ytmusic.search(query=query, limit=1, filter='songs')[0]
     except IndexError:
@@ -445,45 +445,47 @@ def soundcloud_playlist(url: str) -> list:
     return playlist
 
 # Spotify
-def get_uri(url: str) -> str:
-    return url.split("/")[-1].split("?")[0]
+def spotify_track(url: str) -> TrackInfo | Exception:
+    """Retrieves a Spotify track and returns it as a TrackInfo object.
 
-def spotify_playlist(url: str) -> PlaylistInfo:
+    Returns a SpotifyException if retrieval fails."""
     try:
-        playlist = sp.playlist(url)['tracks']['items']
-    except spotipy.exceptions.SpotifyException as e:
-        log(f'Failed to retrieve Spotify playlist: {e}')
-        return None, e
-    newlist = []
-    for item in playlist:
-        item = item['track']
-        newlist.append(PlaylistInfo(
-                source = SPOTIFY,
-                url    = item['external_urls']['spotify']
-            ))
-    return newlist
-
-def spotify_track(url: str) -> TrackInfo:
-    try:
-        info: dict = cast(dict, sp.track(url))
+        track: dict = cast(dict, sp.track(url))
     except spotipy.exceptions.SpotifyException as e:
         log(f'Failed to retrieve Spotify track: {e}')
+        return e
 
-    return TrackInfo(source = SPOTIFY, info_dict = info)
+    return TrackInfo(source = SPOTIFY, info_dict = track)
 
-def spotify_album(url: str) -> AlbumInfo:
+def spotify_playlist(url: str) -> PlaylistInfo | Exception:
+    """Retrieves a Spotify track and returns it as a PlaylistInfo object.
+
+    Returns a SpotifyException if retrieval fails."""
     try:
-        info: dict = cast(dict, sp.album(url))
+        playlist: dict = cast(dict, sp.playlist(url))
+    except spotipy.exceptions.SpotifyException as e:
+        log(f'Failed to retrieve Spotify playlist: {e}')
+        return e
+
+    return PlaylistInfo(source = SPOTIFY, info_dict = playlist)
+
+def spotify_album(url: str) -> AlbumInfo | Exception:
+    """Retrieves a Spotify track and returns it as a AlbumInfo object.
+
+    Returns a SpotifyException if retrieval fails."""
+    try:
+        album: dict = cast(dict, sp.album(url))
     except spotipy.exceptions.SpotifyException as e:
         log(f'Failed to retrieve Spotify album: {e}')
+        return e
 
-    return AlbumInfo(source = SPOTIFY, info_dict = info)
+    return AlbumInfo(source = SPOTIFY, info_dict = album)
 
 def analyze_track(url: str) -> tuple:
-    uri = get_uri(url)
-    title = sp.track(uri)['name']
-    artist = sp.track(uri)['artists'][0]['name']
-    data = sp.audio_features(uri)[0]
+    # TODO: Rewrite with MediaInfo objects
+    title = sp.track(url)['name']
+    artist = sp.track(url)['artists'][0]['name']
+    data = sp.audio_features(url)[0]
 
     # Nicer formatting
     data['tempo'] = str(int(data['tempo']))+'bpm'
