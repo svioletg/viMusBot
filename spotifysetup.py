@@ -1,7 +1,7 @@
 CLIENT_ID = input('Client ID: ')
 CLIENT_SECRET = input('Client secret: ')
 
-with open('test_spotify_config.json', 'w') as f:
+with open('spotify_config.json', 'w') as f:
     f.write('{\n'+
 '    "spotify":\n'+
 '    {\n'+
