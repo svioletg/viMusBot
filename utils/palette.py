@@ -5,7 +5,7 @@ import re
 import colorama
 from colorama import Fore, Style
 
-import vmbutils.configuration as config
+import utils.configuration as config
 
 colorama.init(autoreset=True)
 
@@ -24,19 +24,25 @@ def get_filename_color(filename: str) -> str:
     return get_color_config(filename.replace('.', '-'))
 
 class Palette:
+    """Contains color attributes and public methods."""
     def __init__(self):
         # General color names
         self.reset       = Style.RESET_ALL
-        self.lime        = Style.BRIGHT+Fore.GREEN   if not NO_COLOR else self.reset
-        self.green       = Style.NORMAL+Fore.GREEN   if not NO_COLOR else self.reset
-        self.yellow      = Style.BRIGHT+Fore.YELLOW  if not NO_COLOR else self.reset
-        self.gold        = Style.NORMAL+Fore.YELLOW  if not NO_COLOR else self.reset
-        self.red         = Style.BRIGHT+Fore.RED     if not NO_COLOR else self.reset
-        self.darkred     = Style.NORMAL+Fore.RED     if not NO_COLOR else self.reset
-        self.magenta     = Style.BRIGHT+Fore.MAGENTA if not NO_COLOR else self.reset
-        self.darkmagenta = Style.NORMAL+Fore.MAGENTA if not NO_COLOR else self.reset
-        self.blue        = Style.BRIGHT+Fore.BLUE    if not NO_COLOR else self.reset
-        self.darkblue    = Style.NORMAL+Fore.BLUE    if not NO_COLOR else self.reset
+        
+        self.lime        = Style.BRIGHT+Fore.GREEN
+        self.green       = Style.NORMAL+Fore.GREEN
+
+        self.yellow      = Style.BRIGHT+Fore.YELLOW 
+        self.gold        = Style.NORMAL+Fore.YELLOW 
+
+        self.red         = Style.BRIGHT+Fore.RED
+        self.darkred     = Style.NORMAL+Fore.RED
+
+        self.magenta     = Style.BRIGHT+Fore.MAGENTA
+        self.darkmagenta = Style.NORMAL+Fore.MAGENTA
+
+        self.blue        = Style.BRIGHT+Fore.BLUE
+        self.darkblue    = Style.NORMAL+Fore.BLUE
         # Make dictionary for config usage
         self.colors = vars(self)
         # User-defined
@@ -46,7 +52,8 @@ class Palette:
         self.timer: str = self.colors[get_color_config('timer')] #type: ignore
         self.func: str = self.colors[get_color_config('function')] #type: ignore
 
-    def strip_color(self, string) -> str:
+    @staticmethod
+    def strip_color(string) -> str:
         """Uses regex to strip color codes from a string."""
         return re.compile(r'(\x1b\[.*?m)').sub('', string)
 

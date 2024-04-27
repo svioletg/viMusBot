@@ -10,7 +10,7 @@ import colorama
 import requests
 
 # Local modules
-from vmbutils.palette import Palette
+from utils.palette import Palette
 
 colorama.init(autoreset=True)
 plt = Palette()

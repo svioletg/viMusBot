@@ -1,14 +1,12 @@
 """Primarily provides methods for searching and returning 
 standardized results from various sources."""
 
-# Standard libraries
-import inspect
+from ast import Pass
 import json
 import time
 import traceback
-from typing import Any, TypedDict, Literal, cast
+from typing import Any, Literal, cast
 
-# Third-party libraries
 import pytube
 import regex as re
 import sclib
@@ -18,10 +16,9 @@ from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
-# Local modules
-from vmbutils.logging import Log
-from vmbutils.palette import Palette
-import vmbutils.configuration as config
+from utils.logging import Log
+from utils.palette import Palette
+import utils.configuration as config
 
 plt = Palette()
 
@@ -35,21 +32,128 @@ FORCE_NO_MATCH         : bool = config.get('force-no-match') # type: ignore
 SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit') # type: ignore
 DURATION_LIMIT         : int  = config.get('duration-limit') # type: ignore
 
+# Useful to point this out if left on accidentally
+if FORCE_NO_MATCH:
+    log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+
+#region DEFINE CLASSES
+
 # For typing, no functional difference
 class MediaSource(str):
-    pass
+    """String subclass that represents a media source. Exists only for typing purposes."""
 
 YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
 
-class VimusbotErrors:
-    class FormattingError(Exception):
+class MediaError:
+    # TODO: Re-evaluate if this is needed once this file's rework is done
+    """Base class for media-related exceptions."""
+    class FormatError(Exception):
         pass
 
-# Useful to point this out if left on accidentally
-if FORCE_NO_MATCH:
-    log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+class MediaInfo:
+    def __init__(self, source: MediaSource, info: Any):
+        self.source = source
+        self.info = info
+        self.url: str
+        self.title: str
+        self.artist: str
+        self.length_seconds: int
+        self.album_name: str
+        self.album_image: str
+
+        if source == SPOTIFY:
+            self.url            = cast(str, info['external_urls']['spotify'])
+            self.title          = cast(str, info['name'])
+            self.artist         = cast(str, info['artists'][0]['name'])
+            self.album_name     = cast(str, info['album']['name'])
+            self.album_image    = cast(str, info['images'][0]['url'])
+        elif source == SOUNDCLOUD:
+            self.url            = cast(str, info.permalink_url)
+            self.title          = cast(str, info.title)
+            self.artist         = cast(str, info.user['username']) # Gets the user that uploaded the album, not a guarantee that this is accurate
+            self.album_image    = cast(str, info.artwork_url)
+            self.length_seconds = int(info.duration // 1000)
+        elif source == YOUTUBE:
+            pass
+        else:
+            pass
+
+class TrackInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        MediaInfo.__init__(self, source, info)
+        self.album_name: str
+        self.isrc: str
+
+        if source == SPOTIFY:
+            self.length_seconds = cast(int, info['duration_ms'] // 1000)
+            self.isrc           = cast(str, info['external_ids'].get('isrc', None))
+        elif source == SOUNDCLOUD:
+            pass
+        elif source == YOUTUBE:
+            pass
+        else:
+            pass
+
+class AlbumInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        MediaInfo.__init__(self, source, info)
+        self.contents: list[TrackInfo] = get_group_contents(self)
+        self.upc: str
+
+        if source == SPOTIFY:
+            self.length_seconds = length_of_media_list(self.contents)
+            self.upc            = cast(str, info['external_ids']['upc'])
+        elif source == SOUNDCLOUD:
+            pass
+        elif source == YOUTUBE:
+            pass
+        else:
+            pass
+
+class PlaylistInfo(MediaInfo):
+    def __init__(self, source: MediaSource, info: Any):
+        MediaInfo.__init__(self, source, info)
+        self.contents: list[TrackInfo] = get_group_contents(self)
+        self.length_seconds: int
+
+        if source == SPOTIFY:
+            self.length_seconds = length_of_media_list(self.contents)
+        if source == SOUNDCLOUD:
+            pass
+        if source == YOUTUBE:
+            pass
+
+def length_of_media_list(track_list: list[TrackInfo]) -> int:
+    return int(sum(track.length_seconds for track in track_list))
+
+def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
+    """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
+    # TODO: Make compatible with all sources
+    # TODO: This can take a while, maybe find a way to report status back to bot.py?
+    object_list: list[TrackInfo] = []
+    track_list: list[Any] = []
+    if group_object.source == SPOTIFY:
+        track_list = cast(list[dict], group_object.info['tracks']['items'])
+        for n, track in enumerate(track_list):
+            # print(f'Getting track {n+1} out of {len(track_list)}...')
+            if isinstance(group_object, AlbumInfo):
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
+            elif isinstance(group_object, PlaylistInfo):
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
+        return object_list
+
+    if group_object.source == SOUNDCLOUD:
+        track_list = group_object.info.tracks
+        for track in track_list:
+            object_list.append(TrackInfo(SOUNDCLOUD, track))
+        return object_list
+
+    if group_object.source == YOUTUBE:
+        pass
+
+#endregion
 
 # Configure youtube dl
 ytdl_format_options = {
@@ -88,101 +192,6 @@ sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 sc = sclib.SoundcloudAPI()
 
 #endregion
-
-class MediaInfo:
-    pass
-
-class TrackInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info: Any):
-        self.source = source
-        self.url: str
-        self.title: str
-        self.artist: str
-        self.album_name: str
-        self.isrc: str
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.url            = cast(str, info['external_urls']['spotify'])
-                self.title          = cast(str, info['name'])
-                self.artist         = cast(str, info['artists'][0]['name'])
-                self.album_name     = cast(str, info['album']['name'])
-                self.isrc           = cast(str, info['external_ids'].get('isrc', None))
-                self.length_seconds = cast(int, info['duration_ms'] // 1000)
-            case 'souncloud':
-                pass
-            case 'youtube':
-                pass
-
-class AlbumInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info: Any):
-        self.source = source
-        self.info = info
-        self.url: str
-        self.title: str
-        self.artist: str
-        self.upc: str
-        self.contents: list[TrackInfo]
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.url            = cast(str, info['external_urls']['spotify'])
-                self.title          = cast(str, info['name'])
-                self.artist         = cast(str, info['artists'][0]['name'])
-                self.upc            = cast(str, info['external_ids']['upc'])
-                self.contents       = get_group_contents(self)
-                self.length_seconds = length_of_media_list(self.contents)
-            case 'soundcloud':
-                pass
-            case 'youtube':
-                pass
-
-class PlaylistInfo(MediaInfo):
-    def __init__(self, source: MediaSource, info: Any):
-        self.source = source
-        self.info = info
-        self.contents: list[TrackInfo]
-        self.length_seconds: int
-
-        match source:
-            case 'spotify':
-                self.title = info['name']
-                self.contents = get_group_contents(self)
-                self.length_seconds = length_of_media_list(self.contents)
-            case 'soundcloud':
-                pass
-            case 'youtube':
-                pass
-
-def length_of_media_list(track_list: list[TrackInfo]) -> int:
-    return sum(track.length_seconds for track in track_list)
-
-def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
-    """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
-    # TODO: Make compatible with all sources
-    # TODO: This can take a while, maybe find a way to report status back to bot.py?
-    object_list: list[TrackInfo] = []
-    track_list: list[Any] = []
-    if group_object.source == SPOTIFY:
-        track_list = cast(list[dict], group_object.info['tracks']['items'])
-        for n, track in enumerate(track_list):
-            # print(f'Getting track {n+1} out of {len(track_list)}...')
-            if isinstance(group_object, AlbumInfo):
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
-            elif isinstance(group_object, PlaylistInfo):
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
-        return object_list
-
-    if group_object.source == SOUNDCLOUD:
-        track_list = group_object.info.tracks
-        for track in track_list:
-            object_list.append(TrackInfo(SOUNDCLOUD, track))
-        return object_list
-
-    if group_object.source == YOUTUBE:
-        pass
 
 # SoundCloud
 def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:

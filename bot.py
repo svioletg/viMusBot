@@ -1,3 +1,5 @@
+"""The main bot script. Running this will start viMusBot."""
+
 # Standard libraries
 import sys
 
@@ -16,7 +18,6 @@ import sys
 import time
 import traceback
 import urllib.request
-from inspect import currentframe
 from pathlib import Path
 
 # Third-party libraries
@@ -26,10 +27,7 @@ import discord
 import pytube
 import regex as re
 import requests
-import yaml
 import yt_dlp
-from benedict import benedict
-from colorama import Back, Fore, Style
 from discord.ext import commands
 from pretty_help import PrettyHelp
 
@@ -37,26 +35,24 @@ print('Checking for config file...')
 
 if not Path('config_default.yml').is_file():
     print('config_default.yml not found; downloading latest version from remote...')
-    urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml','config_default.yml')
+    urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml', 'config_default.yml')
 
 if not Path('config.yml').is_file():
     print('config.yml does not exist; creating blank config.yml...')
-    with open('config.yml', 'w') as f:
+    with open('config.yml', 'w', encoding='utf-8') as f:
         f.write('')
 
 print('Importing local packages...')
 
 # Local modules
 import updater
-import vmbutils.configuration as config
-import vmbutils.palette as palette
-import vmbutils.media as media
-from vmbutils.logging import log, log_traceback
-
-_here = Path(__file__).name
+import utils.configuration as config
+import utils.media as media
+import utils.palette as palette
+from utils.logging import Log
 
 # Represents the version of the overall project, not just this file
-with open('version.txt','r') as f:
+with open('version.txt', 'r', encoding='utf-8') as f:
     VERSION = f.read().strip()
 
 # Setup discord logging
@@ -66,6 +62,10 @@ discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 # Setup bot logging
 colorama.init(autoreset=True)
 plt = palette.Palette()
+
+vmb_logger = Log()
+log = vmb_logger.log
+log_traceback = vmb_logger.log_traceback
 
 if __name__ == '__main__':
     log(f'Running on version {VERSION}; checking for updates...')

@@ -1,6 +1,5 @@
 """Custom logging module for viMusBot."""
 
-# Standard libraries
 import inspect
 import os
 import re
@@ -8,17 +7,18 @@ import time
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
-# Third-party libraries
 from benedict import benedict
 
-# Local modules
-import vmbutils.configuration as config
-from vmbutils.palette import Palette
+import utils.configuration as config
+from utils.palette import NO_COLOR, Palette
 
-LOG_OPTIONS: benedict = config.get('logging-options') # type: ignore
-LOG_BLACKLIST: list[str] = config.get('logging-options.ignore-logs-from') # type: ignore
 LOG_FILE: Path = Path('../vimusbot.log')
+
+LOG_OPTIONS: benedict = config.get('logging-options')
+NO_COLOR: bool = cast(bool, LOG_OPTIONS.get('colors.no-color'))
+LOG_BLACKLIST: list[str] = cast(list[str], LOG_OPTIONS.get('ignore-logs-from'))
 
 plt = Palette()
 
@@ -59,6 +59,9 @@ class Log:
         blacklist_exceptions = [plt.warn, plt.error]
 
         # If showing logs is disabled, don't print anything to console
+        if NO_COLOR:
+            log_string = plt.strip_color(log_string)
+        
         if LOG_OPTIONS.get('show-console-logs'):
             # TODO: Has to be a better way to do these checks.
             if not (function_source in LOG_BLACKLIST \
@@ -70,5 +73,5 @@ class Log:
 
     def log_traceback(self, error: BaseException):
         """Logs the traceback of a given exception to the file, and the console if applicable."""
-        trace = traceback.format_exception(error)
-        self.log(f'Full traceback below.\n\n{plt.error}{''.join(trace)}')
+        formatted_exception = traceback.format_exception(error)
+        self.log(f'Full traceback below.\n\n{plt.error if not NO_COLOR else ''}{''.join(formatted_exception)}')
