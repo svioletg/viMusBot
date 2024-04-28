@@ -8,7 +8,9 @@ See progress on bug fixes and new features here: [viMusBot Taskboard](https://gi
 
 ---
 
-viMusBot is a Discord music bot with support for Spotify links, written in Python.
+viMusBot is a Discord music bot with support for Spotify links, written in Python. This project is licensed under GNU GPLv3 — you are free to use, modify, and distribute this source code on the conditions that your modified version is also fully open-source, and licensed under the same terms.
+
+If you're having problems, have a suggestion, or just have a general question, feel free to [open an issue](https://github.com/svioletg/viMusBot/issues) — you will need a GitHub account to do this. Direct contributions are welcome, as well!
 
 Start by downloading the `Source code (zip)` file under **Assets** from the bottom of the [latest stable release](https://github.com/svioletg/viMusBot/releases/latest) page. Extract the contents into a folder anywhere, then follow the instructions below.
 

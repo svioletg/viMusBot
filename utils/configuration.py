@@ -18,9 +18,13 @@ with open(CONFIG_PATHS['user'], 'r', encoding='utf-8') as f:
     config = benedict(config_yaml) if config_yaml else benedict({})
 
 def get(key: str) -> Any:
-    """Looks for the given key in the user config, returns the default value if none is set"""
+    """Looks for the given key in the user config, returns the default value if none is set."""
     return config.get(key, config_default.get(key))
 
+def get_default(key: str) -> Any:
+    """Returns the default value for a given key."""
+    return config_default.get(key)
+
 def get_full(config_type: Literal['user', 'default']) -> benedict:
-    """Returns the full config benedict object"""
+    """Returns the full config benedict object."""
     return config if config_type == 'user' else config_default

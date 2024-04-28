@@ -14,7 +14,6 @@ import math
 import os
 import random
 import subprocess
-import sys
 import time
 import traceback
 import urllib.request
@@ -35,7 +34,7 @@ from pretty_help import PrettyHelp
 print('Checking for config file...')
 
 if not Path('config_default.yml').is_file():
-    print('config_default.yml not found; downloading latest version from remote...')
+    print('config_default.yml not found; downloading the latest version...')
     urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml', 'config_default.yml')
 
 if not Path('config.yml').is_file():
@@ -43,18 +42,15 @@ if not Path('config.yml').is_file():
     with open('config.yml', 'w', encoding='utf-8') as f:
         f.write('')
 
-print('Importing local packages...')
+print('Importing local modules...')
 
 # Local modules
-import updater
+import update
 import utils.configuration as config
 import utils.media as media
-import utils.palette as palette
+from __version__ import VERSION
 from utils.logging import Log
-
-# Represents the version of the overall project, not just this file
-with open('version.txt', 'r', encoding='utf-8') as f:
-    VERSION = f.read().strip()
+from utils.palette import Palette
 
 # Setup discord logging
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -62,22 +58,27 @@ discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
 
 # Setup bot logging
 colorama.init(autoreset=True)
-plt = palette.Palette()
+plt = Palette()
 
 vmb_logger = Log()
 log = vmb_logger.log
 log_traceback = vmb_logger.log_traceback
 
+media.log = log
+
+log('Logging is ready.')
+
+# Check for updates
 if __name__ == '__main__':
     log(f'Running on version {VERSION}; checking for updates...')
 
-    update_check_result = updater.check()
+    update_check_result = update.get_latest_tag()
 
-    # Check for an outdated version.txt
-    if update_check_result[0] == False and update_check_result[1] == True:
-        log(f'{plt.warn}There is a new release available.')
-        current_tag = update_check_result[1]['current']
-        latest_tag = update_check_result[1]['latest']['tag_name']
+    # Check for an outdated version
+    if update_check_result['current'] != update_check_result['latest']:
+        log(f'{plt.lime}There is a new release available.')
+        current_tag = update_check_result['current']
+        latest_tag = update_check_result['latest']
         log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
         log('Use "update.py" to update.')
     else:

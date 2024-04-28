@@ -18,7 +18,6 @@ Developer
         - This was not added to the `utils` directory since there were some issues with getting the YAML file paths otherwise
 - The individual `log()` and `log_traceback()` functions in `bot.py` and `media_data.py` have been moved into `customlog.py` into a new `Log` class
 - Replaced calls to `sys._getframe()` in `log()` functions with `inspect.currentframe()`
-- `update.py` renamed to `updater.py`
 
 ## 1.9.0
 

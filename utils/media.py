@@ -2,7 +2,6 @@
 standardized results from various sources."""
 
 import json
-import time
 import traceback
 from typing import Any, Callable, Literal, cast
 
@@ -15,24 +14,16 @@ from fuzzywuzzy import fuzz
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
 
-from utils.logging import Log
 from utils.palette import Palette
 import utils.configuration as config
 
 plt = Palette()
 
-send_logs: bool = True
+# Logs won't be printed unless bot.py assigns this to its own logger
+log: Callable = lambda message, verbose=False: None
 
-logger = Log()
-log = lambda message, verbose=False: logger.log(message, verbose=verbose) if send_logs else None
-
-def log_if_allowed(message: str, verbose: bool = False) -> None:
-    if send_logs:
-        log(message, verbose=verbose)
-    else:
-        return
-
-status_callback: Callable | None = None
+# Function to communicate with the bot and send status messages, useful for long tasks
+bot_status_callback: Callable = lambda message: None
 
 # Set constants from config
 FORCE_NO_MATCH         : bool = config.get('force-no-match') # type: ignore
@@ -162,6 +153,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
         track_list = cast(list[dict], group_object.info['tracks']['items'])
         for n, track in enumerate(track_list):
             log(f'Getting track {n+1} out of {len(track_list)}...', verbose=True)
+            bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
             if isinstance(group_object, AlbumInfo):
                 object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
             elif isinstance(group_object, PlaylistInfo):

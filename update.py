@@ -10,43 +10,38 @@ import colorama
 import requests
 
 # Local modules
+from __version__ import VERSION
 from utils.palette import Palette
 
 colorama.init(autoreset=True)
 plt = Palette()
 
-def check() -> tuple[bool, dict]:
-    response: requests.Response = requests.get("https://api.github.com/repos/svioletg/viMusBot/releases/latest")
+def get_latest_tag() -> dict:
+    """Retrieves the latest release on the viMusBot repository and stores it along with the detected local version."""
+    response: requests.Response = requests.get('https://api.github.com/repos/svioletg/viMusBot/releases/latest', timeout=5)
     latest: dict = response.json()
     latest_tag: str = latest['tag_name'].strip()
 
-    with open('version.txt', 'r') as f:
-        current: str = f.read().strip()
-
-    return current == latest_tag, {'current': current, 'latest': latest}
+    return {'tag': latest_tag, 'response_json': latest}
 
 def main() -> None:
     print('Checking...')
 
-    version_check = check()
-    is_latest = version_check[0]
-    current: str = version_check[1]['current']
-    latest: str = version_check[1]['latest']
-    latest_tag: str = latest['tag_name']
+    latest: dict = get_latest_tag()
+    up_to_date: bool = VERSION == latest['tag']
 
-    if is_latest:
-        print(f'{plt.yellow}{current}{plt.reset}=={plt.blue}{latest_tag}')
+    if up_to_date:
+        print(f'Current: {plt.gold}{VERSION}{plt.reset} | Latest: {plt.lime}{latest['tag']}')
         print('You are up to date.')
-        exit()
+        return
 
-    print(f'Your local version number:\n{plt.gold}{current}{plt.reset}\n'+
-        f'...does not match the current latest release of:\n{plt.lime}{latest_tag}')
+    print(f'Current: {plt.gold}{VERSION}{plt.reset} | Latest: {plt.lime}{latest['tag']}')
 
-    if input('Would you like to update now? (y/n) ').strip().lower() != 'y':
+    if input('A new version is available. Update now? (y/n) ').strip().lower() != 'y':
         print('Exiting.')
-        raise SystemExit(0)
+        return
 
-    latest_zip = f'./viMusBot-{latest_tag}.zip'
+    latest_zip = f'./viMusBot-{latest['tag']}.zip'
 
     print('Retrieving: '+latest['zipball_url'])
     urllib.request.urlretrieve(latest['zipball_url'], latest_zip)
@@ -65,10 +60,10 @@ def main() -> None:
     os.remove(latest_zip)
     shutil.rmtree(source_dir)
 
-    with open('version.txt', 'r') as f:
+    with open('version.txt', 'r', encoding='utf-8') as f:
         new_version = f.read()
         print('Done!')
-        print(f'You are now on {plt.lime}v{new_version}{plt.reset}')
+        print(f'You are now using: {plt.lime}v{new_version}{plt.reset}')
 
 if __name__ == '__main__':
     main()
