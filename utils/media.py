@@ -3,10 +3,12 @@ standardized results from various sources."""
 
 # Standard imports
 import json
+from re import X
 import traceback
 from typing import Any, Callable, Literal, cast
 
 # External imports
+from benedict import benedict
 import pytube
 import regex as re
 from sclib import SoundcloudAPI
@@ -73,8 +75,6 @@ class MediaInfo:
         self.album_name: str
         self.release_year: str
 
-        attrs = vars(self)
-
         if source == SPOTIFY:
             self.url            = cast(str, info['external_urls']['spotify'])
             self.title          = cast(str, info['name'])
@@ -112,13 +112,12 @@ class MediaInfo:
             if self.yt_result_origin == 'ytmusic':
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, [item['name'] for item in self.info['artists'] if item['name'] != 'Album'][0]) # type: ignore
-                self.embed_image    = cast(str, self.info['thumbnails'][0]['url']) # type: ignore
-                self.release_year   = cast(str, self.info['year']) # type: ignore
+                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
             elif self.yt_result_origin == 'ytdl':
                 self.url            = cast(str, self.info['webpage_url']) # type: ignore
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, self.info['uploader']) # type: ignore
-                self.embed_image    = cast(str, self.info['thumbnails'][0]['url']) # type: ignore
+                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
         else:
             pass
 
@@ -138,17 +137,12 @@ class TrackInfo(MediaInfo):
         elif source == SOUNDCLOUD:
             self.release_year   = cast(str, self.info.release_date.split('-')[0]) if self.info.release_date else ''
         elif source == YOUTUBE:
-            print(self.yt_result_origin)
             if self.yt_result_origin == 'pytube':
                 pass
             elif self.yt_result_origin == 'ytmusic':
-                print(1)
                 self.url = cast(str, f'https://www.youtube.com/watch?v={self.info['videoId']}')
-                print(self.url)
                 self.length_seconds = int(self.info['duration_seconds'])
-                print(self.length_seconds)
-                self.album_name     = cast(str, self.info['album']['name'])
-                print(self.album_name)
+                self.album_name     = cast(str, self.info['album'])
             elif self.yt_result_origin == 'ytdl':
                 self.length_seconds = int(self.info['duration'])
         else:
@@ -174,9 +168,10 @@ class AlbumInfo(MediaInfo):
             if self.yt_result_origin == 'pytube':
                 self.upc = cast(str, self.info.upc)
             elif self.yt_result_origin == 'ytmusic':
-                self.url = cast(str, f'https://www.youtube.com/playlist?list={ytmusic.get_album(self.info['browseId'])['audioPlaylistId']}')
+                self.url            = cast(str, f'https://www.youtube.com/playlist?list={ytmusic.get_album(self.info['browseId'])['audioPlaylistId']}')
                 self.length_seconds = media_list_duration(self.contents)
-                self.album_name     = cast(str, self.info['name'])
+                self.album_name     = cast(str, self.info['title'])
+                self.release_year   = cast(str, self.info['year'])
             elif self.yt_result_origin == 'ytdl':
                 self.length_seconds = media_list_duration(self.contents)
         else:
@@ -205,6 +200,7 @@ class PlaylistInfo(MediaInfo):
 
 def media_list_duration(track_list: list[TrackInfo]) -> int:
     """Return the sum of track lengths from a list of TrackInfo objects."""
+    print(track_list)
     return int(sum(track.length_seconds for track in track_list))
 
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
@@ -231,7 +227,18 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
         return object_list
 
     if group_object.source == YOUTUBE:
-        pass
+        if group_object.yt_result_origin == 'pytube':
+            track_list = group_object.info.videos
+        elif group_object.yt_result_origin == 'ytmusic':
+            print(group_object.info['browseId'])
+            print('gonna try')
+            track_list = ytmusic.get_album(group_object.info['browseId'])['tracks']
+            for track in track_list:
+                object_list.append(TrackInfo(YOUTUBE, track))
+            return object_list
+        elif group_object.yt_result_origin == 'ytdl':
+            pass
+            # track_list = group_object.info['entries']
 
 #endregion
 
