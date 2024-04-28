@@ -283,9 +283,9 @@ keytable = {
 # Define matching logic
 def is_matching(reference: dict, ytresult: dict,
         mode: Literal['fuzz', 'strict'] = 'fuzz',
-        threshold: int = 75, 
-        ignore_title: bool = False, 
-        ignore_artist: bool = False, 
+        fuzz_threshold: int = 75,
+        ignore_title: bool = False,
+        ignore_artist: bool = False,
         ignore_album: bool = False,
         **kwargs) -> bool:
     # TODO: Review this!
@@ -293,10 +293,9 @@ def is_matching(reference: dict, ytresult: dict,
     # 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
     # 'strict' = checking for strings in other strings, how matching was done beforehand
 
-    # overrides the fuzzy matching threshold, default is 75%
-    title_threshold = kwargs.get('title_threshold', threshold)
-    artist_threshold = kwargs.get('artist_threshold', threshold)
-    album_threshold = kwargs.get('album_threshold', threshold)
+    title_threshold = kwargs.get('title_threshold', fuzz_threshold)
+    artist_threshold = kwargs.get('artist_threshold', fuzz_threshold)
+    album_threshold = kwargs.get('album_threshold', fuzz_threshold)
 
     ref_title, ref_artist, ref_album = reference['title'], reference['artist'], reference['album']
     yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
