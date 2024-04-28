@@ -1,11 +1,10 @@
 """Primarily provides methods for searching and returning 
 standardized results from various sources."""
 
-from ast import Pass
 import json
 import time
 import traceback
-from typing import Any, Literal, cast
+from typing import Any, Callable, Literal, cast
 
 import pytube
 import regex as re
@@ -22,12 +21,20 @@ import utils.configuration as config
 
 plt = Palette()
 
-last_logtime = time.time()
+send_logs: bool = True
 
-# TODO: Remove/update this for refactor
 logger = Log()
-log = logger.log
+log = lambda message, verbose=False: logger.log(message, verbose=verbose) if send_logs else None
 
+def log_if_allowed(message: str, verbose: bool = False) -> None:
+    if send_logs:
+        log(message, verbose=verbose)
+    else:
+        return
+
+status_callback: Callable | None = None
+
+# Set constants from config
 FORCE_NO_MATCH         : bool = config.get('force-no-match') # type: ignore
 SPOTIFY_PLAYLIST_LIMIT : int  = config.get('spotify-playlist-limit') # type: ignore
 DURATION_LIMIT         : int  = config.get('duration-limit') # type: ignore
@@ -53,50 +60,59 @@ class MediaError:
         pass
 
 class MediaInfo:
+    """Base class for gathering standardized data from different media sources.
+    
+    Retrieves common attributes that can be obtained the same way regardless of type (Track, Album, Playlist).
+    Generally should not be called directly; use the appropriate subclass instead.
+    """
     def __init__(self, source: MediaSource, info: Any):
         self.source = source
         self.info = info
+
         self.url: str
         self.title: str
         self.artist: str
         self.length_seconds: int
         self.album_name: str
         self.album_image: str
+        self.release_year: str
 
         if source == SPOTIFY:
             self.url            = cast(str, info['external_urls']['spotify'])
             self.title          = cast(str, info['name'])
             self.artist         = cast(str, info['artists'][0]['name'])
-            self.album_name     = cast(str, info['album']['name'])
-            self.album_image    = cast(str, info['images'][0]['url'])
         elif source == SOUNDCLOUD:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
             self.artist         = cast(str, info.user['username']) # Gets the user that uploaded the album, not a guarantee that this is accurate
-            self.album_image    = cast(str, info.artwork_url)
             self.length_seconds = int(info.duration // 1000)
+            self.album_image    = cast(str, info.artwork_url)
         elif source == YOUTUBE:
             pass
         else:
             pass
 
 class TrackInfo(MediaInfo):
+    """Specific parsing for single track data."""
     def __init__(self, source: MediaSource, info: Any):
         MediaInfo.__init__(self, source, info)
-        self.album_name: str
-        self.isrc: str
+        self.isrc: str # Can help for more accurate YouTube searching
 
         if source == SPOTIFY:
             self.length_seconds = cast(int, info['duration_ms'] // 1000)
+            self.album_image    = cast(str, info['album']['images'][0]['url'])
+            self.album_name     = cast(str, info['album']['name'])
+            self.release_year   = cast(str, info['album']['release_date'].split('-')[0])
             self.isrc           = cast(str, info['external_ids'].get('isrc', None))
         elif source == SOUNDCLOUD:
-            pass
+            self.release_year   = cast(str, info.release_date.split('-')[0])
         elif source == YOUTUBE:
             pass
         else:
             pass
 
 class AlbumInfo(MediaInfo):
+    """Specific parsing for album data."""
     def __init__(self, source: MediaSource, info: Any):
         MediaInfo.__init__(self, source, info)
         self.contents: list[TrackInfo] = get_group_contents(self)
@@ -104,28 +120,36 @@ class AlbumInfo(MediaInfo):
 
         if source == SPOTIFY:
             self.length_seconds = length_of_media_list(self.contents)
+            self.album_image    = cast(str, info['images'][0]['url'])
+            self.album_name     = cast(str, info['name'])
+            self.release_year   = cast(str, info['release_date'].split('-')[0])
             self.upc            = cast(str, info['external_ids']['upc'])
         elif source == SOUNDCLOUD:
-            pass
+            self.release_year   = cast(str, info.release_date.split('-')[0])
         elif source == YOUTUBE:
             pass
         else:
             pass
 
 class PlaylistInfo(MediaInfo):
+    """Specific parsing for playlist data."""
     def __init__(self, source: MediaSource, info: Any):
         MediaInfo.__init__(self, source, info)
         self.contents: list[TrackInfo] = get_group_contents(self)
         self.length_seconds: int
 
         if source == SPOTIFY:
+            self.album_image    = cast(str, info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
             self.length_seconds = length_of_media_list(self.contents)
         if source == SOUNDCLOUD:
             pass
         if source == YOUTUBE:
             pass
+        else:
+            pass
 
 def length_of_media_list(track_list: list[TrackInfo]) -> int:
+    """Return the sum of track lengths from a list of TrackInfo objects."""
     return int(sum(track.length_seconds for track in track_list))
 
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
@@ -137,7 +161,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
         for n, track in enumerate(track_list):
-            # print(f'Getting track {n+1} out of {len(track_list)}...')
+            log(f'Getting track {n+1} out of {len(track_list)}...', verbose=True)
             if isinstance(group_object, AlbumInfo):
                 object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
             elif isinstance(group_object, PlaylistInfo):
@@ -254,16 +278,16 @@ keytable = {
     11: 'B major (G#/Ab minor)',
 }
 
-### SETUP FINISH
+#region SETUP FINISHED
 
 # Define matching logic
 def is_matching(reference: dict, ytresult: dict,
-                mode: Literal['fuzz', 'strict'] = 'fuzz',
-                threshold: int = 75, 
-                ignore_title: bool = False, 
-                ignore_artist: bool = False, 
-                ignore_album: bool = False,
-                **kwargs) -> bool:
+        mode: Literal['fuzz', 'strict'] = 'fuzz',
+        threshold: int = 75, 
+        ignore_title: bool = False, 
+        ignore_artist: bool = False, 
+        ignore_album: bool = False,
+        **kwargs) -> bool:
     # TODO: Review this!
     # mode is how exactly the code will determine a match
     # 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
@@ -278,7 +302,7 @@ def is_matching(reference: dict, ytresult: dict,
     yt_title, yt_artist = ytresult['title'], ytresult['artists'][0]['name']
     try:
         yt_album = ytresult['album']['name']
-    except Exception as e:
+    except KeyError as e:
         log(f'Ignoring album name. (Cause: {traceback.format_exception(e)[-1]})')
         # User-uploaded videos have no 'album' key
         yt_album = ''
@@ -312,6 +336,7 @@ def is_matching(reference: dict, ytresult: dict,
 
 # Youtube
 def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
+    # TODO: Docstring, better name!
     # This must be done in order for the description to load in
     try:
         pytube_object.bypass_age_gate()
@@ -326,7 +351,7 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
 
     if 'Provided to YouTube by' not in description_list[0]:
         # This function won't work if it doesn't follow the auto-generated template on most official song uploads
-        raise VimusbotErrors.FormattingError(f'{plt.warn} Unexpected description formatting. URL: {pytube_object.watch_url}')
+        raise MediaError.FormatError(f'{plt.warn} Unexpected YouTube description formatting. URL: {pytube_object.watch_url}')
 
     for item in description_list.copy():
         if item == '':
@@ -345,23 +370,18 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
 
 def search_ytmusic_text(query: str) -> tuple:
     """Searches YTMusic with a plain-text query."""
-    try:
-        top_song = ytmusic.search(query=query, limit=1, filter='songs')[0]
-    except IndexError:
-        top_song = None
-
-    try:
-        top_video = ytmusic.search(query=query, limit=1, filter='videos')[0]
-    except IndexError:
-        top_video = None
+    songs, videos = [ytmusic.search(query=query, limit=1, filter=filt) for filt in ['songs', 'videos']]
+    top_song: dict | None = songs[0] if songs else None
+    top_video: dict | None = videos[0] if songs else None
 
     return top_song, top_video
 
-def search_ytmusic_album(title: str, artist: str, year: str, upc: str='') -> str|None:
+def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
+    """Attempts to find an album on YTMusic that matches `album_info`'s attributes as closely as possible."""
     if FORCE_NO_MATCH:
         log(f'{plt.warn}force_no_match is set to True.'); return None
 
-    query = f'{title} {artist} {year}'
+    query = f'{album_info.title} {album_info.artist} {album_info.year}'
     
     log('Starting album search...', verbose=True)
     check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')

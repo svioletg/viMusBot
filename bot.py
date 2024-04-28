@@ -31,6 +31,7 @@ import yt_dlp
 from discord.ext import commands
 from pretty_help import PrettyHelp
 
+# TODO: Maybe move into config module
 print('Checking for config file...')
 
 if not Path('config_default.yml').is_file():
