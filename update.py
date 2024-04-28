@@ -1,16 +1,19 @@
-# Standard libraries
+"""Automatic updater for the bot. Checks the locally stored version number against the latest release up on GitHub
+and replaces local files if a new version exists."""
+
+# Standard imports
 import os
 import shutil
 import urllib.request
 from pathlib import Path
 from zipfile import ZipFile
 
-# Third-party libraries
+# External imports
 import colorama
 import requests
 
-# Local modules
-from __version__ import VERSION
+# Local imports
+from version import VERSION
 from utils.palette import Palette
 
 colorama.init(autoreset=True)

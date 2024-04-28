@@ -1,5 +1,6 @@
 """Custom logging module for viMusBot."""
 
+# Standard imports
 import inspect
 import os
 import re
@@ -9,8 +10,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
+# External imports
 from benedict import benedict
 
+# Local imports
 import utils.configuration as config
 from utils.palette import NO_COLOR, Palette
 

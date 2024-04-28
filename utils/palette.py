@@ -1,10 +1,13 @@
 """Provides shorthand variables mapped to colorama's color codes, for easier and quicker usage."""
 
+# Standard imports
 import re
 
+# External imports
 import colorama
 from colorama import Fore, Style
 
+# Local imports
 import utils.configuration as config
 
 colorama.init(autoreset=True)

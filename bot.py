@@ -1,11 +1,6 @@
 """The main bot script. Running this will start viMusBot."""
 
 # Standard libraries
-import sys
-
-print('Getting ready...')
-print('Python ' + sys.version)
-
 import asyncio
 import glob
 import itertools
@@ -48,7 +43,7 @@ print('Importing local modules...')
 import update
 import utils.configuration as config
 import utils.media as media
-from __version__ import VERSION
+from version import VERSION
 from utils.logging import Log
 from utils.palette import Palette
 

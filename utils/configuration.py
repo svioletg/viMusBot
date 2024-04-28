@@ -1,7 +1,9 @@
 """Handles loading default and user configuration from YAML."""
 
+# Standard imports
 from typing import Any, Literal
 
+# External imports
 import yaml
 from benedict import benedict
 

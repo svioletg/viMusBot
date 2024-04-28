@@ -1,21 +1,25 @@
 """Primarily provides methods for searching and returning 
 standardized results from various sources."""
 
+# Standard imports
 import json
 import traceback
 from typing import Any, Callable, Literal, cast
 
+# External imports
 import pytube
 import regex as re
-import sclib
-import spotipy
-import yt_dlp
+from sclib import SoundcloudAPI
 from fuzzywuzzy import fuzz
+from spotipy import Spotify
+from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
+from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 
-from utils.palette import Palette
+# Local imports
 import utils.configuration as config
+from utils.palette import Palette
 
 plt = Palette()
 
@@ -64,8 +68,8 @@ class MediaInfo:
         self.title: str
         self.artist: str
         self.length_seconds: int
+        self.embed_image: str
         self.album_name: str
-        self.album_image: str
         self.release_year: str
 
         if source == SPOTIFY:
@@ -75,11 +79,39 @@ class MediaInfo:
         elif source == SOUNDCLOUD:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
-            self.artist         = cast(str, info.user['username']) # Gets the user that uploaded the album, not a guarantee that this is accurate
+            self.artist         = cast(str, info.user['username'])
+            self.embed_image    = cast(str, info.artwork_url)
             self.length_seconds = int(info.duration // 1000)
-            self.album_image    = cast(str, info.artwork_url)
         elif source == YOUTUBE:
-            pass
+            if isinstance(info, pytube.YouTube):
+                self.url = cast(str, info.watch_url)
+                # Check if this video has a matching song result on YTMusic, which provides better info
+                if ytmusic_result := ytmusic.search(query = self.url, filter = 'songs'):
+                    self.info = ytmusic_result[0]
+                else:
+                    # ...if not, handle the pytube data
+                    self.title          = cast(str, info.title)
+                    self.artist         = cast(str, info.author)
+                    self.length_seconds = int(info.length)
+                    self.embed_image    = cast(str, info.thumbnail_url)
+            # Not an elif, so that a converted pytube object can be used if applicable
+            if isinstance(info, dict):
+                if 'inLibrary' in info:
+                    # Should only be a YTMusic result dict, process as such
+                    self.url            = cast(str, f'https://www.youtube.com/watch?v={info['videoId']}')
+                    self.title          = cast(str, info['title'])
+                    self.artist         = cast(str, [item['name'] for item in info['artists'] if item['name'] != 'Album'][0])
+                    self.length_seconds = int(info['duration_seconds'])
+                    self.embed_image    = cast(str, info['thumbnails'][0]['url'])
+                    self.album_name     = cast(str, info['album']['name'])
+                    self.release_year   = cast(str, info['year'])
+                else:
+                    # Probably a dict from yt_dlp at this point
+                    self.url            = cast(str, info['webpage_url'])
+                    self.title          = cast(str, info['title'])
+                    self.artist         = cast(str, info['uploader'])
+                    self.length_seconds = int(info['duration'])
+                    self.embed_image    = cast(str, info['thumbnails'][0]['url'])
         else:
             pass
 
@@ -91,12 +123,12 @@ class TrackInfo(MediaInfo):
 
         if source == SPOTIFY:
             self.length_seconds = cast(int, info['duration_ms'] // 1000)
-            self.album_image    = cast(str, info['album']['images'][0]['url'])
+            self.embed_image    = cast(str, info['album']['images'][0]['url'])
             self.album_name     = cast(str, info['album']['name'])
             self.release_year   = cast(str, info['album']['release_date'].split('-')[0])
             self.isrc           = cast(str, info['external_ids'].get('isrc', None))
         elif source == SOUNDCLOUD:
-            self.release_year   = cast(str, info.release_date.split('-')[0])
+            self.release_year   = cast(str, info.release_date.split('-')[0]) if info.release_date else ''
         elif source == YOUTUBE:
             pass
         else:
@@ -111,7 +143,7 @@ class AlbumInfo(MediaInfo):
 
         if source == SPOTIFY:
             self.length_seconds = length_of_media_list(self.contents)
-            self.album_image    = cast(str, info['images'][0]['url'])
+            self.embed_image    = cast(str, info['images'][0]['url'])
             self.album_name     = cast(str, info['name'])
             self.release_year   = cast(str, info['release_date'].split('-')[0])
             self.upc            = cast(str, info['external_ids']['upc'])
@@ -130,7 +162,7 @@ class PlaylistInfo(MediaInfo):
         self.length_seconds: int
 
         if source == SPOTIFY:
-            self.album_image    = cast(str, info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
+            self.embed_image    = cast(str, info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
             self.length_seconds = length_of_media_list(self.contents)
         if source == SOUNDCLOUD:
             pass
@@ -171,6 +203,8 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
 
 #endregion
 
+#region CONNECT APIs, ETC.
+
 # Configure youtube dl
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -186,10 +220,7 @@ ytdl_format_options = {
     'extract_flat': True,
     'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
-
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
-#region API CONNECTIONS
+ytdl = YoutubeDL(ytdl_format_options)
 
 # Connect to youtube music API
 ytmusic = YTMusic()
@@ -202,12 +233,40 @@ client_credentials_manager = SpotifyClientCredentials(
     client_id = scred['client_id'],
     client_secret = scred['client_secret']
 )
-sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
+sp = Spotify(client_credentials_manager = client_credentials_manager)
 
 # Connect to soundcloud API
-sc = sclib.SoundcloudAPI()
+sc = SoundcloudAPI()
 
 #endregion
+#region SETUP FINISHED
+
+class Testing:
+    def __init__(self):
+        self.t = {
+            'sp':  TrackInfo(SPOTIFY, sp.track('https://open.spotify.com/track/1pmImsdC9t35L3TkD26ax8?si=7aad7529066b448d')),
+            'sc':  TrackInfo(SOUNDCLOUD, sc.resolve('https://soundcloud.com/sethgibbsmusic/rain')),
+            'ytm': TrackInfo(YOUTUBE, ytmusic.search('qAayzrbYYuM', filter='songs')[0]),
+            'ytd': TrackInfo(YOUTUBE, ytdl.extract_info('https://www.youtube.com/watch?v=qAayzrbYYuM', download=False)),
+            'ytp': TrackInfo(YOUTUBE, pytube.YouTube('https://www.youtube.com/watch?v=qAayzrbYYuM'))
+        }
+        print(self.t)
+        self.a = {
+            'sp':  AlbumInfo(SPOTIFY, sp.album('https://open.spotify.com/album/3jgktTCGathax8HKW4aGfg?si=d34b1518a5fc4ef0')),
+            'sc':  AlbumInfo(SOUNDCLOUD, sc.resolve('https://soundcloud.com/sethgibbsmusic/sets/chromatic')),
+            'ytm': AlbumInfo(YOUTUBE, ytmusic.search('No Dogs Allowed Sidney Gish', filter='albums')[0]),
+            'ytd': AlbumInfo(YOUTUBE, ytdl.extract_info('https://www.youtube.com/playlist?list=OLAK5uy_knTbxsoO4G4jNtofx7NSkKaBIaom5-314', download=False)),
+            'ytp': AlbumInfo(YOUTUBE, pytube.Playlist('https://www.youtube.com/playlist?list=OLAK5uy_knTbxsoO4G4jNtofx7NSkKaBIaom5-314'))
+        }
+        print(self.a)
+        self.p = {
+            'sp':  PlaylistInfo(SPOTIFY, sp.album('https://open.spotify.com/playlist/2Av9o5qHogf6p6kYOGi0uL?si=1fe4d964e25a4e8f')),
+            'sc':  PlaylistInfo(SOUNDCLOUD, sc.resolve('https://soundcloud.com/sethgibbsmusic/sets/2019-releases')),
+            # Using YTMusic would be pointless here
+            'ytd': PlaylistInfo(YOUTUBE, ytdl.extract_info('https://www.youtube.com/playlist?list=PLvNp0Boas720BYHiEHd-zM942KP_bCSZ4', download=False)),
+            'ytp': PlaylistInfo(YOUTUBE, pytube.Playlist('https://www.youtube.com/playlist?list=PLvNp0Boas720BYHiEHd-zM942KP_bCSZ4'))
+        }
+        print(self.p)
 
 # SoundCloud
 def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
@@ -224,7 +283,7 @@ def spotify_track(url: str) -> TrackInfo | Exception:
     Returns a SpotifyException if retrieval fails."""
     try:
         track: dict = cast(dict, sp.track(url))
-    except spotipy.exceptions.SpotifyException as e:
+    except SpotifyException as e:
         log(f'Failed to retrieve Spotify track: {e}')
         return e
 
@@ -236,7 +295,7 @@ def spotify_playlist(url: str) -> PlaylistInfo | Exception:
     Returns a SpotifyException if retrieval fails."""
     try:
         playlist: dict = cast(dict, sp.playlist(url))
-    except spotipy.exceptions.SpotifyException as e:
+    except SpotifyException as e:
         log(f'Failed to retrieve Spotify playlist: {e}')
         return e
 
@@ -248,32 +307,14 @@ def spotify_album(url: str) -> AlbumInfo | Exception:
     Returns a SpotifyException if retrieval fails."""
     try:
         album: dict = cast(dict, sp.album(url))
-    except spotipy.exceptions.SpotifyException as e:
+    except SpotifyException as e:
         log(f'Failed to retrieve Spotify album: {e}')
         return e
 
     return AlbumInfo(source = SPOTIFY, info = album)
 
-# For analyze()
-keytable = {
-    0: 'C major (A minor)',
-    1: 'C#/Db major (A#/Bb minor)',
-    2: 'D major (B minor)',
-    3: 'D#/Eb major (C minor)',
-    4: 'E major (C#/Db minor)',
-    5: 'F major (D minor)',
-    6: 'F#/Gb major (D#/Eb minor)',
-    7: 'G major (E minor)',
-    8: 'G#/Ab major (F minor)',
-    9: 'A major (F#/Gb minor)',
-    10: 'A#/Bb major (G minor)',
-    11: 'B major (G#/Ab minor)',
-}
-
-#region SETUP FINISHED
-
 # Define matching logic
-def is_matching(reference: dict, ytresult: dict,
+def compare_media(reference: dict, ytresult: dict,
         mode: Literal['fuzz', 'strict'] = 'fuzz',
         fuzz_threshold: int = 75,
         ignore_title: bool = False,
@@ -319,7 +360,7 @@ def is_matching(reference: dict, ytresult: dict,
     alternate_desired = any(i in ref_title.lower() for i in ['remix', 'cover', 'version'])
     alternate_found = any(i in yt_title.lower() for i in ['remix', 'cover', 'version'])
     alternate_check = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
-
+    # TODO: Rework to use a confidence score
     return (matching_title or ignore_title) \
         and (matching_artist or ignore_artist) \
         and (matching_album or ignore_album) \
@@ -340,7 +381,7 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
             raise ValueError('ytdl.extract_info() returned None.')
         description_list: list[str] = ytdl_info['description'].split('\n')
 
-    if 'Provided to YouTube by' not in description_list[0]:
+    if '' not in description_list[0]:
         # This function won't work if it doesn't follow the auto-generated template on most official song uploads
         raise MediaError.FormatError(f'{plt.warn} Unexpected YouTube description formatting. URL: {pytube_object.watch_url}')
 
@@ -359,13 +400,13 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
 
     return description_dict
 
-def search_ytmusic_text(query: str) -> tuple:
+def search_ytmusic_text(query: str) -> dict:
     """Searches YTMusic with a plain-text query."""
     songs, videos = [ytmusic.search(query=query, limit=1, filter=filt) for filt in ['songs', 'videos']]
     top_song: dict | None = songs[0] if songs else None
     top_video: dict | None = videos[0] if songs else None
 
-    return top_song, top_video
+    return {'top_song': top_song, 'top_video': top_video}
 
 def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
     """Attempts to find an album on YTMusic that matches `album_info`'s attributes as closely as possible."""
@@ -468,7 +509,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
 
     # First pass, check officially uploaded songs from artist channels
     for song in song_results[:5]:
-        if is_matching(reference, song, ignore_artist=True):
+        if compare_media(reference, song, ignore_artist=True):
             log('Song match found.')
             match = song
             break
@@ -477,7 +518,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
     if not match_found():
         log('Not found; checking for close match...')
         for song in video_results[:5]:
-            if is_matching(reference, song, ignore_artist=True, ignore_album=True):
+            if compare_media(reference, song, ignore_artist=True, ignore_album=True):
                 log('Video match found.')
                 match = song
                 break
@@ -516,6 +557,21 @@ def analyze_track(url: str) -> tuple:
     title = sp.track(url)['name']
     artist = sp.track(url)['artists'][0]['name']
     data = sp.audio_features(url)[0]
+
+    keytable = {
+        0: 'C major (A minor)',
+        1: 'C#/Db major (A#/Bb minor)',
+        2: 'D major (B minor)',
+        3: 'D#/Eb major (C minor)',
+        4: 'E major (C#/Db minor)',
+        5: 'F major (D minor)',
+        6: 'F#/Gb major (D#/Eb minor)',
+        7: 'G major (E minor)',
+        8: 'G#/Ab major (F minor)',
+        9: 'A major (F#/Gb minor)',
+        10: 'A#/Bb major (G minor)',
+        11: 'B major (G#/Ab minor)',
+    }
 
     # Nicer formatting
     data['tempo'] = str(int(data['tempo']))+'bpm'
