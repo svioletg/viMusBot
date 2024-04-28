@@ -60,9 +60,10 @@ class MediaInfo:
     Retrieves common attributes that can be obtained the same way regardless of type (Track, Album, Playlist).
     Generally should not be called directly; use the appropriate subclass instead.
     """
-    def __init__(self, source: MediaSource, info: Any):
+    def __init__(self, source: MediaSource, info: Any, yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
         self.source = source
         self.info = info
+        self.yt_result_origin = yt_result_origin
 
         self.url: str
         self.title: str
@@ -75,7 +76,6 @@ class MediaInfo:
         if source == SPOTIFY:
             self.url            = cast(str, info['external_urls']['spotify'])
             self.title          = cast(str, info['name'])
-            self.artist         = cast(str, info['artists'][0]['name'])
         elif source == SOUNDCLOUD:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
@@ -83,45 +83,49 @@ class MediaInfo:
             self.embed_image    = cast(str, info.artwork_url)
             self.length_seconds = int(info.duration // 1000)
         elif source == YOUTUBE:
-            if isinstance(info, pytube.YouTube):
-                self.url = cast(str, info.watch_url)
-                # Check if this video has a matching song result on YTMusic, which provides better info
-                if ytmusic_result := ytmusic.search(query = self.url, filter = 'songs'):
-                    self.info = ytmusic_result[0]
-                else:
-                    # ...if not, handle the pytube data
-                    self.title          = cast(str, info.title)
-                    self.artist         = cast(str, info.author)
-                    self.length_seconds = int(info.length)
-                    self.embed_image    = cast(str, info.thumbnail_url)
-            # Not an elif, so that a converted pytube object can be used if applicable
-            if isinstance(info, dict):
-                if 'inLibrary' in info:
-                    # Should only be a YTMusic result dict, process as such
-                    self.url            = cast(str, f'https://www.youtube.com/watch?v={info['videoId']}')
-                    self.title          = cast(str, info['title'])
-                    self.artist         = cast(str, [item['name'] for item in info['artists'] if item['name'] != 'Album'][0])
-                    self.length_seconds = int(info['duration_seconds'])
-                    self.embed_image    = cast(str, info['thumbnails'][0]['url'])
-                    self.album_name     = cast(str, info['album']['name'])
-                    self.release_year   = cast(str, info['year'])
-                else:
-                    # Probably a dict from yt_dlp at this point
-                    self.url            = cast(str, info['webpage_url'])
-                    self.title          = cast(str, info['title'])
-                    self.artist         = cast(str, info['uploader'])
-                    self.length_seconds = int(info['duration'])
-                    self.embed_image    = cast(str, info['thumbnails'][0]['url'])
+            if not self.yt_result_origin:
+                if isinstance(self.info, pytube.YouTube):
+                    self.yt_result_origin = 'pytube'
+                    self.url = cast(str, self.info.watch_url)
+                    # Check if this video has a matching song result on YTMusic, which provides better info
+                    if ytmusic_result := ytmusic.search(query = self.url.split('watch?v=')[1], filter = 'songs'):
+                        self.yt_result_origin = 'ytmusic'
+                        self.info = ytmusic_result[0]
+                elif isinstance(self.info, dict):
+                    if 'inLibrary' in self.info or 'browseId' in self.info:
+                        # Should only be a YTMusic result dict, process as such
+                        self.yt_result_origin = 'ytmusic'
+                    else:
+                        # Probably a dict from yt_dlp at this point
+                        self.yt_result_origin = 'ytdl'
+            # Lots of type ignores here, Pylance seems confused
+            if self.yt_result_origin == 'pytube':
+                self.title          = cast(str, self.info.title) # type: ignore
+                self.artist         = cast(str, self.info.author) # type: ignore
+                self.length_seconds = int(self.info.length) # type: ignore
+                self.embed_image    = cast(str, self.info.thumbnail_url) # type: ignore
+            
+            if self.yt_result_origin == 'ytmusic':
+                self.title          = cast(str, self.info['title']) # type: ignore
+                self.artist         = cast(str, [item['name'] for item in self.info['artists'] if item['name'] != 'Album'][0]) # type: ignore
+                self.embed_image    = cast(str, self.info['thumbnails'][0]['url']) # type: ignore
+                self.release_year   = cast(str, self.info['year']) # type: ignore
+            elif self.yt_result_origin == 'ytdl':
+                self.url            = cast(str, self.info['webpage_url']) # type: ignore
+                self.title          = cast(str, self.info['title']) # type: ignore
+                self.artist         = cast(str, self.info['uploader']) # type: ignore
+                self.embed_image    = cast(str, self.info['thumbnails'][0]['url']) # type: ignore
         else:
             pass
 
 class TrackInfo(MediaInfo):
     """Specific parsing for single track data."""
-    def __init__(self, source: MediaSource, info: Any):
-        MediaInfo.__init__(self, source, info)
+    def __init__(self, source: MediaSource, info: Any, yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+        MediaInfo.__init__(self, source, info, yt_result_origin)
         self.isrc: str # Can help for more accurate YouTube searching
 
         if source == SPOTIFY:
+            self.artist         = cast(str, info['artists'][0]['name'])
             self.length_seconds = cast(int, info['duration_ms'] // 1000)
             self.embed_image    = cast(str, info['album']['images'][0]['url'])
             self.album_name     = cast(str, info['album']['name'])
@@ -130,19 +134,27 @@ class TrackInfo(MediaInfo):
         elif source == SOUNDCLOUD:
             self.release_year   = cast(str, info.release_date.split('-')[0]) if info.release_date else ''
         elif source == YOUTUBE:
-            pass
+            if yt_result_origin == 'pytube':
+                pass
+            elif yt_result_origin == 'ytmusic':
+                self.url = cast(str, f'https://www.youtube.com/watch?v={info['videoId']}')
+                self.length_seconds = int(info['duration_seconds'])
+                self.album_name     = cast(str, self.info['album']['name'])
+            elif yt_result_origin == 'ytdl':
+                self.length_seconds = int(self.info['duration'])
         else:
             pass
 
 class AlbumInfo(MediaInfo):
     """Specific parsing for album data."""
-    def __init__(self, source: MediaSource, info: Any):
-        MediaInfo.__init__(self, source, info)
+    def __init__(self, source: MediaSource, info: Any, yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+        MediaInfo.__init__(self, source, info, yt_result_origin)
         self.contents: list[TrackInfo] = get_group_contents(self)
         self.upc: str
 
         if source == SPOTIFY:
-            self.length_seconds = length_of_media_list(self.contents)
+            self.artist         = cast(str, info['artists'][0]['name'])
+            self.length_seconds = media_list_duration(self.contents)
             self.embed_image    = cast(str, info['images'][0]['url'])
             self.album_name     = cast(str, info['name'])
             self.release_year   = cast(str, info['release_date'].split('-')[0])
@@ -150,28 +162,40 @@ class AlbumInfo(MediaInfo):
         elif source == SOUNDCLOUD:
             self.release_year   = cast(str, info.release_date.split('-')[0])
         elif source == YOUTUBE:
-            pass
+            if yt_result_origin == 'pytube':
+                self.upc = cast(str, info.upc)
+            elif yt_result_origin == 'ytmusic':
+                self.url = cast(str, f'https://www.youtube.com/playlist?list={ytmusic.get_album('browseId')['audioPlaylistId']}')
+                self.length_seconds = media_list_duration(self.contents)
+                self.album_name     = cast(str, self.info['name'])
+            elif yt_result_origin == 'ytdl':
+                self.length_seconds = media_list_duration(self.contents)
         else:
             pass
 
 class PlaylistInfo(MediaInfo):
     """Specific parsing for playlist data."""
-    def __init__(self, source: MediaSource, info: Any):
-        MediaInfo.__init__(self, source, info)
+    def __init__(self, source: MediaSource, info: Any, yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+        MediaInfo.__init__(self, source, info, yt_result_origin)
         self.contents: list[TrackInfo] = get_group_contents(self)
         self.length_seconds: int
 
         if source == SPOTIFY:
             self.embed_image    = cast(str, info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
-            self.length_seconds = length_of_media_list(self.contents)
+            self.length_seconds = media_list_duration(self.contents)
         if source == SOUNDCLOUD:
             pass
         if source == YOUTUBE:
-            pass
+            if yt_result_origin == 'pytube':
+                self.length_seconds = media_list_duration(self.contents)
+            elif yt_result_origin == 'ytmusic':
+                self.length_seconds = media_list_duration(self.contents)
+            elif yt_result_origin == 'ytdl':
+                self.length_seconds = media_list_duration(self.contents)
         else:
             pass
 
-def length_of_media_list(track_list: list[TrackInfo]) -> int:
+def media_list_duration(track_list: list[TrackInfo]) -> int:
     """Return the sum of track lengths from a list of TrackInfo objects."""
     return int(sum(track.length_seconds for track in track_list))
 
@@ -260,7 +284,7 @@ class Testing:
         }
         print(self.a)
         self.p = {
-            'sp':  PlaylistInfo(SPOTIFY, sp.album('https://open.spotify.com/playlist/2Av9o5qHogf6p6kYOGi0uL?si=1fe4d964e25a4e8f')),
+            'sp':  PlaylistInfo(SPOTIFY, sp.playlist('https://open.spotify.com/playlist/2Av9o5qHogf6p6kYOGi0uL?si=1fe4d964e25a4e8f')),
             'sc':  PlaylistInfo(SOUNDCLOUD, sc.resolve('https://soundcloud.com/sethgibbsmusic/sets/2019-releases')),
             # Using YTMusic would be pointless here
             'ytd': PlaylistInfo(YOUTUBE, ytdl.extract_info('https://www.youtube.com/playlist?list=PLvNp0Boas720BYHiEHd-zM942KP_bCSZ4', download=False)),
