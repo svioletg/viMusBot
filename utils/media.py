@@ -3,16 +3,15 @@ standardized results from various sources."""
 
 # Standard imports
 import json
-from re import X
-import traceback
+import traceback; 
 from typing import Any, Callable, Literal, cast
 
 # External imports
-from benedict import benedict
 import pytube
 import regex as re
-from sclib import SoundcloudAPI
+from benedict import benedict
 from fuzzywuzzy import fuzz
+from sclib import SoundcloudAPI
 from spotipy import Spotify
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -114,7 +113,10 @@ class MediaInfo:
                 self.artist         = cast(str, [item['name'] for item in self.info['artists'] if item['name'] != 'Album'][0]) # type: ignore
                 self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
             elif self.yt_result_origin == 'ytdl':
-                self.url            = cast(str, self.info['webpage_url']) # type: ignore
+                # It'll be 'webpage_url' if ytdl.extract_info() was used on a single video, but
+                # 'url' if its a video dictionary from the entries list of a playlist's extracted info
+                # i'm so tired
+                self.url            = cast(str, self.info.get('webpage_url', self.info.get['url'])) # type: ignore
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, self.info['uploader']) # type: ignore
                 self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
@@ -201,14 +203,15 @@ class PlaylistInfo(MediaInfo):
 def media_list_duration(track_list: list[TrackInfo]) -> int:
     """Return the sum of track lengths from a list of TrackInfo objects."""
     print(track_list)
+    print('duration getting')
     return int(sum(track.length_seconds for track in track_list))
 
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
     """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
     # TODO: Make compatible with all sources
     # TODO: This can take a while, maybe find a way to report status back to bot.py?
-    object_list: list[TrackInfo] = []
     track_list: list[Any] = []
+    object_list: list[TrackInfo] = []
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
         for n, track in enumerate(track_list):
@@ -230,15 +233,13 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
         if group_object.yt_result_origin == 'pytube':
             track_list = group_object.info.videos
         elif group_object.yt_result_origin == 'ytmusic':
-            print(group_object.info['browseId'])
-            print('gonna try')
             track_list = ytmusic.get_album(group_object.info['browseId'])['tracks']
-            for track in track_list:
-                object_list.append(TrackInfo(YOUTUBE, track))
-            return object_list
         elif group_object.yt_result_origin == 'ytdl':
-            pass
-            # track_list = group_object.info['entries']
+            track_list = group_object.info['entries']
+        
+        for track in track_list:
+            object_list.append(TrackInfo(YOUTUBE, track))
+        return object_list
 
 #endregion
 

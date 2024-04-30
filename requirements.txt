@@ -12,4 +12,4 @@ soundcloud_lib == 0.6.1
 spotipy == 2.23.0
 requests == 2.31.0
 yt_dlp == 2024.4.9
-ytmusicapi == 1.6.0
+ytmusicapi @ git+https://github.com/sigma67/ytmusicapi.git@2217f3d92d9aec75c07b0dd0768561ade2ab43d6
