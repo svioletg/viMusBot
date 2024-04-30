@@ -3,6 +3,7 @@ standardized results from various sources."""
 
 # Standard imports
 import json
+import time
 import traceback; 
 from typing import Any, Callable, Literal, cast
 
@@ -66,17 +67,18 @@ class MediaInfo:
         self.info: Any = info
         self.yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = yt_result_origin
 
-        self.url: str
-        self.title: str
-        self.artist: str
-        self.length_seconds: int
-        self.embed_image: str
-        self.album_name: str
-        self.release_year: str
+        self.url: str = ''
+        self.title: str = ''
+        self.artist: str = ''
+        self.length_seconds: int = 0
+        self.embed_image: str = ''
+        self.album_name: str = ''
+        self.release_year: str = ''
 
         if source == SPOTIFY:
             self.url            = cast(str, info['external_urls']['spotify'])
             self.title          = cast(str, info['name'])
+            self.artist         = cast(str, benedict(self.info).get('artists[0].name', ''))
         elif source == SOUNDCLOUD:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
@@ -116,7 +118,7 @@ class MediaInfo:
                 # It'll be 'webpage_url' if ytdl.extract_info() was used on a single video, but
                 # 'url' if its a video dictionary from the entries list of a playlist's extracted info
                 # i'm so tired
-                self.url            = cast(str, self.info.get('webpage_url', self.info.get['url'])) # type: ignore
+                self.url            = cast(str, self.info.get('webpage_url', self.info.get('url'))) # type: ignore
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, self.info['uploader']) # type: ignore
                 self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
@@ -127,15 +129,17 @@ class TrackInfo(MediaInfo):
     """Specific parsing for single track data."""
     def __init__(self, source: MediaSource, info: Any, yt_result_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
         MediaInfo.__init__(self, source, info, yt_result_origin)
-        self.isrc: str # Can help for more accurate YouTube searching
+        self.isrc: str # ISRC can help for more accurate YouTube searching
 
         if source == SPOTIFY:
-            self.artist         = cast(str, self.info['artists'][0]['name'])
             self.length_seconds = int(self.info['duration_ms'] // 1000)
-            self.embed_image    = cast(str, self.info['album']['images'][0]['url'])
-            self.album_name     = cast(str, self.info['album']['name'])
-            self.release_year   = cast(str, self.info['album']['release_date'].split('-')[0])
-            self.isrc           = cast(str, self.info['external_ids'].get('isrc', None))
+            if 'album' in self.info:
+                # An 'album' key indicates this was retrieved from Spotipy.track() or .playlist(), otherwise its from an album
+                # get_group_contents() will take care of these in that case, although it can't get an ISRC
+                self.embed_image  = cast(str, self.info['album']['images'][0]['url'])
+                self.album_name   = cast(str, self.info['album']['name'])
+                self.release_year = cast(str, self.info['album']['release_date'].split('-')[0])
+                self.isrc         = cast(str, self.info['external_ids'].get('isrc', None))
         elif source == SOUNDCLOUD:
             self.release_year   = cast(str, self.info.release_date.split('-')[0]) if self.info.release_date else ''
         elif source == YOUTUBE:
@@ -158,7 +162,6 @@ class AlbumInfo(MediaInfo):
         self.upc: str
 
         if source == SPOTIFY:
-            self.artist         = cast(str, self.info['artists'][0]['name'])
             self.length_seconds = media_list_duration(self.contents)
             self.embed_image    = cast(str, self.info['images'][0]['url'])
             self.album_name     = cast(str, self.info['name'])
@@ -214,13 +217,23 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
     object_list: list[TrackInfo] = []
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
+        telapsed = 0
         for n, track in enumerate(track_list):
             log(f'Getting track {n+1} out of {len(track_list)}...', verbose=True)
             bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
             if isinstance(group_object, AlbumInfo):
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['external_urls']['spotify']))))
+                print('GET CONTENTS ', track)
+                ta = time.time()
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
+                object_list[-1].embed_image  = group_object.embed_image
+                object_list[-1].album_name   = group_object.album_name
+                object_list[-1].release_year = group_object.release_year
+                tb = time.time()
+                print(f'{plt.magenta}TIME: ', tb - ta)
+                telapsed += tb - ta
             elif isinstance(group_object, PlaylistInfo):
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, sp.track(track['track']['external_urls']['spotify']))))
+                object_list.append(TrackInfo(SPOTIFY, cast(dict, track['track'])))
+        print(f'{plt.blue}TOTAL ELAPSED ... {telapsed}')
         return object_list
 
     if group_object.source == SOUNDCLOUD:
@@ -327,6 +340,16 @@ class Testing:
             check(alb)
         elif isinstance(obj, PlaylistInfo):
             check(pla)
+    
+    @staticmethod
+    def verall() -> None:
+        r = Testing()
+        for n, i in enumerate((r.t, r.p, r.a)):
+            src = ['SINGLE TRACK,', 'PLAYLIST', 'ALBUM'][n]
+            print(f'---## {src} ##---')
+            for j in i:
+                print(f'---| {j} |---')
+                Testing.verify(i[j])
 
 # SoundCloud
 def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
