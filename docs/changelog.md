@@ -5,6 +5,7 @@
 > *2024.mm.dd / dev.34*
 
 Developer
+- Docstrings have been added to most functions, classes, and modules
 - `utils` directory added to contain helper modules
     - `spoofy.py` renamed to `media.py`
     - `customlog.py` renamed to `logging.py`
