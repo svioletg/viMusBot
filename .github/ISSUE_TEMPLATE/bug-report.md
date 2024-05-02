@@ -1,9 +1,9 @@
 ---
 name: Bug report
 about: Report incorrect or unintended behavior
-title: "[Bug]"
+title: ''
 labels: bug
-assignees: ''
+assignees: svioletg
 
 ---
 
@@ -11,7 +11,12 @@ assignees: ''
 Describe what's going wrong here.
 
 **Exact error message or traceback, if any:**
-A "traceback" is the error message that appears in **red text**, if you have not turned coloring for logs off.
+A "traceback" is the error message that appears in **red text**, if you have not turned coloring for logs off. An example:
+```
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TypeError: unsupported operand type(s) for +: 'int' and 'str'
+```
 
 **Link to most recent vimusbot.log file:**
-Pasting its contents to pastebin.com is typically the easiest way to do this.
+Attach the file to this issue, or upload its contents to a service like pastebin if needed.
