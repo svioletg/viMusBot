@@ -3,8 +3,7 @@ standardized results from various sources."""
 
 # Standard imports
 import json
-import time
-import traceback; 
+import traceback
 from typing import Any, Callable, Literal, cast
 
 # External imports
@@ -12,7 +11,7 @@ import pytube
 import regex as re
 from benedict import benedict
 from fuzzywuzzy import fuzz
-from sclib import SoundcloudAPI
+from sclib import SoundcloudAPI, Track as SoundcloudTrack, Playlist as SoundcloudPlaylist
 from spotipy import Spotify
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -50,11 +49,11 @@ YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
 
-class MediaError:
+class MediaError(Exception):
     # TODO: Re-evaluate if this is needed once this file's rework is done
     """Base class for media-related exceptions."""
     class FormatError(Exception):
-        pass
+        """Used for incorrect or unexpected MediaInfo formatting."""
 
 class MediaInfo:
     """Base class for gathering standardized data from different media sources.
@@ -90,7 +89,9 @@ class MediaInfo:
                 # Figure out YouTube dict source from either pytube, ytmusicapi, or yt_dlp
                 if isinstance(self.info, (pytube.YouTube, pytube.Playlist)):
                     if isinstance(self.info, pytube.Playlist):
-                        raise MediaError.FormatError('pytube.Playlist should not be used to instance MediaInfo.')
+                        # Pytube only returns a list of URL strings for playlists which isn't very helpful,
+                        # it's better to just enforce using other methods.
+                        raise ValueError('pytube.Playlist should not be used to instance MediaInfo.')
                     self.yt_result_origin = 'pytube'
                     self.url = cast(str, self.info.watch_url)
                     # Check if this video has a matching song result on YTMusic, which provides better info
@@ -114,14 +115,14 @@ class MediaInfo:
             if self.yt_result_origin == 'ytmusic':
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, [item['name'] for item in self.info['artists'] if item['name'] != 'Album'][0]) # type: ignore
-                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
+                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
             elif self.yt_result_origin == 'ytdl':
                 # It'll be 'webpage_url' if ytdl.extract_info() was used on a single video, but
                 # 'url' if its a video dictionary from the entries list of a playlist's extracted info
                 self.url            = cast(str, self.info.get('webpage_url', self.info.get('url'))) # type: ignore
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, self.info['uploader']) # type: ignore
-                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', '')) # type: ignore
+                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
         else:
             pass
 
@@ -168,6 +169,7 @@ class AlbumInfo(MediaInfo):
             self.release_year   = cast(str, self.info['release_date'].split('-')[0])
             self.upc            = cast(str, self.info['external_ids']['upc'])
         elif source == SOUNDCLOUD:
+            self.album_name     = cast(str, self.info.title)
             self.release_year   = cast(str, self.info.release_date.split('-')[0])
         elif source == YOUTUBE:
             if self.yt_result_origin == 'pytube':
@@ -195,7 +197,7 @@ class PlaylistInfo(MediaInfo):
             pass
         if source == YOUTUBE:
             if self.yt_result_origin == 'ytmusic':
-                raise MediaError.FormatError('ytmusic origin incompatible with PlaylistInfo.')
+                raise ValueError('ytmusic origin is incompatible with PlaylistInfo.')
             if self.yt_result_origin == 'ytdl':
                 self.length_seconds = track_list_duration(self.contents)
         else:
@@ -205,15 +207,14 @@ def track_list_duration(track_list: list[TrackInfo]) -> int:
     """Return the sum of track lengths from a list of TrackInfo objects."""
     return int(sum(track.length_seconds for track in track_list))
 
-def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]:
+# Pylance warns about some return paths here returning None, but I can't find a situation where that would happen
+def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]: # type: ignore
     """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
-    # TODO: Make compatible with all sources
     # TODO: This can take a while, maybe find a way to report status back to bot.py?
     track_list: list[Any] = []
     object_list: list[TrackInfo] = []
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
-        telapsed = 0
         for n, track in enumerate(track_list):
             log(f'Getting track {n+1} out of {len(track_list)}...', verbose=True)
             bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
@@ -237,6 +238,8 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             track_list = ytmusic.get_album(group_object.info['browseId'])['tracks']
         if group_object.yt_result_origin == 'ytdl':
             track_list = group_object.info['entries']
+        if group_object.yt_result_origin == 'pytube':
+            raise ValueError('pytube origin incompatible with get_group_contents()')
         
         for track in track_list:
             object_list.append(TrackInfo(YOUTUBE, track))
@@ -308,6 +311,7 @@ class Testing:
     
     @staticmethod
     def verify(obj: TrackInfo | AlbumInfo | PlaylistInfo) -> None:
+        """A testing method."""
         std = ['url', 'title', 'artist', 'length_seconds', 'embed_image', 'album_name', 'release_year']
         tra = ['isrc']
         alb = ['contents', 'upc']
@@ -328,6 +332,7 @@ class Testing:
     
     @staticmethod
     def verall() -> None:
+        """Testing method. Runs verify for every result returned."""
         r = Testing()
         for n, i in enumerate((r.t, r.p, r.a)):
             src = ['SINGLE TRACK,', 'PLAYLIST', 'ALBUM'][n]
@@ -341,43 +346,39 @@ def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
     """Retrieves a SoundCloud set and returns either a PlaylistInfo or AlbumInfo where applicable."""
     # Soundcloud playlists and albums use the same URL format, a set
     response: Any = sc.resolve(url)
-    return AlbumInfo(SOUNDCLOUD, response.tracks) if response.is_album \
-        else PlaylistInfo(SOUNDCLOUD, response.tracks)
+    if isinstance(response, SoundcloudTrack):
+        raise ValueError(f'Tried to retrieve a SoundCloud set with a single track URL: {url}')
+
+    # is_album IS a member of Playlist, but Pylint doesn't seem to know that
+    is_album: bool = response.is_album # pylint: disable=no-member
+    return AlbumInfo(SOUNDCLOUD, response.tracks) if is_album else PlaylistInfo(SOUNDCLOUD, response.tracks)
 
 # Spotify
-def spotify_track(url: str) -> TrackInfo | Exception:
-    """Retrieves a Spotify track and returns it as a TrackInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
-    try:
-        track: dict = cast(dict, sp.track(url))
-    except SpotifyException as e:
-        log(f'Failed to retrieve Spotify track: {e}')
-        return e
+def spotify_track(url: str) -> TrackInfo:
+    """Retrieves a Spotify track and returns it as a TrackInfo object."""
+    track: dict = sp.track(url) # type: ignore
+    if not track:
+        raise MediaError(f'No track found for URL: {url}')
 
     return TrackInfo(source = SPOTIFY, info = track)
 
-def spotify_playlist(url: str) -> PlaylistInfo | Exception:
+def spotify_playlist(url: str) -> PlaylistInfo:
     """Retrieves a Spotify track and returns it as a PlaylistInfo object.
 
     Returns a SpotifyException if retrieval fails."""
-    try:
-        playlist: dict = cast(dict, sp.playlist(url))
-    except SpotifyException as e:
-        log(f'Failed to retrieve Spotify playlist: {e}')
-        return e
+    playlist: dict = sp.playlist(url) # type: ignore
+    if not playlist:
+        raise MediaError(f'No playlist found for URL: {url}')
 
     return PlaylistInfo(source = SPOTIFY, info = playlist)
 
-def spotify_album(url: str) -> AlbumInfo | Exception:
+def spotify_album(url: str) -> AlbumInfo:
     """Retrieves a Spotify track and returns it as a AlbumInfo object.
 
     Returns a SpotifyException if retrieval fails."""
-    try:
-        album: dict = cast(dict, sp.album(url))
-    except SpotifyException as e:
-        log(f'Failed to retrieve Spotify album: {e}')
-        return e
+    album: dict = sp.album(url) # type: ignore
+    if not album:
+        raise MediaError(f'No album found for URL: {url}')
 
     return AlbumInfo(source = SPOTIFY, info = album)
 
@@ -441,12 +442,14 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
     try:
         pytube_object.bypass_age_gate()
         description_list = pytube_object.description.split('\n')
+        # TODO: Figure out what exception this actually raises
     except Exception as e:
+        print(e)
         log(f'pytube description retrieval failed; using ytdl...', verbose=True)
         log(f'Cause of the above: {e}')
         ytdl_info = ytdl.extract_info(pytube_object.watch_url)
         if not ytdl_info:
-            raise ValueError('ytdl.extract_info() returned None.')
+            raise ValueError('ytdl.extract_info() returned None')
         description_list: list[str] = ytdl_info['description'].split('\n')
 
     if '' not in description_list[0]:
@@ -476,12 +479,13 @@ def search_ytmusic_text(query: str) -> dict:
 
     return {'top_song': top_song, 'top_video': top_video}
 
-def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
+def search_ytmusic_album(album_info: AlbumInfo) -> str | None:
     """Attempts to find an album on YTMusic that matches `album_info`'s attributes as closely as possible."""
     if FORCE_NO_MATCH:
         log(f'{plt.warn}force_no_match is set to True.'); return None
 
-    query = f'{album_info.title} {album_info.artist} {album_info.year}'
+    title, artist, release_year = album_info.title, album_info.artist, album_info.release_year
+    query = f'{title} {artist} {release_year}'
     
     log('Starting album search...', verbose=True)
     check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
@@ -490,7 +494,7 @@ def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
     for yt in album_results:
         title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['title'])) > 75
         artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
-        year_match = fuzz.ratio(year, yt['year']) > 75
+        year_match = fuzz.ratio(release_year, yt['year']) > 75
         if title_match + artist_match + year_match >= 2:
             log('Match found.', verbose=True)
             return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
@@ -499,7 +503,7 @@ def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
     for yt in song_results:
         title_match = fuzz.ratio(check.sub('', title), check.sub('', yt['album']['name'])) > 75
         artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
-        year_match = fuzz.ratio(year, yt['year']) > 75
+        year_match = fuzz.ratio(release_year, yt['year']) > 75
         if title_match + artist_match + year_match >= 2:
             log('Match found.', verbose=True)
             return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['album']['id'])['audioPlaylistId']
@@ -508,8 +512,9 @@ def search_ytmusic_album(album_info: AlbumInfo) -> str|None:
     return None
 
 # Trim ytmusic song data down to what's relevant to us
-def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=False) -> dict:
-    if is_pytube_object:
+def trim_track_data(data: dict | pytube.YouTube, album: str='') -> dict:
+    # TODO: Might be unnecessary now, verify
+    if isinstance(data, pytube.YouTube):
         data = pytube_track_data(data)
         try:
             album = data['album']['name']
@@ -527,21 +532,24 @@ def trim_track_data(data: dict|object, album: str='', is_pytube_object: bool=Fal
     }
     return relevant
 
-def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: int=10, fast_search: bool=False):
+def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int=10, fast_search: bool=False):
     unsure = False
 
     query = f'{title} {artist} {album}'
     reference = {'title':title, 'artist':artist, 'album':album, 'isrc':isrc}
 
     # Start search
-    if isrc is not None and not FORCE_NO_MATCH:
+    if (isrc) and (not FORCE_NO_MATCH):
         log(f'Searching for ISRC: {isrc}', verbose=True)
         # For whatever reason, pytube seems to be more accurate here
-        isrc_matches = pytube.Search(isrc).results
+        pytube_results = pytube.Search(isrc).results
+        if not pytube_results:
+            log('No ISRC match found, falling back on text search.')
+        isrc_matches: list = cast(list, pytube_results)
         for song in isrc_matches:
             if fuzz.ratio(song.title, reference['title']) > 75:
                 log('Found an ISRC match.', verbose=True)
-                return trim_track_data(song, is_pytube_object=True)
+                return trim_track_data(song)
             
         log('No ISRC match found, falling back on text search.')
 
@@ -601,7 +609,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
     if match_found():
         # Return match
         log('Returning match.', verbose=True)
-        return trim_track_data(match)
+        return trim_track_data(match) # TODO: Check what's actually going on here
     else:
         log('Creating results dictionary...', verbose=True)
         song_choices = 2
@@ -622,9 +630,10 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str=None, limit: i
 
 def analyze_track(url: str) -> tuple:
     # TODO: Rewrite with MediaInfo objects
-    title = sp.track(url)['name']
-    artist = sp.track(url)['artists'][0]['name']
-    data = sp.audio_features(url)[0]
+    if features := sp.audio_features(url):
+        data = features[0]
+    else:
+        raise MediaError(f'No features found for track: {url}')
 
     keytable = {
         0: 'C major (A minor)',
@@ -670,12 +679,13 @@ def analyze_track(url: str) -> tuple:
 # Other
 def is_jp(text: str) -> bool:
     # TODO: Test this
+    print('!!! is_jp() called')
     return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text)
 
-def spyt(url: str, limit: int=20, **kwargs) -> dict|tuple:
+def spyt(url: str, limit: int=20) -> dict | tuple:
     """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
     track = spotify_track(url)
-    result = search_ytmusic(title=track['title'], artist=track['artist'], album=track['album'], isrc=track['isrc'], limit=limit, **kwargs)
+    result = search_ytmusic(title=track.title, artist=track.artist, album=track.album_name, isrc=track.isrc, limit=limit)
     if isinstance(result, tuple) and result[0] == 'unsure':
         log('Returning as unsure.')
         return result
