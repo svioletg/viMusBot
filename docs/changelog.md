@@ -7,8 +7,9 @@
 Developer
 - Docstrings have been added to most functions, classes, and modules
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library
+    - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - `utils` directory added to contain helper modules
-    - `utils.py` created in this directory to house general-purpose utility methods that should be shared between modules
+    - `miscutil.py` created in this directory to house general-purpose utility methods that should be shared between modules
     - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
     - `spoofy.py` renamed to `media.py`, moved to this directory

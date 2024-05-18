@@ -41,7 +41,7 @@ print('Importing local modules...')
 
 # Local imports
 import update
-import utils.general as general
+import utils.miscutil as miscutil
 import utils.configuration as config
 import utils.media as media
 from utils.palette import Palette
@@ -55,7 +55,9 @@ discordpy_logfile_handler = logging.FileHandler(filename='discord.log', encoding
 discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INFO, root=False)
 
 # Setup bot logging
-log = general.create_logger(__name__, Path('vimusbot.log'))
+log = miscutil.create_logger(__name__, Path('vimusbot.log'))
+# Assign local modules the same logger
+media.log = log
 
 log.debug('DEBUG!')
 log.info('INFO!')

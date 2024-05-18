@@ -4,6 +4,7 @@ standardized results from various sources."""
 # Standard imports
 import json
 import traceback
+import logging
 from typing import Any, Callable, Literal, cast
 
 # External imports
@@ -11,7 +12,7 @@ import pytube
 import regex as re
 from benedict import benedict
 from fuzzywuzzy import fuzz
-from sclib import SoundcloudAPI, Track as SoundcloudTrack, Playlist as SoundcloudPlaylist
+from sclib import SoundcloudAPI, Track as SoundcloudTrack
 from spotipy import Spotify
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -19,13 +20,16 @@ from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 
 # Local imports
+import utils.miscutil as miscutil
 import utils.configuration as config
 from utils.palette import Palette
 
 plt = Palette()
 
-# Logs won't be printed unless bot.py assigns this to its own logger
-log: Callable = lambda message, verbose=False: None
+# Logs shouldn't be printed unless bot.py assigns this to its own logger
+log = logging.getLogger(__name__)
+# Setting the level to CRITICAL effectively disables logs
+log.setLevel(logging.CRITICAL)
 
 # Function to communicate with the bot and send status messages, useful for long tasks
 bot_status_callback: Callable = lambda message: None
@@ -37,7 +41,7 @@ DURATION_LIMIT         : int  = config.get('duration-limit') # type: ignore
 
 # Useful to point this out if left on accidentally
 if FORCE_NO_MATCH:
-    log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+    log.info(f'{plt.warn}NOTICE: force_no_match is set to True.')
 
 #region DEFINE CLASSES
 
@@ -216,7 +220,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
         for n, track in enumerate(track_list):
-            log(f'Getting track {n+1} out of {len(track_list)}...', verbose=True)
+            log.debug(f'Getting track {n+1} out of {len(track_list)}...')
             bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
             if isinstance(group_object, AlbumInfo):
                 object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
@@ -404,7 +408,7 @@ def compare_media(reference: dict, ytresult: dict,
     try:
         yt_album = ytresult['album']['name']
     except KeyError as e:
-        log(f'Ignoring album name. (Cause: {traceback.format_exception(e)[-1]})')
+        log.info(f'Ignoring album name. (Cause: {traceback.format_exception(e)[-1]})')
         # User-uploaded videos have no 'album' key
         yt_album = ''
 
@@ -444,11 +448,11 @@ def pytube_track_data(pytube_object: pytube.YouTube) -> dict:
         description_list = pytube_object.description.split('\n')
         # TODO: Figure out what exception this actually raises
     except Exception as e:
-        print(e)
-        log(f'pytube description retrieval failed; using ytdl...', verbose=True)
-        log(f'Cause of the above: {e}')
+        log.debug(f'pytube description retrieval failed; using ytdl...')
+        log.debug(f'Cause of the above: {e}')
         ytdl_info = ytdl.extract_info(pytube_object.watch_url)
         if not ytdl_info:
+            # TODO: check on
             raise ValueError('ytdl.extract_info() returned None')
         description_list: list[str] = ytdl_info['description'].split('\n')
 
@@ -482,12 +486,13 @@ def search_ytmusic_text(query: str) -> dict:
 def search_ytmusic_album(album_info: AlbumInfo) -> str | None:
     """Attempts to find an album on YTMusic that matches `album_info`'s attributes as closely as possible."""
     if FORCE_NO_MATCH:
-        log(f'{plt.warn}force_no_match is set to True.'); return None
+        log.info(f'{plt.warn}force_no_match is set to True.')
+        return None
 
     title, artist, release_year = album_info.title, album_info.artist, album_info.release_year
     query = f'{title} {artist} {release_year}'
     
-    log('Starting album search...', verbose=True)
+    log.info('Starting album search...')
     check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
 
     album_results = ytmusic.search(query=query, limit=5, filter='albums')
@@ -496,7 +501,7 @@ def search_ytmusic_album(album_info: AlbumInfo) -> str | None:
         artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
         year_match = fuzz.ratio(release_year, yt['year']) > 75
         if title_match + artist_match + year_match >= 2:
-            log('Match found.', verbose=True)
+            log.info('Match found.')
             return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
     
     song_results = ytmusic.search(query=query,limit=5,filter='songs')
@@ -505,10 +510,10 @@ def search_ytmusic_album(album_info: AlbumInfo) -> str | None:
         artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
         year_match = fuzz.ratio(release_year, yt['year']) > 75
         if title_match + artist_match + year_match >= 2:
-            log('Match found.', verbose=True)
+            log.info('Match found.')
             return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['album']['id'])['audioPlaylistId']
     
-    log('No match found.', verbose=True)
+    log.info('No match found.')
     return None
 
 # Trim ytmusic song data down to what's relevant to us
@@ -519,10 +524,12 @@ def trim_track_data(data: dict | pytube.YouTube, album: str='') -> dict:
         try:
             album = data['album']['name']
         except KeyError as e:
-            log(f'Failed to retrieve album from pytube object. ({e})', verbose=True)
-            pass
-    if 'duration' in data: duration = data['duration']
-    elif 'length' in data: duration = data['length']
+            log.warning(f'Failed to retrieve album from pytube object. ({e})')
+    # TODO: could be condensed?
+    if 'duration' in data:
+        duration = data['duration']
+    elif 'length' in data:
+        duration = data['length']
     relevant = {
         'title': data['title'],
         'artist': data['artists'][0]['name'],
@@ -540,20 +547,21 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int
 
     # Start search
     if (isrc) and (not FORCE_NO_MATCH):
-        log(f'Searching for ISRC: {isrc}', verbose=True)
+        log.info(f'Searching for ISRC: {isrc}')
         # For whatever reason, pytube seems to be more accurate here
         pytube_results = pytube.Search(isrc).results
         if not pytube_results:
-            log('No ISRC match found, falling back on text search.')
+            log.info('No ISRC match found, falling back on text search.')
         isrc_matches: list = cast(list, pytube_results)
+        # TODO: confusing
         for song in isrc_matches:
             if fuzz.ratio(song.title, reference['title']) > 75:
-                log('Found an ISRC match.', verbose=True)
+                log.info('Found an ISRC match.')
                 return trim_track_data(song)
             
-        log('No ISRC match found, falling back on text search.')
+        log.info('No ISRC match found, falling back on text search.')
 
-    log(f'Trying query \"{query}\" with a limit of {limit}')
+    log.info(f'Trying query \"{query}\"')
     song_results = ytmusic.search(query=query, limit=limit, filter='songs')
     video_results = ytmusic.search(query=query, limit=limit, filter='videos')
     # Remove videos over a certain length
@@ -564,18 +572,21 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int
             video_results.pop(video_results.index(v))
     
     if fast_search:
-        log('fast_search is True.', verbose=True)
-        log('Returning match.', verbose=True)
+        log.debug('fast_search is True.')
+        log.debug('Returning match.')
         return trim_track_data(song_results[0])
 
-    log('Checking for exact match...')
+    log.info('Checking for exact match...')
     if FORCE_NO_MATCH:
-        log(f'{plt.warn}NOTICE: force_no_match is set to True.')
+        log.warning('NOTICE: force_no_match is set to True.')
 
     # Check for matches
     match = None
     def match_found() -> bool:
-        return match != None if not FORCE_NO_MATCH else False
+        if FORCE_NO_MATCH:
+            return True
+        else:
+            return match is not None
 
     if is_jp(query):
         # Assumes first Japanese result is correct, otherwise
@@ -586,21 +597,21 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int
     # First pass, check officially uploaded songs from artist channels
     for song in song_results[:5]:
         if compare_media(reference, song, ignore_artist=True):
-            log('Song match found.')
+            log.info('Song match found.')
             match = song
             break
 
     # Next, try standard non-"song" videos
     if not match_found():
-        log('Not found; checking for close match...')
+        log.info('Not found; checking for close match...')
         for song in video_results[:5]:
             if compare_media(reference, song, ignore_artist=True, ignore_album=True):
-                log('Video match found.')
+                log.info('Video match found.')
                 match = song
                 break
     
     if not match_found():
-        log('No match. Setting unsure to True.', verbose=True)
+        log.info('No match. Setting unsure to True')
         unsure = True
 
     # Make new dict with more relevant information
@@ -608,10 +619,10 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int
     # Determine what to queue
     if match_found():
         # Return match
-        log('Returning match.', verbose=True)
+        log.info('Returning match.')
         return trim_track_data(match) # TODO: Check what's actually going on here
     else:
-        log('Creating results dictionary...', verbose=True)
+        log.info('Creating results dictionary...')
         song_choices = 2
         video_choices = 2
         position = 0
@@ -625,7 +636,7 @@ def search_ytmusic(title: str, artist: str, album: str, isrc: str='', limit: int
 
         # Ask for confirmation if no exact match found
         if unsure:
-            log('Returning as unsure.')
+            log.info('Returning as unsure.')
             return 'unsure', results
 
 def analyze_track(url: str) -> tuple:
@@ -680,13 +691,13 @@ def analyze_track(url: str) -> tuple:
 def is_jp(text: str) -> bool:
     # TODO: Test this
     print('!!! is_jp() called')
-    return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text)
+    return re.search(r'([\p{IsHan}\p{IsBopo}\p{IsHira}\p{IsKatakana}]+)', text) is not None
 
 def spyt(url: str, limit: int=20) -> dict | tuple:
     """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
     track = spotify_track(url)
     result = search_ytmusic(title=track.title, artist=track.artist, album=track.album_name, isrc=track.isrc, limit=limit)
     if isinstance(result, tuple) and result[0] == 'unsure':
-        log('Returning as unsure.')
+        log.info('Returning as unsure.')
         return result
     return result
