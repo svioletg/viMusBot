@@ -1,6 +1,6 @@
 """The main bot script. Running this will start viMusBot."""
 
-# Standard libraries
+# Standard imports
 import asyncio
 import glob
 import itertools
@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 from pathlib import Path
 
-# Third-party libraries
+# External imports
 import aioconsole
 import colorama
 import discord
@@ -39,27 +39,39 @@ if not Path('config.yml').is_file():
 
 print('Importing local modules...')
 
-# Local modules
+# Local imports
 import update
+import utils.general as general
 import utils.configuration as config
 import utils.media as media
-from version import VERSION
-from utils.logging import Log
 from utils.palette import Palette
+from version import VERSION
 
-# Setup discord logging
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-discord.utils.setup_logging(handler=handler, level=logging.INFO, root=False)
-
-# Setup bot logging
 colorama.init(autoreset=True)
 plt = Palette()
 
-vmb_logger = Log()
-log = vmb_logger.log
-log_traceback = vmb_logger.log_traceback
+# Setup discord logging
+discordpy_logfile_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INFO, root=False)
 
-media.log = log
+# Setup bot logging
+log = general.create_logger(__name__, Path('vimusbot.log'))
+
+log.debug('DEBUG!')
+log.info('INFO!')
+log.warning('WARNING!')
+log.error('ERROR!')
+log.critical('CRITICAL!')
+
+log.info('Logging for bot.py is now active.')
+
+exit()
+
+# vmb_logger = Log()
+# log = vmb_logger.log
+# log_traceback = vmb_logger.log_traceback
+
+# media.log = log
 
 log('Logging is ready.')
 
@@ -127,6 +139,8 @@ def embedq(*args: str) -> discord.Embed:
         return discord.Embed(title=args[0], color=EMBED_COLOR)
     elif len(args) == 2:
         return discord.Embed(title=args[0], description=args[1], color=EMBED_COLOR)
+    else:
+        raise ValueError('More than 2 arguments provided to embedq()')
 
 # For easier emoji usage
 emoji = {

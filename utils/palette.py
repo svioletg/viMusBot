@@ -49,11 +49,11 @@ class Palette:
         # Make dictionary for config usage
         self.colors = vars(self)
         # User-defined
-        self.file = get_filename_color
-        self.warn: str = self.colors[get_color_config('warn')] #type: ignore
-        self.error: str = self.colors[get_color_config('error')] #type: ignore
-        self.timer: str = self.colors[get_color_config('timer')] #type: ignore
-        self.func: str = self.colors[get_color_config('function')] #type: ignore
+        self.module = self.colors[get_color_config('module')]
+        self.func = self.colors[get_color_config('function')]
+        self.warn = self.colors[get_color_config('warn')]
+        self.error = self.colors[get_color_config('error')]
+        self.timer = self.colors[get_color_config('timer')]
 
     @staticmethod
     def strip_color(string) -> str:

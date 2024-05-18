@@ -1,5 +1,6 @@
 aioconsole == 0.7.0
 colorama == 0.4.6
+colorlog == 6.8.2
 discord.py == 2.3.2
 discord-pretty-help == 2.0.7
 fuzzywuzzy == 0.18.0

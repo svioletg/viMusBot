@@ -115,6 +115,25 @@ viMusBot will automatically check for new releases each time it starts. To updat
 
 If you experience any issues with the bot, or you want a new feature added, you're free to [open a new issue](https://github.com/svioletg/viMusBot/issues) so I can look into it when possible.
 
+## Reading Logs
+
+viMusBot stores its logs in `vimusbot.log`, as well as printing them out to the console window — `stdout`, to be more specific. A log will look something like this:
+
+`[24-05-17 23:31:30] [bot.py/INFO] <module>: Logging for bot.py is now active.`
+
+First is the current date (YY-MM-DD) and time (HH:MM:SS), followed by the file that created the log, the log's levels, and the function the log originated from. There are five levels that a log can have, depending on the importance and severity, and are largely used as such:
+
+- `DEBUG`
+  - Debug-level logs only show up in the console if they've been enabled in `config.yml`, and are only written to `vimusbot-debug.log` — `vimusbot.log` will not contain them. These usually contain more verbose and frequent information that isn't very important for most users to know in normal usage, but is very useful for diagnosing issues when things go wrong. If you're [reporting a bug](https://github.com/svioletg/viMusBot/issues), you should attach the debug log file.
+- `INFO`
+  - Nothing of concern. Largely used for general status updates.
+- `WARNING`
+  - Used when something has occurred that isn't of immediate concern, but could *potentially* cause issues or unwanted side effects. For example, this is used when certain debugging options are enabled in your configuration that you probably don't want unless you're trying to diagnose an issue.
+- `ERROR`
+  - An error has occurred that has prevented the bot from completing a task, but the bot can continue running as usual afterwards. Most commonly, this can happen if media retrieval has failed in a way that was unprepared for — you should [report this error](https://github.com/svioletg/viMusBot/issues) if it keeps happening.
+- `CRITICAL`
+  - Only used when something of major concern has happened, and therefore should be extremely rare, ideally non-existent. If *any* logs like this appear, it should be reported right away to this repository.
+
 ## Documentation & Guides
 
 Extra pages of information are stored inside this repository's `docs` directory. It currently contains the following:

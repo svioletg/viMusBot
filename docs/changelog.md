@@ -6,23 +6,29 @@
 
 Developer
 - Docstrings have been added to most functions, classes, and modules
+- `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library
 - `utils` directory added to contain helper modules
-    - `spoofy.py` renamed to `media.py`
-    - `customlog.py` renamed to `logging.py`
-    - `media.py`, `logging.py`, and `palette.py` moved into `utils`
+    - `utils.py` created in this directory to house general-purpose utility methods that should be shared between modules
+    - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project
+        - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
+    - `spoofy.py` renamed to `media.py`, moved to this directory
     - Changes in `media.py`:
-        - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used
+        - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used so there was no need for this
         - `MediaInfo` class added to standardize expected results and improve typing
             - This class largely just acts as a category for three sub-classes: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
-    - `configuration.py` created to reduce the amount of duplicated code regarding configuration across this project
-        - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
-        - This was not added to the `utils` directory since there were some issues with getting the YAML file paths otherwise
-- The individual `log()` and `log_traceback()` functions in `bot.py` and `media.py` have been moved into `customlog.py` into a new `Log` class
-- Replaced calls to `sys._getframe()` in `log()` functions with `inspect.currentframe()`
+        - `MediaError` class extending from `Exception` added as a container for media-specific errors; it contains the following sub-classes:
+            - `FormatError` - an exception used for incorrect or unexpected `MediaInfo` formatting
+    - `palette.py` moved to this directory
+        - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
+        - `module` attribute added to `Palette`, represents the color of any module filenames in logs
 
 Other
+- Config changes:
+    - In `logging-options`, `colors`:
+        - The entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:
-    - `ytmusicapi` now requires [this specific commit](https://github.com/sigma67/ytmusicapi/commit/2217f3d92d9aec75c07b0dd0768561ade2ab43d6) to be installed, to fix a new bug that cropped up with `get_album()` amongst others
+    - `colorlog` now required
+    - `ytmusicapi` now requires [this specific commit](https://github.com/sigma67/ytmusicapi/commit/2217f3d92d9aec75c07b0dd0768561ade2ab43d6) as a version, to fix a new bug that cropped up with `get_album()` amongst others
 
 ## 1.9.0
 
