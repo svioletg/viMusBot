@@ -113,21 +113,12 @@ command-blacklist:
 
 # Set various options for output logs
 logging-options:
-    # Everything still outputs to vimusbot.log regardless of the options below
-    # Toggle outputting logs from bot.py and/or spoofy.py to the console
-    show-console-logs:
-        bot-py: yes
-        spoofy-py: yes
-    # Certain logs are tagged as "verbose"; these are messages that are useful for debugging, but may be seen as screen clutter for most users
-    # This toggles whether they will be displayed in the command line (verbose logs are sent to vimusbot.log regardless of this setting)
-    show-verbose-logs: yes
-    # Ignore logs from specific functions (blue text in logs, by default)
-    ignore-logs-from:
-        - "search_ytmusic"
-    # Choose your preferred log colors
+    
+    # Choose your preferred log colors (these are only used in console output, log files will have no color codes)
     colors:
         # Run "palette.py" to see a list of choices
         no-color: no # Disables all message coloring
+        info: "white" # Most common log type, general status updates
         warn: "gold" # For non-serious warning messages
         error: "red" # For tracebacks and/or fatal errors
         timer: "darkmagenta" # The time between logs at the end of each message

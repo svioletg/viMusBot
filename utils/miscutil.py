@@ -30,6 +30,7 @@ def time_func(func: Callable, printout: bool=True) -> float:
     return func_result
 
 def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
+    """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output"""
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     use_color: bool = not config.get('logging-options.colors.no-color')
     new_logger = colorlog.getLogger(logger_name)

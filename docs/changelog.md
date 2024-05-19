@@ -29,8 +29,10 @@ Developer
 
 Other
 - Config changes:
-    - In `logging-options`, `colors`:
-        - The entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
+    - In `logging-options`:
+        - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
+        - `colors`:
+            - The entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:
     - `colorlog` now required
     - `ytmusicapi` now requires [this specific commit](https://github.com/sigma67/ytmusicapi/commit/2217f3d92d9aec75c07b0dd0768561ade2ab43d6) as a version, to fix a new bug that cropped up with `get_album()` amongst others

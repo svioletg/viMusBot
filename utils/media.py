@@ -368,9 +368,7 @@ def spotify_track(url: str) -> TrackInfo:
     return TrackInfo(source = SPOTIFY, info = track)
 
 def spotify_playlist(url: str) -> PlaylistInfo:
-    """Retrieves a Spotify track and returns it as a PlaylistInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
+    """Retrieves a Spotify track and returns it as a PlaylistInfo object."""
     playlist: dict = sp.playlist(url) # type: ignore
     if not playlist:
         raise MediaError(f'No playlist found for URL: {url}')
@@ -378,9 +376,7 @@ def spotify_playlist(url: str) -> PlaylistInfo:
     return PlaylistInfo(source = SPOTIFY, info = playlist)
 
 def spotify_album(url: str) -> AlbumInfo:
-    """Retrieves a Spotify track and returns it as a AlbumInfo object.
-
-    Returns a SpotifyException if retrieval fails."""
+    """Retrieves a Spotify track and returns it as a AlbumInfo object."""
     album: dict = sp.album(url) # type: ignore
     if not album:
         raise MediaError(f'No album found for URL: {url}')
@@ -395,14 +391,26 @@ def compare_media(reference: TrackInfo, compared: TrackInfo,
         ignore_artist: bool = False,
         ignore_album: bool = False,
         **kwargs) -> tuple[int, dict[str, bool]]:
+    """Compares the data from two TrackInfo objects, and returns a percentage of how close they are overall, along with the individual
+    matching factors themselves.
+    
+    @reference: TrackInfo object to compare against
+    @compared: TrackInfo object to be compared
+    @mode: Either 'fuzz' or 'strict'; 'fuzz' uses fuzzy matching to determine whether something should clear a check,\
+        where 'strict' only checks for exact matches
+    @fuzz_threshold: If using 'fuzz' mode, this is the minimum ratio a match must clear to pass the check
+    @ignore_title: Forces a title matching check to pass
+    @ignore_artist: Forces an artist matching check to pass
+    @ignore_album: Forces an album matching check to pass
+    """
     # TODO: Review this!
     # mode is how exactly the code will determine a match
     # 'fuzz' = fuzzy matching, by default returns a match with a ratio of >75
     # 'strict' = checking for strings in other strings, how matching was done beforehand
 
-    title_threshold = kwargs.get('title_threshold', fuzz_threshold)
-    artist_threshold = kwargs.get('artist_threshold', fuzz_threshold)
-    album_threshold = kwargs.get('album_threshold', fuzz_threshold)
+    title_threshold: int = kwargs.get('title_threshold', fuzz_threshold)
+    artist_threshold: int = kwargs.get('artist_threshold', fuzz_threshold)
+    album_threshold: int = kwargs.get('album_threshold', fuzz_threshold)
 
     if (not reference.album_name) or (not compared.album_name):
         # If either is missing an album name, any checks would just fail, to don't check albums
@@ -428,11 +436,11 @@ def compare_media(reference: TrackInfo, compared: TrackInfo,
         
     # Do not count tracks that are specific/alternate version,
     # unless said keyword matches the original Spotify title
-    alternate_desired = any(keyword in reference.title.lower() for keyword in ['remix', 'cover', 'version'])
-    alternate_found = any(keyword in compared.title.lower() for keyword in ['remix', 'cover', 'version'])
-    alternate_check = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
+    alternate_desired: bool = any(keyword in reference.title.lower() for keyword in ['remix', 'cover', 'version'])
+    alternate_found: bool = any(keyword in compared.title.lower() for keyword in ['remix', 'cover', 'version'])
+    alternate_check: bool = (alternate_desired and alternate_found) or (not alternate_desired and not alternate_found)
     # TODO: Rework to use a confidence score
-    match_results = {
+    match_results: dict[str, bool] = {
         'title': matching_title or ignore_title,
         'artist': matching_artist or ignore_artist,
         'album': matching_album or ignore_album,

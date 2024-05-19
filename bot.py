@@ -11,7 +11,6 @@ import random
 import subprocess
 import time
 import traceback
-import urllib.request
 from pathlib import Path
 
 # External imports
@@ -25,25 +24,11 @@ import yt_dlp
 from discord.ext import commands
 from pretty_help import PrettyHelp
 
-# TODO: Maybe move into config module
-print('Checking for config file...')
-
-if not Path('config_default.yml').is_file():
-    print('config_default.yml not found; downloading the latest version...')
-    urllib.request.urlretrieve('https://raw.githubusercontent.com/svioletg/viMusBot/master/config_default.yml', 'config_default.yml')
-
-if not Path('config.yml').is_file():
-    print('config.yml does not exist; creating blank config.yml...')
-    with open('config.yml', 'w', encoding='utf-8') as f:
-        f.write('')
-
-print('Importing local modules...')
-
 # Local imports
 import update
-import utils.miscutil as miscutil
 import utils.configuration as config
 import utils.media as media
+import utils.miscutil as miscutil
 from utils.palette import Palette
 from version import VERSION
 
