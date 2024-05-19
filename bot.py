@@ -44,46 +44,30 @@ log = miscutil.create_logger(__name__, Path('vimusbot.log'))
 # Assign local modules the same logger
 media.log = log
 
-log.debug('DEBUG!')
-log.info('INFO!')
-log.warning('WARNING!')
-log.error('ERROR!')
-log.critical('CRITICAL!')
-
 log.info('Logging for bot.py is now active.')
-
-exit()
-
-# vmb_logger = Log()
-# log = vmb_logger.log
-# log_traceback = vmb_logger.log_traceback
-
-# media.log = log
-
-log('Logging is ready.')
 
 # Check for updates
 if __name__ == '__main__':
-    log(f'Running on version {VERSION}; checking for updates...')
+    log.info(f'Running on version {VERSION}; checking for updates...')
 
     update_check_result = update.get_latest_tag()
 
     # Check for an outdated version
     if update_check_result['current'] != update_check_result['latest']:
-        log(f'{plt.lime}There is a new release available.')
+        log.info(f'{plt.lime}There is a new release available.')
         current_tag = update_check_result['current']
         latest_tag = update_check_result['latest']
-        log(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
-        log('Use "update.py" to update.')
+        log.info(f'Current: {plt.gold}{current_tag}{plt.reset} | Latest: {plt.lime}{latest_tag}')
+        log.info('Use "update.py" to update.')
     else:
         if VERSION.startswith('dev.'):
-            log(f'{plt.yellow}NOTICE: You are running a development version.')
+            log.info(f'{plt.yellow}NOTICE: You are running a development version.')
         else:
-            log(f'{plt.lime}You are up to date.')
+            log.info(f'{plt.lime}You are up to date.')
 
-    log('Changelog: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md')
+    log.info('Changelog: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md')
 
-log('Parsing config...')
+log.info('Parsing config...')
 
 #region CONFIGURATION FROM YAML
 PUBLIC             : bool = config.get('public')
@@ -113,7 +97,7 @@ skip_votes_remaining = 0
 skip_votes = []
 
 # Clear out downloaded files
-log('Removing previously downloaded media files...')
+log.info('Removing previously downloaded media files...')
 files = glob.glob('*.*')
 to_remove = [f for f in files if Path(f).suffix in CLEANUP_EXTENSIONS]
 for t in to_remove:
@@ -240,17 +224,17 @@ class General(commands.Cog):
                     audio_time_elapsed += 1
                     
                 if timeout_counter == INACTIVITY_TIMEOUT*60:
-                    log('Leaving voice due to inactivity.')
+                    log.info('Leaving voice due to inactivity.')
                     await voice.disconnect()
                 if not voice.is_connected():
-                    log('Voice doesn\'t look connected, waiting three seconds...', verbose=True)
+                    log.debug('Voice doesn\'t look connected, waiting three seconds...')
                     await asyncio.sleep(3)
                     if not voice.is_connected():
-                        log('Still disconnected. Setting `voice` to None...', verbose=True)
+                        log.debug('Still disconnected. Setting `voice` to None...')
                         voice = None
                         break
                     else:
-                        log('Voice looks connected again. Continuing as normal.', verbose=True)
+                        log.debug('Voice looks connected again. Continuing as normal.')
 
     #region DEBUGGING COMMANDS
     @commands.command(aliases=command_aliases('getctx'))
@@ -260,12 +244,12 @@ class General(commands.Cog):
         global debugctx
         debugctx = ctx
         await ctx.send(embed=embedq('Stored into debugctx.'))
-        log(f'Stored into debugctx. {ctx}')
+        log.info(f'Stored into debugctx. {ctx}')
     #endregion
 
     @commands.command(aliases=command_aliases('changelog'))
     @commands.check(is_command_enabled)
-    async def changelog(self, ctx: commands.Context):
+    async def changelog.info(self, ctx: commands.Context):
         """Returns a link to the changelog, and displays most recent version."""
         await ctx.send(embed=embedq(
             'Read the changelog here: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md', 
@@ -357,7 +341,7 @@ class Music(commands.Cog):
         global voice
         global media_queue
         media_queue.clear(ctx)
-        log(f'Leaving voice channel: {ctx.author.voice.channel}')
+        log.info(f'Leaving voice channel: {ctx.author.voice.channel}')
         try:
             await voice.disconnect()
         except AttributeError:
@@ -371,7 +355,7 @@ class Music(commands.Cog):
         global loop_this
         # Inverts the boolean
         loop_this = not loop_this
-        log(f'Looping {["disabled", "enabled"][loop_this]}.', verbose=True)
+        log.info(f'Looping {["disabled", "enabled"][loop_this]}.')
         await ctx.send(embed=embedq(f'{get_loop_icon()}Looping {["disabled", "enabled"][loop_this]}.'))
 
     @commands.command(aliases=command_aliases('move'))
@@ -386,7 +370,7 @@ class Music(commands.Cog):
             await ctx.send(embed=embedq('The selected number is out of range.'))
         except Exception as e:
             await ctx.send(embed=embedq('An unexpected error occurred.'))
-            log_traceback(e)
+            log.error(e)
 
     @commands.command(aliases=command_aliases('nowplaying'))
     @commands.check(is_command_enabled)
@@ -463,7 +447,7 @@ class Music(commands.Cog):
                 # Prevent yt-dlp from grabbing the playlist the track is from
                 url = queries[0].split('&list=')[0]
 
-        log('Found multiple URLs.' if multiple_urls else 'Found a single URL or query.')
+        log.info('Found multiple URLs.' if multiple_urls else 'Found a single URL or query.')
 
         async with ctx.typing():
             if multiple_urls:
@@ -479,19 +463,19 @@ class Music(commands.Cog):
                         if objlist[1] != []:
                             await qmessage.edit(embed=embedq(f'Failed to retrieve {len(objlist[1])} URL{'s' if len(objlist[1]) > 1 else ''}:', f'{'\n'.join(objlist[1])}'))
                         if not voice.is_playing():
-                            log('Voice client is not playing; starting...')
+                            log.info('Voice client is not playing; starting...')
                             await advance_queue(ctx)
                     else:
                         await qmessage.edit(embed=embedq('Failed to retrieve all URLs; nothing added to the queue.'))
                     return
                 except Exception as e:
-                    log_traceback(e)
+                    log.error(e)
             
             # Search with text if no url is provided
             if query_type == 'text':
                 await qmessage.edit(embed=embedq('Searching by text...'))
-                log('Link not detected, searching by text', verbose=True)
-                log(f'Searching: "{query}"')
+                log.debug('Link not detected, searching by text.')
+                log.info(f'Searching: "{query}"')
 
                 top_song, top_video = media.search_ytmusic_text(query)
 
@@ -505,16 +489,16 @@ class Music(commands.Cog):
                     top_video['url'] = 'https://www.youtube.com/watch?v=' + top_video['videoId']
                 
                 if top_song is None:
-                    log(f'No song result found; using video result...', verbose=True)
+                    log.info('No song result found; using video result...')
                     url = top_video['url']
                 elif top_video is None:
-                    log(f'No video result found; using song result...', verbose=True)
+                    log.info('No video result found; using song result...')
                     url = top_song['url']
                 elif top_song['url'] == top_video['url']:
-                    log(f'Song and video results were identical; using song result...', verbose=True)
+                    log.info('Song and video results were identical; using song result...')
                     url = top_song['url']
                 else:
-                    log(f'Prompting user for song/video choice.', verbose=True)
+                    log.info(f'Prompting user for song/video choice.')
                     embed = discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
                     embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
                     embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
@@ -531,21 +515,21 @@ class Music(commands.Cog):
             # Locate youtube equivalent if spotify link given
             if 'https://spotify.link/' in url:
                 # Resolve mobile share link to a usable URL
-                log(f'Resolving spotify.link URL... ({url})')
+                log.info(f'Resolving spotify.link URL... ({url})')
                 try:
                     url = requests.get(url).url
-                    log(f'Resolved to {url}')
+                    log.info(f'Resolved to {url}')
                 except Exception as e:
-                    log(f'Failed; aborting play command and showing traceback...')
-                    log_traceback(e)
+                    log.info(f'Failed; aborting play command and showing traceback...')
+                    log.error(e)
                     await qmessage.edit(embed=embedq('Failed to resolve Spotify link. Please use an "open.spotify.com" link instead of "spotify.link" if possible.'))
                     return
 
             if 'https://open.spotify.com' in url:
-                log('Spotify URL received from play command.', verbose=True)
-                log('Checking for playlist...', verbose=True)
+                log.debug('Spotify URL received from play command.')
+                log.info('Checking for playlist...')
                 if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:
-                    log('Spotify playlist detected.', verbose=True)
+                    log.info('Spotify playlist detected.')
                     await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
                     playlist_result = media.spotify_playlist(url)
 
@@ -553,15 +537,15 @@ class Music(commands.Cog):
                         code = playlist_result[1].http_status
                         match code:
                             case 400:
-                                log('Could not retrieve playlist; the URL seems invalid.')
+                                log.info('Could not retrieve playlist; the URL seems invalid.')
                                 await qmessage.edit(embed=embedq('Could not retrieve playlist; the URL seems invalid. (HTTP 400)'))
                                 return
                             case 404:
-                                log('Could not retrieve playlist; the playlist is likely private.')
+                                log.info('Could not retrieve playlist; the playlist is likely private.')
                                 await qmessage.edit(embed=embedq('Could not retrieve playlist; the playlist is likely private. (HTTP 404)'))
                                 return
                             case _:
-                                log(f'Could not retrieve playlist; an unknown error occurred: HTTP {code}')
+                                log.info(f'Could not retrieve playlist; an unknown error occurred: HTTP {code}')
                                 await qmessage.edit(embed=embedq(f'Could not retrieve playlist; HTTP {code}'))
                                 return
 
@@ -574,7 +558,7 @@ class Music(commands.Cog):
                     list_name = media.sp.playlist(url)['name']
                     await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
                     if not voice.is_playing():
-                        log('Voice client is not playing; starting...')
+                        log.info('Voice client is not playing; starting...')
                         await advance_queue(ctx)
                     return
                 elif not ALLOW_SPOTIFY_PLAYLISTS:
@@ -585,9 +569,9 @@ class Music(commands.Cog):
                     )
                     return
 
-                log('Checking for album...', verbose=True)
+                log.info('Checking for album...')
                 if 'https://open.spotify.com/album/' in url:
-                    log('Spotify album detected.', verbose=True)
+                    log.info('Spotify album detected.')
                     album_info = media.spotify_album(url)
 
                     if isinstance(album_info, tuple):
@@ -602,7 +586,7 @@ class Music(commands.Cog):
             # Determines if the input was a playlist or album; any Spotify links should have already been handled
             valid = ['playlist?list=', '/sets/', '/album/']
             if any(item in url for item in valid):
-                log('URL is a non-Spotify playlist.', verbose=True)
+                log.info('URL is a non-Spotify playlist.')
                 objlist = QueueItem.generate_from_list(url, ctx.author)
                 if isinstance(objlist, tuple):
                     await qmessage.edit(embed=embedq('Could not retrieve playlist.'))
@@ -614,33 +598,33 @@ class Music(commands.Cog):
                 return
             else:
                 # Runs if the input given was not a playlist
-                log('URL is not a playlist.', verbose=True)
-                log('Checking duration...', verbose=True)
+                log.info('URL is not a playlist.')
+                log.info('Checking duration...')
                 duration = duration_from_url(url)
 
                 if isinstance(duration, tuple):
-                    log(f'Couldn\'t retrieve duration; aborting play command: {duration[1]}', verbose=True)
+                    log.info(f'Couldn\'t retrieve duration; aborting play command: {duration[1]}')
                     await qmessage.edit(embed=embedq('Could not retrieve URL; the content may be unavailable, or the URL may be invalid.'))
                     return
 
                 if duration > DURATION_LIMIT*60*60:
-                    log('Item over duration limit; not queueing.')
+                    log.info('Item over duration limit; not queueing.')
                     await qmessage.edit(embed=embedq(f'Cannot queue items longer than {DURATION_LIMIT} hours.'))
                     return
 
             # Queue or start the player
             try:
-                log('Appending to queue...', verbose=True)
+                log.info('Adding to queue...')
                 if not voice.is_playing() and media_queue.get(ctx) == []:
                     media_queue.get(ctx).append(QueueItem(url, ctx.author))
-                    log('Voice client is not playing; starting...')
+                    log.info('Voice client is not playing; starting...')
                     await advance_queue(ctx)
                 else:
                     media_queue.get(ctx).append(QueueItem(url, ctx.author))
                     title = media_queue.get(ctx)[-1].title
                     await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(media_queue.get(ctx))}'))
             except Exception as e:
-                log_traceback(e)
+                log.error(e)
 
     @commands.command(aliases=command_aliases('queue'))
     @commands.check(is_command_enabled)
@@ -678,7 +662,7 @@ class Music(commands.Cog):
         try:
             embed.description = (f'Showing {start+1} to {end} of {len(media_queue.get(ctx))} items. Use -queue [page] to see more.')
         except Exception as e:
-            log_traceback(e)
+            log.error(e)
         await ctx.send(embed=embed)
 
     @commands.command(aliases=command_aliases('remove'))
@@ -698,7 +682,7 @@ class Music(commands.Cog):
     @commands.check(is_command_enabled)
     async def skip(self, ctx: commands.Context):
         """Skips the currently playing media."""
-        log('Trying to skip...', verbose=True)
+        log.info('Skipping track...')
         if voice is None:
             await ctx.send(embed=embedq('Not connected to a voice channel.'))
             return
@@ -746,7 +730,7 @@ class Music(commands.Cog):
         """Removes all information from the current URL cache"""
         global url_info_cache
         url_info_cache = {}
-        log(f'URL cache was cleared: {url_info_cache}', verbose=True)
+        log.debug(f'URL cache was cleared: {url_info_cache}')
         await ctx.send(embed=embedq('URL cache has been emptied.', '' if USE_URL_CACHE else f'{emoji["info"]} URL cache is currently disabled.'))
 
     @join.before_invoke
@@ -756,7 +740,7 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx: commands.Context):
         if ctx.voice_client is None:
             if ctx.author.voice:
-                log(f'Joining voice channel: {ctx.author.voice.channel}')
+                log.info(f'Joining voice channel: {ctx.author.voice.channel}')
                 global voice
                 voice = await ctx.author.voice.channel.connect()
             else:
@@ -795,7 +779,7 @@ def cache_if_succeeded(key: str):
                 if url_info_cache[url].get(key, None) not in ['', None]:
                     # Return stored info
                     result = url_info_cache[url][key]
-                    log(f'{key} of \'{url}\' already stored: {result}', verbose=True)
+                    log.debug(f'{key} of \'{url}\' already stored: {result}')
                     return result
                 else:
                     # Retrieve info normally
@@ -803,7 +787,7 @@ def cache_if_succeeded(key: str):
                     url_info_cache[url][key] = result
                     return result
             except Exception as e:
-                log_traceback(e)
+                log.error(e)
         return cache_check
     return decorator
 
@@ -812,44 +796,40 @@ def cache_if_succeeded(key: str):
 @cache_if_succeeded(key='duration')
 def duration_from_url(url: str) -> int|float:
     """Automatically detects the source of a given URL, and returns its extracted duration."""
-    log(f'Getting length of \'{url}\'...', verbose=True)
+    log.debug(f'Getting length of \'{url}\'...')
     if 'youtube.com' in url:
         try:
             return pytube.YouTube(url).length
         except Exception as e:
-            log(f'pytube couldn\'t retrieve video length: "{traceback.format_exception(e)[-1]}"; Trying yt-dlp...', verbose=True)
+            log.info(f'pytube couldn\'t retrieve video length: "{traceback.format_exception(e)[-1]}"; Trying yt-dlp...')
             # Continues after this block so this isn't duplicated
     elif 'soundcloud.com' in url:
         try:
             result = media.sc.resolve(url).duration
         except TypeError as e:
-            log(f'Failed to retrieve Soundcloud track: {e}')
-            return None, e
+            log.error('Failed to retrieve Soundcloud track.')
         return round(result / 1000)
     elif 'open.spotify.com' in url:
         result = media.spotify_track(url)
-        if isinstance(result, tuple):
-            log(f'Failed to retrieve Spotify track: {result[1]}')
-            return None, result[1]
-        return result['duration']
-
+        return result.length_seconds
+    
     # yt-dlp should handle most other URLs
     try:
         info_dict = ytdl.extract_info(url, download=False)
     except yt_dlp.utils.DownloadError as e:
-        log(f'Failed to retrieve video length: {e}')
+        log.info(f'Failed to retrieve video length: {e}')
         return None, e
     return info_dict.get('duration', 0)
 
 @cache_if_succeeded(key='title')
 def title_from_url(url: str) -> str:
     """Automatically detects the source of a given URL, and returns its extracted title."""
-    log(f'Getting title of \'{url}\'...', verbose=True)
+    log.debug(f'Getting title of \'{url}\'...')
     if 'youtube.com' in url:
         try:
             return pytube.YouTube(url).title
         except Exception as e:
-            log(f'pytube encountered "{traceback.format_exception(e)[-1]}" during title retrieval. Falling back on yt-dlp.', verbose=True)
+            log.info(f'pytube encountered "{traceback.format_exception(e)[-1]}" during title retrieval. Falling back on yt-dlp.')
             # Continues after this block so this isn't duplicated
     elif 'soundcloud.com' in url:
         return media.sc.resolve(url).title
@@ -860,7 +840,7 @@ def title_from_url(url: str) -> str:
     try:
         info_dict = ytdl.extract_info(url, download=False)
     except yt_dlp.utils.DownloadError as e:
-        log(f'Failed to retrieve title: {e}')
+        log.info(f'Failed to retrieve title: {e}')
         return None, e
     return info_dict.get('title', None)
 
@@ -879,10 +859,11 @@ async def prompt_for_choice(ctx: commands.Context, prompt_msg: discord.Message, 
     Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully
     """
     # Get reaction menu ready
-    log('Adding reactions...', verbose=True)
+    log.debug('Adding reactions...')
 
     if choices > len(emoji['num']):
-        log('Choices out of range for emoji number list.'); return
+        log.debug('Choices out of range for emoji number list.')
+        return
 
     for i in list(range(0, choices)):
         await prompt_msg.add_reaction(emoji['num'][i+1])
@@ -890,32 +871,32 @@ async def prompt_for_choice(ctx: commands.Context, prompt_msg: discord.Message, 
     await prompt_msg.add_reaction(emoji['cancel'])
 
     def check(reaction: discord.Reaction, user: discord.Member) -> bool:
-        log('Reaction check is being called...', verbose=True)
+        log.debug('Reaction check is being called...')
         return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji) == emoji['cancel'])
 
-    log('Waiting for reaction...', verbose=True)
+    log.debug('Waiting for reaction...')
 
     try:
         reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
     except asyncio.TimeoutError as e:
-        log('Choice prompt timeout reached.')
+        log.info('Choice prompt timeout reached.')
         await prompt_msg.delete()
         return
     except Exception as e:
-        log_traceback(e)
+        log.error(e)
         await prompt_msg.edit(embed=embedq('An unexpected error occurred.'))
         return
     else:
         # If a valid reaction was received.
-        log('Received a valid reaction.', verbose=True)
+        log.debug('Received a valid reaction.')
 
         if str(reaction) == emoji['cancel']:
-            log('Selection cancelled.', verbose=True)
+            log.info('Selection cancelled.')
             await prompt_msg.delete()
             return
         else:
             choice = emoji['num'].index(str(reaction))
-            log(f'{choice} selected.', verbose=True)
+            log.info(f'{choice} selected.')
             await prompt_msg.delete()
             return choice
 
@@ -966,7 +947,7 @@ class QueueItem:
                     url = item
                     item = media.spotify_track(item)
                     if isinstance(item, tuple):
-                        log(f'Failed to download video: {item[1]}')
+                        log.info(f'Failed to download video: {item[1]}')
                         failures.append(url)
                         continue
                 
@@ -979,7 +960,7 @@ class QueueItem:
                     try:
                         info = ytdl.extract_info(item, download=False)
                     except yt_dlp.utils.DownloadError as e:
-                        log(f'Failed to download video: {e}')
+                        log.info(f'Failed to download video: {e}')
                         failures.append(item)
                         continue
                     objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
@@ -991,14 +972,14 @@ class QueueItem:
                 try:
                     playlist_entries = media.soundcloud_set(playlist)
                 except TypeError as e:
-                    log(f'Failed to retrieve SoundCloud playlist: {e}')
+                    log.info(f'Failed to retrieve SoundCloud playlist: {e}')
                     return None, e
                 objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
             else:
                 try:
                     playlist_entries = ytdl.extract_info(playlist, download=False)
                 except yt_dlp.utils.DownloadError as e:
-                    log(f'Failed to download playlist: {e}')
+                    log.info(f'Failed to download playlist: {e}')
                     return None, e
                 objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
             return objlist
@@ -1044,22 +1025,22 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         if npmessage is not None:
             await npmessage.delete()
     except discord.errors.NotFound:
-        log('Now-playing message wasn\'t found, ignoring and continuing...', verbose=True)
+        log.debug('Now-playing message wasn\'t found, ignoring and continuing...')
     
-    log('Trying to start playing...')
+    log.info('Trying to start playing...')
 
     # Check if we need to match a Spotify link
     if 'open.spotify.com' not in item.url:
         url = item.url
     else:
-        log('Trying to match Spotify track...')
+        log.info('Trying to match Spotify track...')
         npmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
         spyt = media.spyt(item.url)
-
-        log('Checking if unsure...', verbose=True)
+        # TODO: unsure isn't a thing anymore, this all need redoing
+        log.info('Checking if unsure...')
         if isinstance(spyt, tuple) and spyt[0] == 'unsure':
             # This indicates no match was found
-            log('spyt returned unsure.', verbose=True)
+            log.info('spyt returned unsure.')
             # Remove the warning, no longer needed
             spyt = spyt[1]
             # Shorten to {limit} results
@@ -1096,7 +1077,7 @@ async def play_item(item: QueueItem, ctx: commands.Context):
     try:
         player = await YTDLSource.from_url(item.url, loop=bot.loop, stream=False)
     except yt_dlp.utils.DownloadError as e:
-        log(f'Failed to download video: {e}')
+        log.info(f'Failed to download video: {e}')
         await ctx.send(embed=embedq('This video is unavailable.', url))
         await advance_queue(ctx)
         return
@@ -1113,17 +1094,17 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         try:
             now_playing.duration = pytube.YouTube(now_playing.weburl).length
         except Exception as e:
-            log(f'Falling back on yt-dlp. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
+            log.info(f'Falling back on yt-dlp. (Cause: {traceback.format_exception(e)[-1]})')
             try:
                 now_playing.duration = ytdl.extract_info(now_playing.weburl, download=False)['duration']
             except Exception as e:
-                log(f'ytdl duration extraction failed, likely a direct file link. (Cause: {traceback.format_exception(e)[-1]})', verbose=True)
-                log(f'Attempting to retrieve URL through FFprobe...', verbose=True)
+                log.info(f'ytdl duration extraction failed, likely a direct file link. (Cause: {traceback.format_exception(e)[-1]})')
+                log.info(f'Attempting to retrieve URL through FFprobe...')
                 ffprobe_command = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
                 now_playing.duration = float(subprocess.check_output(ffprobe_command).decode('utf-8').split('.')[0])
-    
+
     now_playing.duration_stamp = timestamp_from_seconds(now_playing.duration)
-    
+
     voice.stop()
     voice.play(now_playing, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
     audio_start_time = time.time()
@@ -1148,10 +1129,10 @@ async def play_item(item: QueueItem, ctx: commands.Context):
         for i in glob.glob(f'*-#-{last_played.ID}-#-*'):
             # Delete last played file
             try:
-                log(f'Removing file: {i}', verbose=True)
+                log.debug(f'Removing file: {i}')
                 os.remove(i)
             except PermissionError as e:
-                log(f'Cannot remove; the file is likely in use.', verbose=True)
+                log.debug(f'Cannot remove; the file is likely in use.')
                 pass
 
 advance_lock = False
@@ -1161,7 +1142,7 @@ async def advance_queue(ctx: commands.Context, skip: bool=False):
     # Triggers every time the player finishes
     global advance_lock
     if not advance_lock and (skip or not voice.is_playing()):
-        log('Locking...', verbose=True)
+        log.debug('Locking...')
         advance_lock = True
 
         try:
@@ -1174,14 +1155,14 @@ async def advance_queue(ctx: commands.Context, skip: bool=False):
                 next_item = media_queue.get(ctx).pop(0)
                 await play_item(next_item, ctx)
             
-            log('Tasks finished; unlocking...', verbose=True)
+            log.error('Tasks finished; unlocking...')
             advance_lock = False
         except Exception as e:
-            log_traceback(e)
-            log('Error encountered; unlocking...', verbose=True)
+            log.error(e)
+            log.error('Error encountered; unlocking...')
             advance_lock = False
     elif advance_lock:
-        log('Attempted call while locked; ignoring...', verbose=True)
+        log.error('Attempted call while locked; ignoring...')
 
 # TODO: This could have a better name
 def get_loop_icon() -> str:
@@ -1224,30 +1205,30 @@ async def on_command_error(ctx: commands.Context, error):
     elif isinstance(error, yt_dlp.utils.DownloadError):
         await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
     else:
-        log(f'Error encountered in command `{ctx.command}`.')
-        log(error)
+        log.info(f'Error encountered in command `{ctx.command}`.')
+        log.info(error)
         trace = traceback.format_exception(error)
         await ctx.send(embed=embedq(error, 'If this issue persists, please check https://github.com/svioletg/viMusBot/issues and submit a new issue if your problem is not listed.'))
         # A second traceback is created from this command itself, usually not useful
-        log(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
+        log.info(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
 
 @bot.event
 async def on_ready():
-    log(f'Logged in as {bot.user} (ID: {bot.user.id})')
+    log.info(f'Logged in as {bot.user} (ID: {bot.user.id})')
     print('-----')
-    log('Ready!')
+    log.info('Ready!')
 
 # Retrieve bot token
-log(f'Retrieving token from {plt.blue}{TOKEN_FILE_PATH}')
+log.info(f'Retrieving token from {plt.blue}{TOKEN_FILE_PATH}')
 
 if not PUBLIC:
-    log(f'{plt.warn}NOTICE: Starting in dev mode.')
+    log.info(f'{plt.warn}NOTICE: Starting in dev mode.')
 
 try:
     with open(TOKEN_FILE_PATH, 'r') as f:
         token = f.read()
 except FileNotFoundError:
-    log(f'{plt.error}{f} does not exist; exiting.')
+    log.info(f'{plt.error}{f} does not exist; exiting.')
     raise SystemExit(0)
 
 class Tests:
@@ -1310,11 +1291,11 @@ class Tests:
         "playlist" and "album" can't be used together
         """
         if (not bypass_ctx) and (debugctx is None):
-            log(f'{plt.warn}Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
+            log.info(f'{plt.warn}Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
             return
         
         if source not in self.test_sources + ['any', 'mixed']:
-            log(f'{plt.warn}Invalid source; aborting test. Valid sources are: {', '.join(self.test_sources)}')
+            log.info(f'{plt.warn}Invalid source; aborting test. Valid sources are: {', '.join(self.test_sources)}')
             return
 
         valid: str|bool = 'invalid' if 'invalid' in flags else 'valid'
@@ -1325,10 +1306,10 @@ class Tests:
         conclusion: str = ''
         arguments: str = f'SOURCE? {source} | VALID? {valid} | MULTIPLE? {multiple_urls} | PLAYLIST/ALBUM? {playlist_or_album}'
 
-        log(f'{plt.gold}### START TEST! play command; {arguments}')
+        log.info(f'{plt.gold}### START TEST! play command; {arguments}')
 
         if 'playlist' in flags and 'album' in flags:
-            log(f'{plt.warn}Invalid flags; aborting test. The "playlist" and "album" flags cannot be used together.')
+            log.info(f'{plt.warn}Invalid flags; aborting test. The "playlist" and "album" flags cannot be used together.')
             return
 
         src = random.choice(self.test_sources) if source in ['any', 'mixed'] else source
@@ -1339,14 +1320,14 @@ class Tests:
             await Music.play(Music, debugctx, random.choice(self.test_urls[url_type][valid][src]))
             if voice.is_playing():
                 conclusion = f'voice client is playing. Test likely {plt.green}passed.'
-                log(conclusion); passed = True
+                log.info(conclusion); passed = True
             else:
                 if valid == 'invalid':
                     conclusion = f'voice client is not playing, and an intentionally invalid URL was used. Test likely {plt.green}passed.'
-                    log(conclusion); passed = True
+                    log.info(conclusion); passed = True
                 else:
                     conclusion = f'voice client is not playing, but a valid URL was used. Test likely {plt.red}failed.'
-                    log(conclusion)
+                    log.info(conclusion)
         else:
             urls = []
             if source == 'mixed':
@@ -1358,35 +1339,35 @@ class Tests:
             await Music.play(Music, debugctx, *urls)
             if voice.is_playing() and media_queue.get(debugctx) != []:
                 conclusion = f'Voice client is playing and the queue is not empty. Test likely {plt.green}passed.'
-                log(conclusion); passed = True
+                log.info(conclusion); passed = True
             else:
                 if valid == 'invalid':
                     conclusion = f'Voice client is not playing, and an intentionally invalid URL was used. Test likely {plt.green}passed.'
-                    log(conclusion); passed = True
+                    log.info(conclusion); passed = True
                 elif playlist_or_album:
                     conclusion = f'Voice client is not playing, all URLs were valid, but multiple {playlist_or_album} URLs were used. Test likely {plt.green}passed.'
-                    log(conclusion); passed = True
+                    log.info(conclusion); passed = True
                 elif media_queue.get(debugctx) != []:
                     conclusion = f'Voice client is not playing, but the queue is not empty. Test likely {plt.red}failed.'
-                    log(conclusion)
+                    log.info(conclusion)
                 else:
                     conclusion = f'Voice client is not playing, but all valid URLs were used. Test likely {plt.red}failed.'
-                    log(conclusion)
+                    log.info(conclusion)
         
-        log(f'Waiting 2 seconds...')
+        log.info(f'Waiting 2 seconds...')
         time.sleep(2)
-        log(f'Clearing media queue and stopping voice client...')
+        log.info(f'Clearing media queue and stopping voice client...')
         media_queue.clear(debugctx)
         voice.stop()
-        log(f'Waiting 2 seconds...')
+        log.info(f'Waiting 2 seconds...')
         time.sleep(2)
-        log(f'{plt.gold}### END TEST!')
+        log.info(f'{plt.gold}### END TEST!')
         return {'passed': passed, 'arguments': arguments, 'conclusion': conclusion}
 
 # Begin main thread
 
 async def console():
-    log('Console is active.')
+    log.info('Console is active.')
     while True:
         try:
             user_input: str = await aioconsole.ainput('')
@@ -1450,13 +1431,13 @@ async def console():
                             for src, valid, multiple_urls, playlist_or_album in test_conditions:
                                 add_test_result(await Tests.test_play(src, flags=[valid, multiple_urls, playlist_or_album]))
                                 tests_run += 1
-                                log(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
+                                log.info(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
                                     f'{plt.green}{len(test_results['pass'])} have passed, and '+
-                                    f'{plt.red}{len(test_results['fail'])} have failed.', verbose=True
+                                    f'{plt.red}{len(test_results['fail'])} have failed.'
                                     )
                         except Exception as e:
-                            log_traceback(e)
-                            log(f'{plt.red}Traceback encountered, tests aborted.')
+                            log.error(e)
+                            log.info(f'{plt.red}Traceback encountered, tests aborted.')
 
                         test_end: float = time.time()
                         test_duration: float = math.floor(test_end - test_start)
@@ -1475,27 +1456,27 @@ async def console():
                     case 'colors':
                         plt.preview(); print()
                     case 'stop':
-                        log('Leaving voice if connected...')
+                        log.info('Leaving voice if connected...')
                         try:
                             await voice.disconnect()
                         except:
                             pass
-                        log('Cancelling bot task...')
+                        log.info('Cancelling bot task...')
                         bot_task.cancel()
-                        log('Cancelling console task...')
+                        log.info('Cancelling console task...')
                         console_task.cancel()
                     case _:
-                        log(f'Unrecognized command "{user_input}"')
+                        log.info(f'Unrecognized command "{user_input}"')
         except Exception as e:
-            log('Error encountered in console thread!')
-            log_traceback(e)
+            log.info('Error encountered in console thread!')
+            log.error(e)
 
 async def bot_thread():
-    log('Starting bot thread...')
+    log.info('Starting bot thread...')
     async with bot:
         await bot.add_cog(General(bot))
         await bot.add_cog(Music(bot))
-        log('Logging in with token...')
+        log.info('Logging in with token...')
         await bot.start(token)
 
 async def main():
