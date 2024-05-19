@@ -6,6 +6,7 @@
 
 Developer
 - Docstrings have been added to most functions, classes, and modules
+- Any instances of `import regex as re` have been replaced with `import re`
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - `utils` directory added to contain helper modules
@@ -17,8 +18,11 @@ Developer
         - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used so there was no need for this
         - `MediaInfo` class added to standardize expected results and improve typing
             - This class largely just acts as a category for three sub-classes: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
+        - `pytube_track_data()` and `trim_track_data()` removed, made unnecessary by the addition of `MediaInfo`
         - `MediaError` class extending from `Exception` added as a container for media-specific errors; it contains the following sub-classes:
             - `FormatError` - an exception used for incorrect or unexpected `MediaInfo` formatting
+        - `search_ytmusic()` renamed to `search_ytmusic_track()`
+            - All arguments have been replaced with a single `src_info` argument, which takes a `TrackInfo` object
     - `palette.py` moved to this directory
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
@@ -597,7 +601,7 @@ Improvements
 
 ### Public Release Versions
 Versions are numbered as X.Y.Z, where:
-- X is reserved for huge, fundamental structural changes to the code, and is almost never increased
+- X is reserved for big, fundamental structural changes to the code, and is almost never increased; these changes will always be, as far as developers are concerned, **almost completely** backwards-incompatible
 - Y represents a "major version", typically coinciding with new features, or a very large number of bugfixes / internal improvements
 - Z is the "minor version", usually just representing handfuls of bugfixes or small improvements/additions
 

@@ -1,17 +1,33 @@
 """General-purpose, miscellaneous utility methods."""
 
 # Standard imports
-import re
 import logging
-import colorlog
+import re
+import time
 from pathlib import Path
 from sys import stdout
+from typing import Callable
+
+# External imports
+import colorlog
 
 # Local imports
 import utils.configuration as config
 from utils.palette import Palette
 
 plt = Palette()
+
+def time_func(func: Callable, printout: bool=True) -> float:
+    """Times the execution of a callable, prints out the result if allowed, and returns the result of the called function
+    
+    @printout: Whether to print a string containing the time elapsed
+    """
+    ta = time.perf_counter()
+    func_result = func()
+    tb = time.perf_counter()
+    if printout:
+        print(f'{func} ... completed in ... {tb - ta}s')
+    return func_result
 
 def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
