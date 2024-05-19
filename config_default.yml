@@ -59,13 +59,13 @@ allow-spotify-playlists: yes
 # Limit the amount of tracks Spotify playlists can have before queueing
 spotify-playlist-limit: 50
 
-# Forces Spotify links to not find an automatic YouTube match,
-# and will always trigger the choice menu
-force-no-match: no
-
 # Automatically queues the top result of a Spotify-YouTube match,
 # regardless of how close the match is
-use-top-match: yes
+use-top-match: no
+
+# Forces Spotify links to not find an automatic YouTube match,
+# and will always trigger the choice menu
+force-match-prompt: no
 
 # Prevent videos over this limit (in hours) from being queued
 duration-limit: 5
@@ -107,20 +107,23 @@ aliases:
 
 # Any commands listed here will be disabled from use
 command-blacklist:
-    # -reload re-imports the spoofy.py file used by the script
-    # This is for testing and should be left disabled otherwise
-    - "reload"
+    -
 
 # Set various options for output logs
 logging-options:
-    
+    # What level of logs to output to the console; valid options are "DEBUG" (lowest), "INFO", "WARNING", "ERROR", and "CRITICAL" (highest)
+    # Only logs greater than or equal to this level will be displayed,
+    # others will not show up in the console but are still logged to vimusbot.log 
+    # For more about this and what each level represents, see: https://github.com/svioletg/viMusBot/blob/dev/README.md#reading-logs
+    console-log-level: "INFO"
     # Choose your preferred log colors (these are only used in console output, log files will have no color codes)
     colors:
         # Run "palette.py" to see a list of choices
         no-color: no # Disables all message coloring
-        info: "white" # Most common log type, general status updates
-        warn: "gold" # For non-serious warning messages
-        error: "red" # For tracebacks and/or fatal errors
+        info: "white"
+        warn: "gold"
+        error: "red"
+        critical: "red"
         timer: "darkmagenta" # The time between logs at the end of each message
         module: "yellow" # For module names (bot.py, media.py, etc.)
         function: "blue" # For function names

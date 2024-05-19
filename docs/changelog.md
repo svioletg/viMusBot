@@ -29,13 +29,19 @@ Developer
 
 Other
 - Config changes:
+    - Default value of `use-top-match` set to `no`
+    - Default value of `command-blacklist` is now empty
+    - `force-no-match` renamed to `force-match-prompt` for clarity
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
+        - `console-log-level` has been added
         - `colors`:
-            - The entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
+            - The color entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:
     - `colorlog` now required
-    - `ytmusicapi` now requires [this specific commit](https://github.com/sigma67/ytmusicapi/commit/2217f3d92d9aec75c07b0dd0768561ade2ab43d6) as a version, to fix a new bug that cropped up with `get_album()` amongst others
+    - `requests` now required
+    - Various package version requirements were updated
+- `envsetup.bat` now runs `py -3` instead of `py`, to make sure the latest version of Python is being used
 
 ## 1.9.0
 

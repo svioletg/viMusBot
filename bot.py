@@ -305,7 +305,7 @@ class Music(commands.Cog):
         info = media.spotify_track(spotifyurl)
         title = info['title']
         artist = info['artist']
-        result = media.analyze_track(spotifyurl)
+        result = media.analyze_spotify_track(spotifyurl)
         data = result[0]
         skip = result[1]
         # Assemble embed object
