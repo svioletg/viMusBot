@@ -594,7 +594,7 @@ class Music(commands.Cog):
                         await qmessage.edit(embed=embedq('Could not retrieve album; the URL seems invalid.'))
                         return
 
-                    url = media.search_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
+                    url = media.match_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
                     if url is None:
                         await qmessage.edit(embed=embedq('No match could be found.'))
                         return

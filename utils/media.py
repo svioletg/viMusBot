@@ -263,6 +263,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
     object_list: list[TrackInfo] = []
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
+        log.debug('Looking for MediaInfo group contents...')
         for n, track in enumerate(track_list):
             log.debug('Getting track %s out of %s...', n + 1, len(track_list))
             bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
@@ -396,18 +397,18 @@ class Testing:
                 Testing.verify(i[j])
 
 # Define matching logic
-def compare_media(reference: TrackInfo, compared: TrackInfo,
+def compare_media(reference: MediaInfo, compared: MediaInfo,
         mode: Literal['fuzz', 'strict'] = 'fuzz',
         fuzz_threshold: int = 75,
         ignore_title: bool = False,
         ignore_artist: bool = False,
         ignore_album: bool = False,
         **kwargs) -> tuple[int, dict[str, bool]]:
-    """Compares the data from two TrackInfo objects, and returns a percentage of how close they are overall, along with the individual
+    """Compares the data from two MediaInfo objects, and returns a percentage of how close they are overall, along with the individual
     matching factors themselves.
     
-    @reference: TrackInfo object to compare against
-    @compared: TrackInfo object to be compared
+    @reference: MediaInfo object to compare against
+    @compared: MediaInfo object to be compared
     @mode: Either 'fuzz' or 'strict'; 'fuzz' uses fuzzy matching to determine whether something should clear a check,\
         where 'strict' only checks for exact matches
     @fuzz_threshold: If using 'fuzz' mode, this is the minimum ratio a match must clear to pass the check
@@ -436,7 +437,6 @@ def compare_media(reference: TrackInfo, compared: TrackInfo,
     if mode == 'fuzz':
         matching_title = fuzz.ratio(reference.title.lower(), compared.title.lower()) > title_threshold
         matching_artist = fuzz.ratio(reference.artist.lower(), compared.artist.lower()) > artist_threshold
-        log.debug('ran | %s | can | %s | comp | %s', reference.album_name, compared.album_name, compared)
         matching_album = fuzz.ratio(reference.album_name.lower(), compared.album_name.lower()) > album_threshold
     elif mode == 'strict': # TODO: Maybe deprecate strict mode
         matching_title = reference.title.lower() in compared.title.lower() or (
@@ -558,46 +558,27 @@ def search_ytmusic_text(query: str) -> dict:
 
     return {'top_song': top_song, 'top_video': top_video, 'top_album': top_album}
 
-def search_ytmusic_album(album_info: AlbumInfo) -> str | None:
-    """Attempts to find an album on YTMusic that matches `album_info`'s attributes as closely as possible."""
-    # TODO: Validate that this works
-    if FORCE_MATCH_PROMPT:
-        log.warning('FORCE_NO_MATCH is set to True.')
-        return None
-
-    title, artist, release_year = album_info.title, album_info.artist, album_info.release_year
+def match_ytmusic_album(src_info: AlbumInfo) -> AlbumInfo | None:
+    """Attempts to find an album on YTMusic that matches `src_info`'s attributes as closely as possible."""
+    title, artist, release_year = src_info.title, src_info.artist, src_info.release_year
     query = f'{title} {artist} {release_year}'
 
     log.info('Starting album search...')
-    details_check = re.compile(r'(\(feat\..*\))|(\(.*Remaster.*\))')
 
-    album_results = ytmusic.search(query=query, limit=5, filter='albums')
-    for yt in album_results:
-        title_match = fuzz.ratio(details_check.sub('', title), details_check.sub('', yt['title'])) > 75
-        artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
-        year_match = fuzz.ratio(release_year, yt['year']) > 75
-        if title_match + artist_match + year_match >= 2:
+    album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')]
+    
+    for result in album_results:
+        if compare_media(src_info, result)[0] >= 100:
             log.info('Match found.')
-            return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['browseId'])['audioPlaylistId']
-
-    song_results = ytmusic.search(query=query, limit=5, filter='songs')
-    for yt in song_results:
-        title_match = fuzz.ratio(details_check.sub('', title), details_check.sub('', yt['album']['name'])) > 75
-        artist_match = fuzz.ratio(artist, yt['artists'][0]['name']) > 75
-        year_match = fuzz.ratio(release_year, yt['year']) > 75
-        if title_match + artist_match + year_match >= 2:
-            log.info('Match found.')
-            return 'https://www.youtube.com/playlist?list='+ytmusic.get_album(yt['album']['id'])['audioPlaylistId']
+            return result
 
     log.info('No match found.')
     return None
 
-def search_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
+def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     """Uses a TrackInfo object to try and retrieve the closest match from YTMusic.
-    If no close match could be found — as determined by `compare_media()` — a list of potential matches (TrackInfo objects) will be returned.
+    If no close match could be found — as determined by `compare_media()` — a list of potential matches (`TrackInfo` objects) will be returned.
     Otherwise, just one is returned.
-    
-    @src_info: TrackInfo object that YTMusic results should be checked against
     """
 
     query = f'{src_info.title} {src_info.artist} {src_info.album_name}'
@@ -686,4 +667,4 @@ def search_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
 # Other
 def spyt(url: str) -> TrackInfo | list[TrackInfo]:
     """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
-    return search_ytmusic_track(spotify_track(url))
+    return match_ytmusic_track(spotify_track(url))

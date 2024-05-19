@@ -15,14 +15,18 @@ Developer
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
     - `spoofy.py` renamed to `media.py`, moved to this directory
     - Changes in `media.py`:
+        - `FORCE_NO_MATCH` renamed to `FORCE_MATCH_PROMPT`
+        - `DURATION_LIMIT` renamed to `DURATION_LIMIT_SECONDS`
         - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used so there was no need for this
         - `MediaInfo` class added to standardize expected results and improve typing
             - This class largely just acts as a category for three sub-classes: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
         - `pytube_track_data()` and `trim_track_data()` removed, made unnecessary by the addition of `MediaInfo`
         - `MediaError` class extending from `Exception` added as a container for media-specific errors; it contains the following sub-classes:
             - `FormatError` - an exception used for incorrect or unexpected `MediaInfo` formatting
-        - `search_ytmusic()` renamed to `search_ytmusic_track()`
+        - `search_ytmusic()` renamed to `match_ytmusic_track()`
             - All arguments have been replaced with a single `src_info` argument, which takes a `TrackInfo` object
+        - `search_ytmusic_album()` renamed to `match_ytmusic_album()`
+            - Arguments also replaced with `src_info` argument, which takes an `AlbumInfo` object
     - `palette.py` moved to this directory
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
