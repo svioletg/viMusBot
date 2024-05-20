@@ -21,7 +21,6 @@ from ytmusicapi import YTMusic
 
 import utils.configuration as config
 # Local imports
-import utils.miscutil as miscutil
 from utils.palette import Palette
 
 plt = Palette()
@@ -500,7 +499,6 @@ def spotify_album(url: str) -> AlbumInfo:
 
 def analyze_spotify_track(url: str) -> tuple:
     """Returns results from Spotify's "audio features" for a given track."""
-    # TODO: Rewrite with MediaInfo objects
     if features := sp.audio_features(url):
         data = features[0]
     else:
@@ -529,9 +527,9 @@ def analyze_spotify_track(url: str) -> tuple:
 
     # Replace ms duration with readable duration
     ms = data['duration_ms']
-    hours = int(ms/(1000*60*60))
-    minutes = int(ms/(1000*60)%60)
-    seconds = int(ms/1000%60)
+    hours = int(ms / (1000 * 60 * 60))
+    minutes = int(ms / (1000 * 60) % 60)
+    seconds = int(ms / 1000 % 60)
 
     # Don't include hours if less than one
     hours = str(hours)
@@ -566,7 +564,7 @@ def match_ytmusic_album(src_info: AlbumInfo) -> AlbumInfo | None:
     log.info('Starting album search...')
 
     album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')]
-    
+
     for result in album_results:
         if compare_media(src_info, result)[0] >= 100:
             log.info('Match found.')
@@ -636,7 +634,7 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
 
     for result in video_results[:2]:
         track_choices.append(result)
-    
+
     if FORCE_MATCH_PROMPT:
         log.info('force-match-prompt is enabled, returning choices without checking for matches.')
         return track_choices
