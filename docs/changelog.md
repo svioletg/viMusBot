@@ -4,19 +4,17 @@
 
 > *2024.mm.dd / dev.34*
 
-
-
 Developer
 - Docstrings have been added to most functions, classes, and modules
 - Any instances of `import regex as re` have been replaced with `import re`
-- `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library
+- `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library ([#73](https://github.com/svioletg/viMusBot/issues/73))
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
     - Many `global` statements have been removed, various variables moved into separate cogs or classes where relevant
-    - Cogs have been moved into separate files, located in `cogs/`
+    - Cogs have been moved into separate files, located in `cogs/` ([#72](https://github.com/svioletg/viMusBot/issues/72))
         - `General` cog moved into `cog_general.py`
-        - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback; other changes have been made within this file, such as...
+        - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback ([#76](https://github.com/svioletg/viMusBot/issues/76)); other changes have been made within this file, such as...
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
     - `embedq()` no longer uses `*args`, now has proper keyword arguments — `title` (`str`; main, largest text), `subtext` (`str`; shown below `title` in smaller font), and `color` (`int`)
@@ -24,12 +22,12 @@ Developer
     - `miscutil.py` created in this directory to house general-purpose utility methods that should be shared between modules
     - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
-    - `spoofy.py` renamed to `media.py`, moved to this directory
+    - `spoofy.py` renamed to `media.py`, moved to this directory ([#42](https://github.com/svioletg/viMusBot/issues/42))
     - Changes in `media.py`:
         - `FORCE_NO_MATCH` renamed to `FORCE_MATCH_PROMPT`
         - `DURATION_LIMIT` renamed to `DURATION_LIMIT_SECONDS`
         - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used so there was no need for this
-        - `MediaInfo` class added to standardize expected results and improve typing
+        - `MediaInfo` class added to standardize expected results and improve typing ([#67](https://github.com/svioletg/viMusBot/issues/67))
             - This class largely just acts as a category for three sub-classes: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
         - `pytube_track_data()` and `trim_track_data()` removed, made unnecessary by the addition of `MediaInfo`
         - `MediaError` class extending from `Exception` added as a container for media-specific errors; it contains the following sub-classes:
