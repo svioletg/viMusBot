@@ -5,8 +5,7 @@ standardized results from various sources."""
 import json
 import logging
 import re
-import sys
-from typing import Any, Callable, Literal, Optional, cast
+from typing import Any, Callable, Literal, Optional, Self, cast
 
 # External imports
 import pytube
@@ -19,23 +18,13 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 
-import utils.configuration as config
 # Local imports
+import utils.configuration as config
 from utils.palette import Palette
 
+log = logging.getLogger('viMusBot')
+
 plt = Palette()
-
-# Logs shouldn't be printed unless bot.py assigns this to its own logger
-log = logging.getLogger(__name__)
-# Setting the level to CRITICAL effectively disables logs
-log.addHandler(logging.StreamHandler(sys.stdout))
-log.setLevel(logging.CRITICAL)
-
-def do_logs(toggle: bool) -> None:
-    """For debugging. In practice, this module's logger is replaced with the main logger created by `bot.py`,\
-    but when importing only this module for development work, it can be more convenient to enable this basic logger.
-    """
-    log.setLevel(logging.DEBUG if toggle else logging.CRITICAL)
 
 # Function to communicate with the bot and send status messages, useful for long tasks
 bot_status_callback: Callable = lambda message: None
@@ -73,7 +62,7 @@ class MediaInfo:
     Retrieves common attributes that can be obtained the same way regardless of type (Track, Album, Playlist).
     Generally should not be called directly; use the appropriate subclass instead.
     """
-    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         """
         @source: A valid MediaSource object.
         @info: A collection of info to be parsed and used for object creation. Exactly what this should be depends on the subclass.
@@ -82,7 +71,7 @@ class MediaInfo:
         """
         self.source: MediaSource = source
         self.info: Any = info
-        self.yt_info_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = yt_info_origin
+        self.yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = yt_info_origin
 
         self.url: str = ''
         self.title: str = ''
@@ -151,22 +140,49 @@ class MediaInfo:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
         else:
             raise ValueError(f'MediaSource object received that has no processing route: {source}')
+    
+    @classmethod
+    def from_pytube(cls, info: pytube.YouTube | str) -> Self:
+        """Shorthand for getting a MediaInfo object from a `pytube` source.
+        @info: URL string, or a `pytube.YouTube` object
+        """
+        if isinstance(info, str):
+            info = pytube.YouTube(info)
+        return cls(YOUTUBE, info, yt_info_origin='pytube')
+
+    @classmethod
+    def from_ytmusic(cls, info: dict | str) -> Self:
+        """Shorthand for getting a MediaInfo object from a `ytmusicapi` source.
+        @info: URL string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
+        """
+        if isinstance(info, str):
+            info = ytmusic.search(info, filter='songs')[0]
+        return cls(YOUTUBE, info, yt_info_origin='ytmusic')
+    
+    @classmethod
+    def from_ytdl(cls, info: dict | str) -> Self:
+        """Shorthand for getting a MediaInfo object from a `yt_dlp` source.
+        @info: URL string, or a dictionary returned by `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
+        """
+        if isinstance(info, str):
+            info = ytdl.extract_info(info, download=False) # type: ignore
+        return cls(YOUTUBE, info, yt_info_origin='ytdl')
 
     def check_missing(self):
         """For debugging. Looks for and logs any attributes that may be "empty", in the sense that bool(attribute) would return False.
         Some attributes are safe to leave empty, but this can helpful to diagnose some problems.
         """
-        log.debug('Checking for any attributes of %s that may be empty...', self)
+        print('Checking for any attributes of %s that may be empty...' % self)
         counter: int = 0
         for k, v in vars(self).items():
             if not v:
-                log.debug('%s returned as false. Its value is: %s', k, repr(v))
+                print('%s returned as false. Its value is: %s' % k, repr(v))
                 counter += 1
-        log.debug('%s empty attributes found.', counter)
+        print('%s empty attributes found.' % counter)
 
 class TrackInfo(MediaInfo):
     """Specific parsing for single track data."""
-    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         """
         @info: Must be track info returned by any of the following:
             - `dict` from `spotipy.Spotify.track()`
@@ -201,7 +217,7 @@ class TrackInfo(MediaInfo):
 
 class AlbumInfo(MediaInfo):
     """Specific parsing for album data."""
-    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         """
         @info: Must be track info returned by any of the following:
             - `dict` from `spotipy.Spotify.album()`
@@ -235,7 +251,7 @@ class AlbumInfo(MediaInfo):
 
 class PlaylistInfo(MediaInfo):
     """Specific parsing for playlist data."""
-    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Literal['pytube', 'ytmusic', 'ytdl'] | None = None):
+    def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         MediaInfo.__init__(self, source, info, yt_info_origin)
         self.contents: list[TrackInfo] = get_group_contents(self)
 
@@ -547,14 +563,21 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-def search_ytmusic_text(query: str) -> dict:
-    """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results."""
-    songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=filt) for filt in ['songs', 'videos', 'albums']]
-    top_song: Optional[TrackInfo] = TrackInfo(YOUTUBE, songs[0], yt_info_origin='ytmusic') if songs else None
-    top_video: Optional[TrackInfo] = TrackInfo(YOUTUBE, videos[0], yt_info_origin='ytmusic') if videos else None
-    top_album: Optional[AlbumInfo] = AlbumInfo(YOUTUBE, albums[0], yt_info_origin='ytmusic') if albums else None
+def search_ytmusic_text(query: str, max_results: int=1) -> dict[str, Optional[list[TrackInfo] | list[AlbumInfo]]]:
+    """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
+    
+    @query: String to search with.
+    @results: Maximum number of search results to return, per each category.
+    """
+    songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
+    return {
+        'songs': [TrackInfo.from_ytmusic(song) for song in songs] if songs else None,
+        'videos': [TrackInfo.from_ytmusic(video) for video in videos] if videos else None,
+        'albums': [TrackInfo.from_ytmusic(album) for album in albums] if albums else None
+    }
 
-    return {'top_song': top_song, 'top_video': top_video, 'top_album': top_album}
+# TrackInfo(YOUTUBE, album, yt_info_origin='ytmusic')
+# TrackInfo.from_ytmusic(album)
 
 def match_ytmusic_album(src_info: AlbumInfo) -> AlbumInfo | None:
     """Attempts to find an album on YTMusic that matches `src_info`'s attributes as closely as possible."""

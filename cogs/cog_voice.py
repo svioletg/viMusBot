@@ -2,19 +2,24 @@
 
 # Standard imports
 import asyncio
-from logging import Logger
-from typing import Any, Optional
+import logging
+import time
+from typing import Optional
 
 # External imports
-from discord import Embed, Member, VoiceClient, VoiceState, PCMVolumeTransformer, Message, FFmpegPCMAudio
+from discord import (Embed, FFmpegPCMAudio, Member, Message,
+                     PCMVolumeTransformer, User, VoiceClient, VoiceState)
 from discord.errors import NotFound
 from discord.ext import commands
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 # Local imports
+from cogs.shared import (EMOJI, INACTIVITY_TIMEOUT, USE_TOP_MATCH, command_aliases,
+                         embedq, is_command_enabled, prompt_for_choice)
 from utils import media
-from cogs.shared import INACTIVITY_TIMEOUT, USE_TOP_MATCH, embedq
+
+log = logging.getLogger('viMusBot')
 
 # Configure youtube dl
 ytdl_format_options = {
@@ -67,7 +72,7 @@ class YTDLSource(PCMVolumeTransformer):
         return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data) # type: ignore
 
 class QueueItem:
-    def __init__(self, info: media.TrackInfo, queued_by: Member):
+    def __init__(self, info: media.TrackInfo, queued_by: User | Member):
         self.info = info
         self.queued_by = queued_by
 
@@ -124,10 +129,9 @@ class QueueItem:
                 objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
             return objlist
 
-class MediaQueue:
+class MediaQueue(list):
     """Manages a media queue, keeping track of what's currently playing, what has previously played, whether looping is on, etc."""
     def __init__(self):
-        self.__queue_list: list[QueueItem] = []
         self.is_looping: bool = False
         self.now_playing: Optional[YTDLSource] = None
         self.last_played: Optional[YTDLSource] = None
@@ -135,27 +139,90 @@ class MediaQueue:
         self.now_playing_msg: Optional[Message] = None
         self.queue_msg: Optional[Message] = None
 
-    def clear(self):
-        """Clears the queue list."""
-        self.__queue_list.clear()
+    def append(self, item: QueueItem):
+        if not isinstance(item, QueueItem):
+            raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
+        super().append(item)
+    
+    def extend(self, item: list[QueueItem]):
+        if not isinstance(item, QueueItem):
+            raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
+        super().extend(item)
     
     def queue(self, to_queue: QueueItem | list[QueueItem]):
         """Takes either a single `QueueItem` or a list of them, and queues them."""
-        if not isinstance(to_queue, list):
-            self.__queue_list.append(to_queue)
-            return
-
-        for item in to_queue:
-            self.__queue_list.append(item)
+        if isinstance(to_queue, list):
+            self.extend(to_queue)
+        else:
+            self.append(to_queue)
 
 class Voice(commands.Cog):
     """Handles voice and music-related tasks."""
 
-    def __init__(self, bot: commands.bot.Bot, logger: Logger):
+    def __init__(self, bot: commands.bot.Bot):
         self.bot = bot
-        self.logger = logger
         self.voice_client: Optional[VoiceClient] = None
         self.media_queue = MediaQueue()
+        self.advance_lock: bool = False
+        self.paused_at: float
+        self.pause_duration: float
+    
+    @commands.command(aliases=command_aliases('play'))
+    @commands.check(is_command_enabled)
+    async def play(self, ctx: commands.Context, *queries: str):
+        """Adds a link to the queue. Plays immediately if the queue is empty.
+        
+        @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
+        """
+        # Using -play alone with no args should resume the bot if we're paused
+        if not queries:
+            if self.voice_client.is_paused():
+                self.voice_client.resume()
+                await ctx.send(embed=embedq('Player is resuming.'))
+                self.pause_duration = time.time() - self.paused_at
+            else:
+                await ctx.send(embed=embedq('No URL or search terms given.'))
+            return
+
+        url_strings: list[str] = []
+        plain_strings: list[str] = []
+
+        for item in queries:
+            if item.startswith('https://'):
+                url_strings.append(item)
+            else:
+                plain_strings.append(item)
+
+        if url_strings and plain_strings:
+            await ctx.send('URLs and plain search terms can\'t be used at the same time.')
+            return
+
+        to_queue: QueueItem | list[QueueItem]
+
+        async with ctx.typing():
+            if plain_strings:
+                text_search = ' '.join(plain_strings)
+                search_results = media.search_ytmusic_text(text_search)
+                choice_map = {n:v for n, v in enumerate(search_results)}
+                choice_prompt = await ctx.send(embed=embedq('Please choose a search result to queue...',
+                    '\n'.join([f'{EMOJI['num'][n]} {result.title}' for n, result in enumerate(search_results)]))
+                )
+                choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_options=search_results)
+                if not choice:
+                    await choice_prompt.edit(embed=embedq(f'{EMOJI['cancel']} Selection cancelled or timed out.'))
+                    return
+
+                to_queue = search_results[0]
+            # Queue or start the player
+            log.info('Adding to queue...')
+            if not self.voice_client.is_playing() and not self.media_queue:
+                self.media_queue.queue(QueueItem(url, ctx.author))
+                log.info('Voice client is not playing; starting...')
+                await advance_queue(ctx)
+            else:
+                self.media_queue.queue(QueueItem(url, ctx.author))
+                title = media_queue.get(ctx)[-1].title
+                await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(self.media_queue)}'))
     
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         # skip_votes = []
@@ -248,8 +315,8 @@ class Voice(commands.Cog):
 
         now_playing.duration_stamp = timestamp_from_seconds(now_playing.duration)
 
-        voice.stop()
-        voice.play(now_playing, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
+        self.voice_client.stop()
+        self.voice_client.play(now_playing, after=lambda e: asyncio.run_coroutine_threadsafe(advance_queue(ctx), bot.loop))
         audio_start_time = time.time()
         if npmessage is not None:
             try:
@@ -277,13 +344,9 @@ class Voice(commands.Cog):
                 except PermissionError as e:
                     log.debug(f'Cannot remove; the file is likely in use.')
 
-    advance_lock = False
-
     async def advance_queue(ctx: commands.Context, skip: bool=False):
-        """Attempts to advance forward in the queue, if the bot is clear to do so."""
-        # Triggers every time the player finishes
-        global advance_lock
-        if not advance_lock and (skip or not voice.is_playing()):
+        """Attempts to advance forward in the queue, if the bot is clear to do so. Set to run whenever the audio player finishes its current item."""
+        if not advance_lock and (skip or not self.voice_client.is_playing()):
             log.debug('Locking...')
             advance_lock = True
 
@@ -292,7 +355,7 @@ class Voice(commands.Cog):
                     media_queue.get(ctx).insert(0, current_item)
 
                 if media_queue.get(ctx) == []:
-                    voice.stop()
+                    self.voice_client.stop()
                 else:
                     next_item = media_queue.get(ctx).pop(0)
                     await play_item(next_item, ctx)

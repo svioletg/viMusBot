@@ -1,12 +1,17 @@
 # Standard imports
-from typing import Optional
+import logging
+import time
+from asyncio import TimeoutError
+from typing import Iterable, Optional
 
 # External imports
-from discord import Embed
+from discord import Embed, Member, Message, Reaction
 from discord.ext import commands
 
 # Local imports
 import utils.configuration as config
+
+log = logging.getLogger('viMusBot')
 
 PUBLIC             : bool      = config.get('public')
 TOKEN_FILE_PATH    : str       = config.get('token-file')
@@ -30,6 +35,16 @@ SKIP_VOTES_TYPE       : str  = config.get('vote-to-skip.threshold-type')
 SKIP_VOTES_EXACT      : int  = config.get('vote-to-skip.threshold-exact')
 SKIP_VOTES_PERCENTAGE : int  = config.get('vote-to-skip.threshold-percentage')
 
+EMOJI = {
+    'cancel': '❌',
+    'confirm': '✅',
+    'repeat': '🔁',
+    'info': 'ℹ️',
+    'num': [
+        '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟',
+    ],
+}
+
 def is_command_enabled(ctx: commands.Context) -> bool:
     """Checks whether this command's name is found in the configuration's list of disabled commands."""
     return not ctx.command.name in DISABLED_COMMANDS
@@ -41,3 +56,55 @@ def command_aliases(command: str) -> list[str]:
 def embedq(title: str, subtext: Optional[str]=None, color: int=EMBED_COLOR) -> Embed:
     """Shortcut for making embeds for messages."""
     return Embed(title=title, description=subtext, color=color)
+
+def timestamp_from_seconds(seconds: int|float) -> str:
+    """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
+    # Omit the hour place if not >=60 minutes
+    return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
+
+async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context, prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> int | str | None:
+    """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
+
+    Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully.
+    """
+    # Get reaction menu ready
+    log.info('Prompting for reactions...')
+
+    choice_map = {num:key for num, key in enumerate(choice_options)}
+    choice_amount = len(choice_map)
+
+    if choice_options > len(EMOJI['num']):
+        log.debug('Choices out of range for emoji number list.')
+        await prompt_msg.edit(embed=embedq(f'Couldn\'t make choice prompt, limit ({len(EMOJI['num'])}) exceeded.'))
+        return
+
+    for i in range(choice_options):
+        await prompt_msg.add_reaction(EMOJI['num'][i + 1])
+
+    await prompt_msg.add_reaction(EMOJI['cancel'])
+
+    def check(reaction: Reaction, user: Member) -> bool:
+        log.debug('Reaction check is being called...')
+        return user == ctx.message.author and (str(reaction.emoji) in EMOJI['num'] or str(reaction.emoji) == EMOJI['cancel'])
+
+    log.debug('Waiting for reaction...')
+
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check)
+    except TimeoutError:
+        log.debug('Choice prompt timeout reached.')
+        await prompt_msg.delete()
+        return
+    else:
+        # If a valid reaction was received.
+        log.debug('Received a valid reaction.')
+
+        if str(reaction) == EMOJI['cancel']:
+            log.debug('Selection cancelled.')
+            await prompt_msg.delete()
+            return
+        else:
+            choice = EMOJI['num'].index(str(reaction))
+            log.debug('%s selected.', choice)
+            await prompt_msg.delete()
+            return choice

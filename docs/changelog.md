@@ -10,14 +10,17 @@ Developer
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library ([#73](https://github.com/svioletg/viMusBot/issues/73))
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
+    - `console()` renamed to `console_thread()` for consistency with `bot_thread()`
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
     - Many `global` statements have been removed, various variables moved into separate cogs or classes where relevant
     - Cogs have been moved into separate files, located in `cogs/` ([#72](https://github.com/svioletg/viMusBot/issues/72))
+        - `shared.py` created to house methods and configuration options shared between cogs
+            - Functions moved into this module include: `is_command_enabled()`, `command_aliases()`, `embedq()`, `timestamp_from_seconds()`, `prompt_for_choice()`
+                - `embedq()` no longer uses `*args`, now has proper keyword arguments — `title` (`str`; main, largest text), `subtext` (`str`; shown below `title` in smaller font), and `color` (`int`)
         - `General` cog moved into `cog_general.py`
         - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback ([#76](https://github.com/svioletg/viMusBot/issues/76)); other changes have been made within this file, such as...
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
-    - `embedq()` no longer uses `*args`, now has proper keyword arguments — `title` (`str`; main, largest text), `subtext` (`str`; shown below `title` in smaller font), and `color` (`int`)
 - `utils/` directory added to contain helper modules
     - `miscutil.py` created in this directory to house general-purpose utility methods that should be shared between modules
     - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project

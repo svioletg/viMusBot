@@ -1,6 +1,5 @@
 # Standard imports
-from logging import Logger
-from typing import Any, Optional
+import logging
 
 # External imports
 from discord.ext import commands
@@ -9,9 +8,11 @@ from discord.ext import commands
 from cogs.shared import command_aliases, is_command_enabled, embedq
 from version import VERSION
 
+log = logging.getLogger('viMusBot')
+
 class General(commands.Cog):
     """General, miscellaneous functions."""
-    def __init__(self, bot: commands.bot.Bot, logger: Logger):
+    def __init__(self, bot: commands.bot.Bot):
         self.bot = bot
 
     @commands.command(aliases=command_aliases('changelog'))

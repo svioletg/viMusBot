@@ -8,11 +8,9 @@ import logging
 import math
 import os
 import random
-import subprocess
 import time
 import traceback
 from pathlib import Path
-from typing import Optional
 
 # External imports
 import aioconsole
@@ -27,7 +25,8 @@ from pretty_help import PrettyHelp
 
 # Local imports
 import update
-import utils.configuration as config
+from cogs import cog_general, cog_voice
+from cogs.shared import PUBLIC, TOKEN_FILE_PATH, embedq
 from utils import media, miscutil
 from utils.palette import Palette
 from version import VERSION
@@ -40,10 +39,7 @@ discordpy_logfile_handler = logging.FileHandler(filename='discord.log', encoding
 discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INFO, root=False)
 
 # Setup bot logging
-log = miscutil.create_logger(__name__, Path('vimusbot.log'))
-# Assign local modules the same logger
-media.log = log
-
+log = miscutil.create_logger('viMusBot', Path('vimusbot.log'))
 log.info('Logging for bot.py is now active.')
 
 # Check for updates
@@ -77,27 +73,6 @@ to_remove = [f for f in files if Path(f).suffix in CLEANUP_EXTENSIONS]
 for t in to_remove:
     os.remove(t)
 del files, to_remove
-
-# For easier emoji usage
-emoji = {
-    'cancel':'❌',
-    'confirm':'✅',
-    'repeat':'🔁',
-    'info':'ℹ️',
-    'num':[
-    '0️⃣',
-    '1️⃣',
-    '2️⃣',
-    '3️⃣',
-    '4️⃣',
-    '5️⃣',
-    '6️⃣',
-    '7️⃣',
-    '8️⃣',
-    '9️⃣',
-    '🔟',
-    ],
-}
 
 # Start bot-related events
 class Music(commands.Cog):
@@ -672,62 +647,6 @@ def title_from_url(url: str) -> str:
         return None, e
     return info_dict.get('title', None)
 
-def timestamp_from_seconds(seconds: int|float) -> str:
-    """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
-    # Omit the hour place if not >=60 minutes
-    return time.strftime('%M:%S', time.gmtime(seconds)) if seconds < 3600 else time.strftime('%H:%M:%S', time.gmtime(seconds))
-
-async def prompt_for_choice(ctx: commands.Context, prompt_msg: discord.Message, choices: int, timeout: int=30) -> int|None:
-    """Adds reactions to a given Message (prompt_msg) and returns the outcome
-    
-    msg -- Message to be edited based on the outcome
-
-    prompt -- Message to add the reaction choices to
-
-    Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully
-    """
-    # Get reaction menu ready
-    log.debug('Adding reactions...')
-
-    if choices > len(emoji['num']):
-        log.debug('Choices out of range for emoji number list.')
-        return
-
-    for i in list(range(0, choices)):
-        await prompt_msg.add_reaction(emoji['num'][i+1])
-
-    await prompt_msg.add_reaction(emoji['cancel'])
-
-    def check(reaction: discord.Reaction, user: discord.Member) -> bool:
-        log.debug('Reaction check is being called...')
-        return user == ctx.message.author and (str(reaction.emoji) in emoji['num'] or str(reaction.emoji) == emoji['cancel'])
-
-    log.debug('Waiting for reaction...')
-
-    try:
-        reaction, user = await bot.wait_for('reaction_add', timeout=timeout, check=check)
-    except asyncio.TimeoutError as e:
-        log.info('Choice prompt timeout reached.')
-        await prompt_msg.delete()
-        return
-    except Exception as e:
-        log.error(e)
-        await prompt_msg.edit(embed=embedq('An unexpected error occurred.'))
-        return
-    else:
-        # If a valid reaction was received.
-        log.debug('Received a valid reaction.')
-
-        if str(reaction) == emoji['cancel']:
-            log.info('Selection cancelled.')
-            await prompt_msg.delete()
-            return
-        else:
-            choice = emoji['num'].index(str(reaction))
-            log.info(f'{choice} selected.')
-            await prompt_msg.delete()
-            return choice
-
 # Establish bot user
 intents = discord.Intents.default()
 intents.messages = True
@@ -791,6 +710,7 @@ except FileNotFoundError:
     raise SystemExit(0)
 
 class Tests:
+    # TODO: Move to another module
     test_sources = ['youtube', 'spotify', 'bandcamp', 'soundcloud']
     test_urls = {
             'single': {
@@ -925,7 +845,7 @@ class Tests:
 
 # Begin main thread
 
-async def console():
+async def console_thread():
     log.info('Console is active.')
     while True:
         try:
@@ -1032,9 +952,12 @@ async def console():
 
 async def bot_thread():
     log.info('Starting bot thread...')
+    log.debug('Assigning bot logger to cogs...')
+    cog_general.log = log
+    cog_voice.log = log
     async with bot:
-        await bot.add_cog(General(bot))
-        await bot.add_cog(Music(bot))
+        await bot.add_cog(cog_general.General(bot))
+        await bot.add_cog(cog_voice.Voice(bot))
         log.info('Logging in with token...')
         await bot.start(token)
 
@@ -1042,7 +965,7 @@ async def main():
     global bot_task, console_task
 
     bot_task = asyncio.create_task(bot_thread())
-    console_task = asyncio.create_task(console())
+    console_task = asyncio.create_task(console_thread())
     await asyncio.gather(bot_task, console_task)
 
 if __name__ == '__main__':
