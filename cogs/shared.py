@@ -73,12 +73,12 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context, prompt_msg
     choice_map = {num:key for num, key in enumerate(choice_options)}
     choice_amount = len(choice_map)
 
-    if choice_options > len(EMOJI['num']):
-        log.debug('Choices out of range for emoji number list.')
+    if choice_amount > len(EMOJI['num']):
+        log.debug('Number of choices (%s) out of range for emoji number list.', choice_amount)
         await prompt_msg.edit(embed=embedq(f'Couldn\'t make choice prompt, limit ({len(EMOJI['num'])}) exceeded.'))
         return
 
-    for i in range(choice_options):
+    for i in range(choice_amount):
         await prompt_msg.add_reaction(EMOJI['num'][i + 1])
 
     await prompt_msg.add_reaction(EMOJI['cancel'])
