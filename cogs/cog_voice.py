@@ -164,8 +164,9 @@ class Voice(commands.Cog):
         self.voice_client: Optional[VoiceClient] = None
         self.media_queue = MediaQueue()
         self.advance_lock: bool = False
-        self.paused_at: float
-        self.pause_duration: float
+        self.paused_at: float = 0.0
+        self.pause_duration: float = 0.0
+        self.audio_time_elapsed: float = 0.0
     
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
@@ -197,13 +198,11 @@ class Voice(commands.Cog):
             await ctx.send('URLs and plain search terms can\'t be used at the same time.')
             return
 
-        to_queue: QueueItem | list[QueueItem]
-
         async with ctx.typing():
+            to_be_queued: QueueItem | list[QueueItem]
             if plain_strings:
                 text_search = ' '.join(plain_strings)
                 search_results = media.search_ytmusic_text(text_search)
-                choice_map = {n:v for n, v in enumerate(search_results)}
                 choice_prompt = await ctx.send(embed=embedq('Please choose a search result to queue...',
                     '\n'.join([f'{EMOJI['num'][n]} {result.title}' for n, result in enumerate(search_results)]))
                 )
@@ -212,22 +211,20 @@ class Voice(commands.Cog):
                     await choice_prompt.edit(embed=embedq(f'{EMOJI['cancel']} Selection cancelled or timed out.'))
                     return
 
-                to_queue = search_results[0]
+                to_be_queued = choice
             # Queue or start the player
             log.info('Adding to queue...')
             if not self.voice_client.is_playing() and not self.media_queue:
-                self.media_queue.queue(QueueItem(url, ctx.author))
+                self.media_queue.queue(QueueItem(to_be_queued, ctx.author))
                 log.info('Voice client is not playing; starting...')
-                await advance_queue(ctx)
+                await self.advance_queue(ctx)
             else:
-                self.media_queue.queue(QueueItem(url, ctx.author))
-                title = media_queue.get(ctx)[-1].title
+                self.media_queue.queue(QueueItem(to_be_queued, ctx.author))
+                title = self.media_queue[-1].title
                 await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(self.media_queue)}'))
     
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         # skip_votes = []
-
-        audio_time_elapsed = paused_at = paused_for = 0
 
         last_played = now_playing
 
@@ -344,7 +341,7 @@ class Voice(commands.Cog):
                 except PermissionError as e:
                     log.debug(f'Cannot remove; the file is likely in use.')
 
-    async def advance_queue(ctx: commands.Context, skip: bool=False):
+    async def advance_queue(self, ctx: commands.Context, skip: bool=False):
         """Attempts to advance forward in the queue, if the bot is clear to do so. Set to run whenever the audio player finishes its current item."""
         if not advance_lock and (skip or not self.voice_client.is_playing()):
             log.debug('Locking...')

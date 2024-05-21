@@ -2,7 +2,7 @@
 import logging
 import time
 from asyncio import TimeoutError
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 # External imports
 from discord import Embed, Member, Message, Reaction
@@ -62,7 +62,8 @@ def timestamp_from_seconds(seconds: int|float) -> str:
     # Omit the hour place if not >=60 minutes
     return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
 
-async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context, prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> int | str | None:
+async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
+    prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> Any | None:
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
     Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully.
@@ -70,7 +71,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context, prompt_msg
     # Get reaction menu ready
     log.info('Prompting for reactions...')
 
-    choice_map = {num:key for num, key in enumerate(choice_options)}
+    choice_map = dict(enumerate(choice_options))
     choice_amount = len(choice_map)
 
     if choice_amount > len(EMOJI['num']):
@@ -95,16 +96,16 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context, prompt_msg
         log.debug('Choice prompt timeout reached.')
         await prompt_msg.delete()
         return
-    else:
-        # If a valid reaction was received.
-        log.debug('Received a valid reaction.')
 
-        if str(reaction) == EMOJI['cancel']:
-            log.debug('Selection cancelled.')
-            await prompt_msg.delete()
-            return
-        else:
-            choice = EMOJI['num'].index(str(reaction))
-            log.debug('%s selected.', choice)
-            await prompt_msg.delete()
-            return choice
+    # If a valid reaction was received.
+    log.debug('Received a valid reaction.')
+
+    if str(reaction) == EMOJI['cancel']:
+        log.debug('Selection cancelled.')
+        await prompt_msg.delete()
+        return
+    else:
+        choice = EMOJI['num'].index(str(reaction))
+        log.debug('%s selected.', choice)
+        await prompt_msg.delete()
+        return choice_map[choice]

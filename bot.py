@@ -11,6 +11,7 @@ import random
 import time
 import traceback
 from pathlib import Path
+from platform import python_version
 
 # External imports
 import aioconsole
@@ -41,6 +42,8 @@ discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INF
 # Setup bot logging
 log = miscutil.create_logger('viMusBot', Path('vimusbot.log'))
 log.info('Logging for bot.py is now active.')
+
+log.info('Python version: %s', python_version())
 
 # Check for updates
 if __name__ == '__main__':

@@ -571,9 +571,9 @@ def search_ytmusic_text(query: str, max_results: int=1) -> dict[str, Optional[li
     """
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
     return {
-        'songs': [TrackInfo.from_ytmusic(song) for song in songs] if songs else None,
-        'videos': [TrackInfo.from_ytmusic(video) for video in videos] if videos else None,
-        'albums': [TrackInfo.from_ytmusic(album) for album in albums] if albums else None
+        'songs': [TrackInfo.from_ytmusic(song) for song in songs][:max_results] if songs else None,
+        'videos': [TrackInfo.from_ytmusic(video) for video in videos][:max_results] if videos else None,
+        'albums': [TrackInfo.from_ytmusic(album) for album in albums][:max_results] if albums else None
     }
 
 # TrackInfo(YOUTUBE, album, yt_info_origin='ytmusic')
