@@ -143,12 +143,12 @@ class MediaQueue(list):
         if not isinstance(item, QueueItem):
             raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
         super().append(item)
-    
+
     def extend(self, item: list[QueueItem]):
         if not isinstance(item, QueueItem):
             raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
         super().extend(item)
-    
+
     def queue(self, to_queue: QueueItem | list[QueueItem]):
         """Takes either a single `QueueItem` or a list of them, and queues them."""
         if isinstance(to_queue, list):
@@ -201,25 +201,24 @@ class Voice(commands.Cog):
         async with ctx.typing():
             to_be_queued: QueueItem | list[QueueItem]
             if plain_strings:
-                text_search = ' '.join(plain_strings)
+                text_search: str = ' '.join(plain_strings)
                 search_results = media.search_ytmusic_text(text_search)
                 choice_prompt = await ctx.send(embed=embedq('Please choose a search result to queue...',
-                    '\n'.join([f'{EMOJI['num'][n]} {result.title}' for n, result in enumerate(search_results)]))
-                )
-                choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_options=search_results)
+                    f'Top song: {search_results['songs'][0]}'
+                ))
+                choice: media.TrackInfo | media.AlbumInfo = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_options=search_results)
                 if not choice:
                     await choice_prompt.edit(embed=embedq(f'{EMOJI['cancel']} Selection cancelled or timed out.'))
                     return
 
-                to_be_queued = choice
+                # to_be_queued = QueueItem(choice, ctx.author)
             # Queue or start the player
             log.info('Adding to queue...')
+            self.media_queue.queue(to_be_queued)
             if not self.voice_client.is_playing() and not self.media_queue:
-                self.media_queue.queue(QueueItem(to_be_queued, ctx.author))
                 log.info('Voice client is not playing; starting...')
                 await self.advance_queue(ctx)
             else:
-                self.media_queue.queue(QueueItem(to_be_queued, ctx.author))
                 title = self.media_queue[-1].title
                 await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(self.media_queue)}'))
     

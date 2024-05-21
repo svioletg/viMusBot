@@ -63,7 +63,7 @@ def timestamp_from_seconds(seconds: int|float) -> str:
     return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
-    prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> Any | None:
+    prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> Any:
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
     Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully.

@@ -77,7 +77,7 @@ class MediaInfo:
         self.title: str = ''
         self.artist: str = ''
         self.length_seconds: int = 0
-        self.embed_image: str = ''
+        self.thumbnail: str = ''
         self.album_name: str = ''
         self.release_year: str = ''
 
@@ -89,7 +89,7 @@ class MediaInfo:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
             self.artist         = cast(str, info.user['username'])
-            self.embed_image    = cast(str, info.artwork_url)
+            self.thumbnail    = cast(str, info.artwork_url)
             self.length_seconds = int(info.duration // 1000)
         elif source == YOUTUBE:
             if not self.yt_info_origin:
@@ -119,13 +119,13 @@ class MediaInfo:
                 self.title          = cast(str, self.info.title)
                 self.artist         = cast(str, self.info.author)
                 self.length_seconds = int(self.info.length)
-                self.embed_image    = cast(str, self.info.thumbnail_url)
+                self.thumbnail    = cast(str, self.info.thumbnail_url)
 
             elif self.yt_info_origin == 'ytmusic':
                 self.info = cast(dict, self.info)
                 self.title          = cast(str, self.info['title'])
-                self.artist         = cast(str, self.info['artists'][0]['name'])
-                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
+                self.artist         = cast(str, benedict(self.info).get('artists[0].name', ''))
+                self.thumbnail    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
 
             elif self.yt_info_origin == 'ytdl':
                 self.info = cast(dict, self.info)
@@ -134,7 +134,7 @@ class MediaInfo:
                 self.url            = cast(str, self.info.get('webpage_url') or self.info.get('url')) # type: ignore
                 self.title          = cast(str, self.info['title']) # type: ignore
                 self.artist         = cast(str, self.info['uploader']) # type: ignore
-                self.embed_image    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
+                self.thumbnail    = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
 
             else:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
@@ -155,6 +155,7 @@ class MediaInfo:
         """Shorthand for getting a MediaInfo object from a `ytmusicapi` source.
         @info: URL string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
         """
+        print(info)
         if isinstance(info, str):
             info = ytmusic.search(info, filter='songs')[0]
         return cls(YOUTUBE, info, yt_info_origin='ytmusic')
@@ -172,13 +173,13 @@ class MediaInfo:
         """For debugging. Looks for and logs any attributes that may be "empty", in the sense that bool(attribute) would return False.
         Some attributes are safe to leave empty, but this can helpful to diagnose some problems.
         """
-        print('Checking for any attributes of %s that may be empty...' % self)
+        log.debug('Checking for any attributes of %s that may be empty...', self)
         counter: int = 0
         for k, v in vars(self).items():
             if not v:
-                print('%s returned as false. Its value is: %s' % k, repr(v))
+                log.debug('%s returned as false. Its value is: %s', k, repr(v))
                 counter += 1
-        print('%s empty attributes found.' % counter)
+        log.debug('%s empty attributes found.', counter)
 
 class TrackInfo(MediaInfo):
     """Specific parsing for single track data."""
@@ -199,7 +200,7 @@ class TrackInfo(MediaInfo):
             if 'album' in self.info:
                 # An 'album' key indicates this was retrieved from Spotipy.track() or .playlist(), otherwise its from an album
                 # get_group_contents() will take care of these in that case, although it can't get an ISRC
-                self.embed_image  = cast(str, self.info['album']['images'][0]['url'])
+                self.thumbnail  = cast(str, self.info['album']['images'][0]['url'])
                 self.album_name   = cast(str, self.info['album']['name'])
                 self.release_year = cast(str, self.info['album']['release_date'].split('-')[0])
                 self.isrc         = cast(str, self.info['external_ids'].get('isrc', None))
@@ -231,7 +232,7 @@ class AlbumInfo(MediaInfo):
 
         if source == SPOTIFY:
             self.length_seconds = track_list_duration(self.contents)
-            self.embed_image    = cast(str, self.info['images'][0]['url'])
+            self.thumbnail    = cast(str, self.info['images'][0]['url'])
             self.album_name     = cast(str, self.info['name'])
             self.release_year   = cast(str, self.info['release_date'].split('-')[0])
             self.upc            = cast(str, self.info['external_ids']['upc'])
@@ -256,7 +257,7 @@ class PlaylistInfo(MediaInfo):
         self.contents: list[TrackInfo] = get_group_contents(self)
 
         if source == SPOTIFY:
-            self.embed_image    = cast(str, self.info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
+            self.thumbnail    = cast(str, self.info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
             self.length_seconds = track_list_duration(self.contents)
         elif source == SOUNDCLOUD:
             pass
@@ -284,7 +285,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             bot_status_callback(f'Looking for tracks... ({n+1} of {len(track_list)})')
             if isinstance(group_object, AlbumInfo):
                 object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
-                object_list[-1].embed_image  = group_object.embed_image
+                object_list[-1].thumbnail  = group_object.thumbnail
                 object_list[-1].album_name   = group_object.album_name
                 object_list[-1].release_year = group_object.release_year
 
@@ -563,7 +564,7 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-def search_ytmusic_text(query: str, max_results: int=1) -> dict[str, Optional[list[TrackInfo] | list[AlbumInfo]]]:
+def search_ytmusic_text(query: str, max_results: int=1) -> dict[str, list[TrackInfo] | list[AlbumInfo] | None]:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
     
     @query: String to search with.
@@ -627,7 +628,7 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
                         track = TrackInfo(YOUTUBE, ytmusic.get_song(song.video_id)['videoDetails'], yt_info_origin='ytmusic')
                         track.album_name = src_info.album_name
                         track.artist = src_info.artist
-                        track.embed_image = src_info.embed_image
+                        track.thumbnail = src_info.thumbnail
                         track.isrc = src_info.isrc
                         return track
                     except KeyError:
