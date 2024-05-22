@@ -5,6 +5,7 @@ standardized results from various sources."""
 import json
 import logging
 import re
+from time import perf_counter
 from typing import Any, Callable, Literal, Optional, Self, cast
 
 # External imports
@@ -20,6 +21,7 @@ from ytmusicapi import YTMusic
 
 # Local imports
 import utils.configuration as config
+from utils.miscutil import Stopwatch
 from utils.palette import Palette
 
 log = logging.getLogger('viMusBot')
@@ -140,7 +142,7 @@ class MediaInfo:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
         else:
             raise ValueError(f'MediaSource object received that has no processing route: {source}')
-    
+
     @classmethod
     def from_pytube(cls, info: pytube.YouTube | str) -> Self:
         """Shorthand for getting a MediaInfo object from a `pytube` source.
@@ -155,7 +157,6 @@ class MediaInfo:
         """Shorthand for getting a MediaInfo object from a `ytmusicapi` source.
         @info: URL string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
         """
-        print(info)
         if isinstance(info, str):
             info = ytmusic.search(info, filter='songs')[0]
         return cls(YOUTUBE, info, yt_info_origin='ytmusic')
@@ -564,21 +565,36 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-def search_ytmusic_text(query: str, max_results: int=1) -> dict[str, list[TrackInfo] | list[AlbumInfo] | None]:
+def ytmusic_top_results(query: str, max_results: int=1) -> dict[str, list[MediaInfo] | None]:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
     
     @query: String to search with.
     @results: Maximum number of search results to return, per each category.
     """
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
-    return {
-        'songs': [TrackInfo.from_ytmusic(song) for song in songs][:max_results] if songs else None,
-        'videos': [TrackInfo.from_ytmusic(video) for video in videos][:max_results] if videos else None,
-        'albums': [TrackInfo.from_ytmusic(album) for album in albums][:max_results] if albums else None
-    }
-
-# TrackInfo(YOUTUBE, album, yt_info_origin='ytmusic')
-# TrackInfo.from_ytmusic(album)
+    results: dict[str, list[MediaInfo] | None] = {'songs': None, 'videos': None, 'albums': None}
+    if songs:
+        results['songs'] = []
+        for n, s in enumerate(songs):
+            if n < max_results:
+                results['songs'].append(TrackInfo.from_ytmusic(s))
+            else:
+                break
+    if videos:
+        results['videos'] = []
+        for n, v in enumerate(videos):
+            if n < max_results:
+                results['videos'].append(TrackInfo.from_ytmusic(v))
+            else:
+                break
+    if albums:
+        results['albums'] = []
+        for n, a in enumerate(albums):
+            if n < max_results:
+                results['albums'].append(AlbumInfo.from_ytmusic(a))
+            else:
+                break
+    return results
 
 def match_ytmusic_album(src_info: AlbumInfo) -> AlbumInfo | None:
     """Attempts to find an album on YTMusic that matches `src_info`'s attributes as closely as possible."""

@@ -15,7 +15,7 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 # Local imports
-from cogs.shared import (EMOJI, INACTIVITY_TIMEOUT, USE_TOP_MATCH, command_aliases,
+from cogs.shared import (EMBED_COLOR, EMOJI, INACTIVITY_TIMEOUT, USE_TOP_MATCH, command_aliases,
                          embedq, is_command_enabled, prompt_for_choice)
 from utils import media
 
@@ -84,50 +84,50 @@ class QueueItem:
         @user: A discord Member object of the user who queued the playlist
         """
         objlist = []
-        # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
-        if isinstance(playlist, (list, tuple)):
-            failures = []
-            for item in playlist:
-                if isinstance(item, str) and 'open.spotify.com' in item:
-                    url = item
-                    item = media.spotify_track(item)
-                    if isinstance(item, tuple):
-                        log.info(f'Failed to download video: {item[1]}')
-                        failures.append(url)
-                        continue
+        # # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
+        # if isinstance(playlist, (list, tuple)):
+        #     failures = []
+        #     for item in playlist:
+        #         if isinstance(item, str) and 'open.spotify.com' in item:
+        #             url = item
+        #             item = media.spotify_track(item)
+        #             if isinstance(item, tuple):
+        #                 log.info(f'Failed to download video: {item[1]}')
+        #                 failures.append(url)
+        #                 continue
                 
-                if isinstance(item, dict) and 'open.spotify.com' in item['url']:
-                    objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
-                else:
-                    # Having the list part of the URL causes issues with getting info back
-                    item = item.split('&list=')[0]
+        #         if isinstance(item, dict) and 'open.spotify.com' in item['url']:
+        #             objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
+        #         else:
+        #             # Having the list part of the URL causes issues with getting info back
+        #             item = item.split('&list=')[0]
                     
-                    try:
-                        info = ytdl.extract_info(item, download=False)
-                    except yt_dlp.utils.DownloadError as e:
-                        log.info(f'Failed to download video: {e}')
-                        failures.append(item)
-                        continue
-                    objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
-            return objlist, failures
-        else:
-            # Anything youtube-dl natively supports is probably a link
-            if 'soundcloud.com' in playlist:
-                # SoundCloud playlists have to be processed differently
-                try:
-                    playlist_entries = media.soundcloud_set(playlist)
-                except TypeError as e:
-                    log.info(f'Failed to retrieve SoundCloud playlist: {e}')
-                    return None, e
-                objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
-            else:
-                try:
-                    playlist_entries = ytdl.extract_info(playlist, download=False)
-                except yt_dlp.utils.DownloadError as e:
-                    log.info(f'Failed to download playlist: {e}')
-                    return None, e
-                objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
-            return objlist
+        #             try:
+        #                 info = ytdl.extract_info(item, download=False)
+        #             except yt_dlp.utils.DownloadError as e:
+        #                 log.info(f'Failed to download video: {e}')
+        #                 failures.append(item)
+        #                 continue
+        #             objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
+        #     return objlist, failures
+        # else:
+        #     # Anything youtube-dl natively supports is probably a link
+        #     if 'soundcloud.com' in playlist:
+        #         # SoundCloud playlists have to be processed differently
+        #         try:
+        #             playlist_entries = media.soundcloud_set(playlist)
+        #         except TypeError as e:
+        #             log.info(f'Failed to retrieve SoundCloud playlist: {e}')
+        #             return None, e
+        #         objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
+        #     else:
+        #         try:
+        #             playlist_entries = ytdl.extract_info(playlist, download=False)
+        #         except yt_dlp.utils.DownloadError as e:
+        #             log.info(f'Failed to download playlist: {e}')
+        #             return None, e
+        #         objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
+        #     return objlist
 
 class MediaQueue(list):
     """Manages a media queue, keeping track of what's currently playing, what has previously played, whether looping is on, etc."""
@@ -168,6 +168,14 @@ class Voice(commands.Cog):
         self.pause_duration: float = 0.0
         self.audio_time_elapsed: float = 0.0
     
+    @commands.command(aliases=command_aliases('leave'))
+    @commands.check(is_command_enabled)
+    async def leave(self, ctx: commands.Context):
+        """Leaves the currently connected to voice channel."""
+        if self.voice_client.is_connected:
+            await ctx.send(embed=embedq('Leaving voice...'))
+            await self.voice_client.disconnect()
+    
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
     async def play(self, ctx: commands.Context, *queries: str):
@@ -202,7 +210,20 @@ class Voice(commands.Cog):
             to_be_queued: QueueItem | list[QueueItem]
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
-                search_results = media.search_ytmusic_text(text_search)
+                top_songs, top_videos, top_albums = map(media.ytmusic_top_results(text_search).get, ('songs', 'videos', 'albums'))
+                
+                choice_embed = Embed(color=EMBED_COLOR, title='Please choose a search result to queue...')
+                position: int = 1
+                if top_songs:
+                    choice_embed.add_field(name='Top song result:', value=EMOJI['num'][position] + f'**{top_songs[0].title}** | *{top_songs[0].artist}*')
+                    position += 1
+                if top_videos:
+                    choice_embed.add_field(name='Top video result:', value=EMOJI['num'][position] + f'**{top_videos[0].title}** | *{top_videos[0].artist}*')
+                    position += 1
+                if top_albums:
+                    choice_embed.add_field(name='Top album result:', value=EMOJI['num'][position] + f'**{top_albums[0].title}** | *{top_albums[0].artist}*')
+                    position += 1
+
                 choice_prompt = await ctx.send(embed=embedq('Please choose a search result to queue...',
                     f'Top song: {search_results['songs'][0]}'
                 ))

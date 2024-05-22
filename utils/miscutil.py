@@ -17,6 +17,25 @@ from utils.palette import Palette
 
 plt = Palette()
 
+class Stopwatch:
+    """Basic debugging tool for timing actions. While `time_func()` from this same module is meant to measure specific functions/callables,
+    the usage of the `Stopwatch` class is more for usage in before and after lines, when that is more convenient."""
+    def __init__(self, name: str='generic'):
+        """
+        @name: A name to assign this instance. Will be displayed upon using `lap()`, no other purpose.
+        """
+        self.name = name
+        self.lap_start: float = 0.0
+        self.lap_end: float = 0.0
+    
+    def lap(self, label: str=''):
+        """Prints out the time elapsed between now and the last call to `lap()`.
+        @label: A message to attach. Useful for more clearly indicating progress or line numbers.
+        """
+        self.lap_end = time.perf_counter()
+        print(f'[WATCH <{self.name}>{('/'+label) if label else ''}]: LAP ... {self.lap_end - self.lap_start}')
+        self.lap_start = time.perf_counter()
+
 def time_func(func: Callable, printout: bool=True) -> float:
     """Times the execution of a callable, prints out the result if allowed, and returns the result of the called function
     
