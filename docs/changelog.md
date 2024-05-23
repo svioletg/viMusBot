@@ -10,8 +10,9 @@ Developer
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library ([#73](https://github.com/svioletg/viMusBot/issues/73))
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
-    - `console()` renamed to `console_thread()` for consistency with `bot_thread()`
+    - `-reload` debug command removed
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
+    - `console()` renamed to `console_thread()` for consistency with `bot_thread()`
     - Many `global` statements have been removed, various variables moved into separate cogs or classes where relevant
     - Cogs have been moved into separate files, located in `cogs/` ([#72](https://github.com/svioletg/viMusBot/issues/72))
         - `shared.py` created to house methods and configuration options shared between cogs
