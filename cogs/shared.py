@@ -63,49 +63,56 @@ def timestamp_from_seconds(seconds: int|float) -> str:
     return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
-    prompt_msg: Message, choice_options: Iterable, timeout_seconds: int=30) -> Any:
+    prompt_msg: Message, choice_nums: int, timeout_seconds: int=30, delete_after: bool=True) -> int | TimeoutError | ValueError:
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
-    Returns None if the prompt failed in some way or was cancelled, returns an integer if a choice was made successfully.
+    Returns the chosen number if a valid selection was made, otherwise a `TimeoutError` if a timeout occurred,\
+    a `ValueError` if `choice_nums` was greater than 10, or 0 if the selection was cancelled.
+
+    @prompt_msg: A `Message` containing the choices that will be edited or deleted depending on the outcome.
+    @choice_nums: How many choices to give. Will always start at 1 and end at `cohice_nums`. Maximum of 10,\
+        as that is the highest number an individual emoji can represent.
+    @timeout_seconds: (`30`) How long to wait before automatically cancelling the prompt, in seconds.
+    @delete_message: (`True`) Whether to delete the choice prompt after either a timeout has occurred,\
+        the selection was cancelled, or a valid selection was made.
     """
     # Get reaction menu ready
     log.info('Prompting for reactions...')
 
-    choice_map = dict(enumerate(choice_options))
-    choice_amount = len(choice_map)
-
-    if choice_amount > len(EMOJI['num']):
-        log.debug('Number of choices (%s) out of range for emoji number list.', choice_amount)
+    if choice_nums > len(EMOJI['num']):
+        log.debug('Number of choices (%s) out of range for emoji number list.', choice_nums)
         await prompt_msg.edit(embed=embedq(f'Couldn\'t make choice prompt, limit ({len(EMOJI['num'])}) exceeded.'))
-        return
+        return ValueError('choice_nums can not be greater than 10.')
 
-    for i in range(choice_amount):
+    for i in range(choice_nums):
         await prompt_msg.add_reaction(EMOJI['num'][i + 1])
 
     await prompt_msg.add_reaction(EMOJI['cancel'])
 
     def check(reaction: Reaction, user: Member) -> bool:
-        log.debug('Reaction check is being called...')
         return user == ctx.message.author and (str(reaction.emoji) in EMOJI['num'] or str(reaction.emoji) == EMOJI['cancel'])
 
     log.debug('Waiting for reaction...')
 
     try:
         reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check)
-    except TimeoutError:
+    except TimeoutError as e:
         log.debug('Choice prompt timeout reached.')
-        await prompt_msg.delete()
-        return
+        if delete_after:
+            await prompt_msg.delete()
+        return e
 
     # If a valid reaction was received.
     log.debug('Received a valid reaction.')
 
     if str(reaction) == EMOJI['cancel']:
         log.debug('Selection cancelled.')
+        if delete_after:
+            await prompt_msg.delete()
+        return 0
+
+    choice = EMOJI['num'].index(str(reaction))
+    log.debug('%s selected.', choice)
+    if delete_after:
         await prompt_msg.delete()
-        return
-    else:
-        choice = EMOJI['num'].index(str(reaction))
-        log.debug('%s selected.', choice)
-        await prompt_msg.delete()
-        return choice_map[choice]
+    return choice

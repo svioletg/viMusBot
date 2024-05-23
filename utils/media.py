@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from time import perf_counter
-from typing import Any, Callable, Literal, Optional, Self, cast
+from typing import Any, Callable, Literal, Optional, Self, TypedDict, cast
 
 # External imports
 import pytube
@@ -565,14 +565,22 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-def ytmusic_top_results(query: str, max_results: int=1) -> dict[str, list[MediaInfo] | None]:
+
+class YTMusicResults(TypedDict):
+    """Contains correctly typed results for `search_ytmusic()`"""
+    songs: Optional[list[TrackInfo]]
+    videos: Optional[list[TrackInfo]]
+    albums: Optional[list[AlbumInfo]]
+
+def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
     
     @query: String to search with.
     @results: Maximum number of search results to return, per each category.
     """
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
-    results: dict[str, list[MediaInfo] | None] = {'songs': None, 'videos': None, 'albums': None}
+
+    results: YTMusicResults = {'songs': None, 'videos': None, 'albums': None}
     if songs:
         results['songs'] = []
         for n, s in enumerate(songs):

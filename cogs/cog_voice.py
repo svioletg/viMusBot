@@ -4,13 +4,14 @@
 import asyncio
 import logging
 import time
-from typing import Optional
+from typing import Optional, Self, TypeVar, cast
 
 # External imports
 from discord import (Embed, FFmpegPCMAudio, Member, Message,
                      PCMVolumeTransformer, User, VoiceClient, VoiceState)
 from discord.errors import NotFound
 from discord.ext import commands
+from requests import delete
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
@@ -76,58 +77,14 @@ class QueueItem:
         self.info = info
         self.queued_by = queued_by
 
-    @staticmethod
-    def generate_from_list(playlist: list[media.TrackInfo] | media.PlaylistInfo, user: Member) -> list | tuple[None, Exception]:
-        """Creates a list of QueueItem instances from a valid playlist
+    @classmethod
+    def from_list(cls, playlist: list[media.TrackInfo] | media.PlaylistInfo | media.AlbumInfo, queued_by: Member) -> list:
+        """Creates a list of individual `QueueItem` instances from a valid playlist or album.
 
         @playlist: Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
         @user: A discord Member object of the user who queued the playlist
         """
-        objlist = []
-        # # Will be a list if origin is Spotify, or if multiple URLs were sent with the command
-        # if isinstance(playlist, (list, tuple)):
-        #     failures = []
-        #     for item in playlist:
-        #         if isinstance(item, str) and 'open.spotify.com' in item:
-        #             url = item
-        #             item = media.spotify_track(item)
-        #             if isinstance(item, tuple):
-        #                 log.info(f'Failed to download video: {item[1]}')
-        #                 failures.append(url)
-        #                 continue
-                
-        #         if isinstance(item, dict) and 'open.spotify.com' in item['url']:
-        #             objlist.append(QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)))
-        #         else:
-        #             # Having the list part of the URL causes issues with getting info back
-        #             item = item.split('&list=')[0]
-                    
-        #             try:
-        #                 info = ytdl.extract_info(item, download=False)
-        #             except yt_dlp.utils.DownloadError as e:
-        #                 log.info(f'Failed to download video: {e}')
-        #                 failures.append(item)
-        #                 continue
-        #             objlist.append(QueueItem(info['webpage_url'], user, title=info['title'], duration=info.get('duration', 0)))
-        #     return objlist, failures
-        # else:
-        #     # Anything youtube-dl natively supports is probably a link
-        #     if 'soundcloud.com' in playlist:
-        #         # SoundCloud playlists have to be processed differently
-        #         try:
-        #             playlist_entries = media.soundcloud_set(playlist)
-        #         except TypeError as e:
-        #             log.info(f'Failed to retrieve SoundCloud playlist: {e}')
-        #             return None, e
-        #         objlist = [QueueItem(item.permalink_url, user, title=item.title, duration=round(item.duration/1000)) for item in playlist_entries]
-        #     else:
-        #         try:
-        #             playlist_entries = ytdl.extract_info(playlist, download=False)
-        #         except yt_dlp.utils.DownloadError as e:
-        #             log.info(f'Failed to download playlist: {e}')
-        #             return None, e
-        #         objlist = [QueueItem(item['url'], user, title=item['title'], duration=item.get('duration', 0)) for item in playlist_entries['entries']]
-        #     return objlist
+        pass
 
 class MediaQueue(list):
     """Manages a media queue, keeping track of what's currently playing, what has previously played, whether looping is on, etc."""
@@ -149,12 +106,16 @@ class MediaQueue(list):
             raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
         super().extend(item)
 
-    def queue(self, to_queue: QueueItem | list[QueueItem]):
+    def queue(self, to_queue: QueueItem | list[QueueItem]) -> int | tuple[int, int]:
         """Takes either a single `QueueItem` or a list of them, and queues them."""
+        start: int = len(self)
         if isinstance(to_queue, list):
             self.extend(to_queue)
+            end: int = len(self)
+            return start, end
         else:
             self.append(to_queue)
+            return start
 
 class Voice(commands.Cog):
     """Handles voice and music-related tasks."""
@@ -183,6 +144,23 @@ class Voice(commands.Cog):
         
         @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
         """
+        async def play_or_enqueue(item: QueueItem | list[QueueItem], queue_msg: Message):
+            """Adds the given `QueueItem` to the media queue. If the queue is empty, the item will attempt to play immediately. Otherwise, the item is appended to the queue.
+
+            @item: Either a single `QueueItem` or a list of `QueueItem`s to queue up.
+            """
+            log.info('Adding to queue...')
+            item_index = self.media_queue.queue(item)
+            if not self.voice_client.is_playing() and not self.media_queue:
+                log.info('Voice client is not playing and the queue is empty, going to try playing...')
+                await self.advance_queue(ctx)
+            else:
+                if isinstance(item, list):
+                    item_index = cast(tuple[int, int], item_index)
+                    await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, starting at #{item_index[0]} and ending at #{item_index[1]}.'))
+                else:
+                    await queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{item_index}'))
+        
         # Using -play alone with no args should resume the bot if we're paused
         if not queries:
             if self.voice_client.is_paused():
@@ -193,6 +171,7 @@ class Voice(commands.Cog):
                 await ctx.send(embed=embedq('No URL or search terms given.'))
             return
 
+        # If we have queries, start sorting them
         url_strings: list[str] = []
         plain_strings: list[str] = []
 
@@ -206,42 +185,55 @@ class Voice(commands.Cog):
             await ctx.send('URLs and plain search terms can\'t be used at the same time.')
             return
 
+        # We now have only queries of either one text search, or one or more URLs
         async with ctx.typing():
-            to_be_queued: QueueItem | list[QueueItem]
+            queue_msg = await ctx.send(embed=embedq('Searching...'))
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
-                top_songs, top_videos, top_albums = map(media.ytmusic_top_results(text_search).get, ('songs', 'videos', 'albums'))
-                
+                top_songs, top_videos, top_albums = map(media.search_ytmusic_text(text_search).get, ('songs', 'videos', 'albums'))
+
+                if USE_TOP_MATCH:
+                    if top_songs:
+                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author), queue_msg)
+                        return
+                    if top_videos:
+                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author), queue_msg)
+                        return
+                    
+                    await ctx.send(embed=embedq('No close matches could be found.'))
+                    return
+
                 choice_embed = Embed(color=EMBED_COLOR, title='Please choose a search result to queue...')
+                choice_options = []
                 position: int = 1
+                # TODO: Probably can be condensed
                 if top_songs:
                     choice_embed.add_field(name='Top song result:', value=EMOJI['num'][position] + f'**{top_songs[0].title}** | *{top_songs[0].artist}*')
+                    choice_options[position] = top_songs[0]
                     position += 1
                 if top_videos:
                     choice_embed.add_field(name='Top video result:', value=EMOJI['num'][position] + f'**{top_videos[0].title}** | *{top_videos[0].artist}*')
+                    choice_options[position] = top_videos[0]
                     position += 1
                 if top_albums:
                     choice_embed.add_field(name='Top album result:', value=EMOJI['num'][position] + f'**{top_albums[0].title}** | *{top_albums[0].artist}*')
+                    choice_options[position] = top_albums[0]
                     position += 1
 
-                choice_prompt = await ctx.send(embed=embedq('Please choose a search result to queue...',
-                    f'Top song: {search_results['songs'][0]}'
-                ))
-                choice: media.TrackInfo | media.AlbumInfo = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_options=search_results)
-                if not choice:
-                    await choice_prompt.edit(embed=embedq(f'{EMOJI['cancel']} Selection cancelled or timed out.'))
+                choice_prompt = await ctx.send(embed=choice_embed)
+                choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_nums=position)
+                if isinstance(choice, TimeoutError):
+                    await queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
+                    return
+                if isinstance(choice, ValueError):
+                    await queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Too many options were provided to the prompt.',
+                        'If you\'re seeing this message, this is probably a bug!'))
                     return
 
-                # to_be_queued = QueueItem(choice, ctx.author)
-            # Queue or start the player
-            log.info('Adding to queue...')
-            self.media_queue.queue(to_be_queued)
-            if not self.voice_client.is_playing() and not self.media_queue:
-                log.info('Voice client is not playing; starting...')
-                await self.advance_queue(ctx)
-            else:
-                title = self.media_queue[-1].title
-                await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(self.media_queue)}'))
+                choice = cast(int, choice)
+
+                await play_or_enqueue(QueueItem(choice_options[choice], ctx.author), queue_msg)
+                return
     
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         # skip_votes = []
@@ -256,50 +248,6 @@ class Voice(commands.Cog):
         
         log.info('Trying to start playing...')
 
-        # Check if we need to match a Spotify link
-        if 'open.spotify.com' not in item.url:
-            url = item.url
-        else:
-            log.info('Trying to match Spotify track...')
-            npmessage = await ctx.send(embed=embedq(f'Spotify link detected, searching YouTube...','Please wait, this may take a while!\nIf you think the bot\'s become stuck, use the skip command.'))
-            spyt = media.spyt(item.url)
-            # TODO: unsure isn't a thing anymore, this all need redoing
-            log.info('Checking if unsure...')
-            if isinstance(spyt, tuple) and spyt[0] == 'unsure':
-                # This indicates no match was found
-                log.info('spyt returned unsure.')
-                # Remove the warning, no longer needed
-                spyt = spyt[1]
-                # Shorten to {limit} results
-                limit = 5
-                spyt = dict(list(spyt.items())[:limit])
-                if USE_TOP_MATCH:
-                    # Use first result if that's set in config
-                    spyt = spyt[0]
-                else:
-                    # Otherwise, prompt the user with choice
-                    embed = Embed(title='No exact match found; please choose an option.',description=f'Select the number with reactions or use {emoji["cancel"]} to cancel.',color=EMBED_COLOR)
-                    
-                    for i in spyt:
-                        title = spyt[i]['title']
-                        url = spyt[i]['url']
-                        artist = spyt[i]['artist']
-                        album = spyt[i]['album']
-                        if artist=='': embed.add_field(name=f'{i+1}. {title}',value=url,inline=False)
-                        else: embed.add_field(name=f'{i+1}. {title}\nby {artist} - {album}',value=url,inline=False)
-
-                    prompt = await ctx.send(embed=embed)
-                    choice = await prompt_for_choice(ctx, prompt, len(spyt))
-                    if choice is None:
-                        await advance_queue(ctx)
-                        return
-                    spyt = spyt[choice-1]
-            url = spyt['url']
-            item.url = url
-            await npmessage.edit(embed=embedq('Match found! Playing...'))
-
-        current_item = item
-
         # Start the player with retrieved URL
         try:
             player = await YTDLSource.from_url(item.url, loop=bot.loop, stream=False)
@@ -312,23 +260,6 @@ class Voice(commands.Cog):
         now_playing = player
         now_playing.weburl = url
         now_playing.user = item.queued_by
-
-        if item.duration is not None:
-            if item.duration == 0:
-                item.duration = duration_from_url(item.url)
-            now_playing.duration = item.duration
-        else:
-            try:
-                now_playing.duration = pytube.YouTube(now_playing.weburl).length
-            except Exception as e:
-                log.info(f'Falling back on yt-dlp. (Cause: {traceback.format_exception(e)[-1]})')
-                try:
-                    now_playing.duration = ytdl.extract_info(now_playing.weburl, download=False)['duration']
-                except Exception as e:
-                    log.info(f'ytdl duration extraction failed, likely a direct file link. (Cause: {traceback.format_exception(e)[-1]})')
-                    log.info(f'Attempting to retrieve URL through FFprobe...')
-                    ffprobe_command = f'ffprobe {url} -v quiet -show_entries format=duration -of csv=p=0'.split(' ')
-                    now_playing.duration = float(subprocess.check_output(ffprobe_command).decode('utf-8').split('.')[0])
 
         now_playing.duration_stamp = timestamp_from_seconds(now_playing.duration)
 
@@ -363,12 +294,12 @@ class Voice(commands.Cog):
 
     async def advance_queue(self, ctx: commands.Context, skip: bool=False):
         """Attempts to advance forward in the queue, if the bot is clear to do so. Set to run whenever the audio player finishes its current item."""
-        if not advance_lock and (skip or not self.voice_client.is_playing()):
+        if not self.advance_lock and (skip or not self.voice_client.is_playing()):
             log.debug('Locking...')
             advance_lock = True
 
             try:
-                if not skip and loop_this and current_item is not None:
+                if not skip and self.media_queue.is_looping and current_item is not None:
                     media_queue.get(ctx).insert(0, current_item)
 
                 if media_queue.get(ctx) == []:

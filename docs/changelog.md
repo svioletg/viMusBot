@@ -19,6 +19,7 @@ Developer
                 - `embedq()` no longer uses `*args`, now has proper keyword arguments — `title` (`str`; main, largest text), `subtext` (`str`; shown below `title` in smaller font), and `color` (`int`)
         - `General` cog moved into `cog_general.py`
         - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback ([#76](https://github.com/svioletg/viMusBot/issues/76)); other changes have been made within this file, such as...
+            - `QueueItem`'s class method `generate_from_list()` renamed to `from_list()`
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
 - `utils/` directory added to contain helper modules
@@ -39,7 +40,6 @@ Developer
             - All arguments have been replaced with a single `src_info` argument, which takes a `TrackInfo` object
         - `search_ytmusic_album()` renamed to `match_ytmusic_album()`
             - Arguments also replaced with `src_info` argument, which takes an `AlbumInfo` object
-        - `search_ytmusic_text()` renamed to `ytmusic_top_results()`
     - `palette.py` moved to this directory
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
