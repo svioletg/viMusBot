@@ -12,6 +12,7 @@ from typing import Callable
 import colorlog
 
 # Local imports
+from cogs.shared import LOG_LEVEL
 import utils.configuration as config
 from utils.palette import Palette
 
@@ -61,13 +62,11 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     log_string_no_color = re.sub(r"%\(reset\)s", '', log_string_no_color)
     log_string_colored = re.sub(r"({c_(.*?)})", r'%(\2log_color)s', log_string_pre)
 
-    print(log_string_no_color)
-    print(log_string_colored)
-
     def get_log_colors(use_color: bool=True):
+        # TODO: Have this use colors set in config.yml
         log_colors = {
-            'DEBUG':    'cyan' if use_color else '',
-            'INFO':     'green'  if use_color else '',
+            'DEBUG':    'green' if use_color else '',
+            'INFO':     ''  if use_color else '',
             'WARNING':  'yellow'  if use_color else '',
             'ERROR':    'red'  if use_color else '',
             'CRITICAL': 'red,bg_white' if use_color else ''
@@ -76,8 +75,8 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     
     def get_secondary_log_colors(use_color: bool=True):
         secondary_log_colors = {
-            'module': {l:'purple' if use_color else '' for l in levels},
-            'func': {l:'blue' if use_color else '' for l in levels},
+            'module': {l:'blue' if use_color else '' for l in levels},
+            'func': {l:'cyan' if use_color else '' for l in levels},
         }
         return secondary_log_colors
 
@@ -89,7 +88,7 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
 
     stdout_handler = colorlog.StreamHandler(stream=stdout)
     stdout_handler.setFormatter(log_format_colored)
-    stdout_handler.setLevel(colorlog.INFO)
+    stdout_handler.setLevel(logging.getLevelName(LOG_LEVEL))
 
     file_handler = logging.FileHandler(filename=logfile, encoding='utf-8', mode='w')
     file_handler.setFormatter(log_format_no_color)
@@ -99,4 +98,5 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     new_logger.addHandler(file_handler)
 
     new_logger.setLevel(colorlog.DEBUG)
+
     return new_logger

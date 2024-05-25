@@ -45,6 +45,9 @@ Developer
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
 
+Fixes
+- Using the `stop` console command will now suppress the resulting `CancelledError`
+
 Other
 - Config changes:
     - Default value of `use-top-match` set to `no`
@@ -52,7 +55,8 @@ Other
     - `force-no-match` renamed to `force-match-prompt` for clarity
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
-        - `console-log-level` has been added
+        - `console-log-level` (boolean) has been added
+        - `log-full-tracebacks` (boolean) has been added
         - `colors`:
             - The color entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:

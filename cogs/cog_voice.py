@@ -73,18 +73,19 @@ class YTDLSource(PCMVolumeTransformer):
         return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data) # type: ignore
 
 class QueueItem:
+    """Items which are to be placed inside of a `MediaQueue`, and nothing else. Holds a `TrackInfo` and the user that queued it."""
     def __init__(self, info: media.TrackInfo, queued_by: User | Member):
         self.info = info
         self.queued_by = queued_by
 
     @classmethod
-    def from_list(cls, playlist: list[media.TrackInfo] | media.PlaylistInfo | media.AlbumInfo, queued_by: Member) -> list:
+    def from_list(cls, playlist: list[media.TrackInfo], queued_by: User | Member) -> list[Self]:
         """Creates a list of individual `QueueItem` instances from a valid playlist or album.
 
         @playlist: Either a URL to a SoundCloud or ytdl-compatible playlist, or a list of Spotify tracks
-        @user: A discord Member object of the user who queued the playlist
+        @queued_by: A discord Member object of the user who queued the playlist
         """
-        pass
+        return [cls(item, queued_by) for item in playlist]
 
 class MediaQueue(list):
     """Manages a media queue, keeping track of what's currently playing, what has previously played, whether looping is on, etc."""
@@ -157,7 +158,7 @@ class Voice(commands.Cog):
             else:
                 if isinstance(item, list):
                     item_index = cast(tuple[int, int], item_index)
-                    await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, starting at #{item_index[0]} and ending at #{item_index[1]}.'))
+                    await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0]} to #{item_index[1]}.'))
                 else:
                     await queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{item_index}'))
         
@@ -188,6 +189,7 @@ class Voice(commands.Cog):
         # We now have only queries of either one text search, or one or more URLs
         async with ctx.typing():
             queue_msg = await ctx.send(embed=embedq('Searching...'))
+            #region play: PLAIN TEXT
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
                 top_songs, top_videos, top_albums = map(media.search_ytmusic_text(text_search).get, ('songs', 'videos', 'albums'))
@@ -199,7 +201,7 @@ class Voice(commands.Cog):
                     if top_videos:
                         await play_or_enqueue(QueueItem(top_videos[0], ctx.author), queue_msg)
                         return
-                    
+
                     await ctx.send(embed=embedq('No close matches could be found.'))
                     return
 
@@ -208,20 +210,24 @@ class Voice(commands.Cog):
                 position: int = 1
                 # TODO: Probably can be condensed
                 if top_songs:
-                    choice_embed.add_field(name='Top song result:', value=EMOJI['num'][position] + f'**{top_songs[0].title}** | *{top_songs[0].artist}*')
+                    choice_embed.add_field(name='Top song result:',
+                        value=EMOJI['num'][position] + f'**{top_songs[0].title}** | *{top_songs[0].artist}*')
                     choice_options[position] = top_songs[0]
                     position += 1
                 if top_videos:
-                    choice_embed.add_field(name='Top video result:', value=EMOJI['num'][position] + f'**{top_videos[0].title}** | *{top_videos[0].artist}*')
+                    choice_embed.add_field(name='Top video result:',
+                        value=EMOJI['num'][position] + f'**{top_videos[0].title}** | *{top_videos[0].artist}*')
                     choice_options[position] = top_videos[0]
                     position += 1
                 if top_albums:
-                    choice_embed.add_field(name='Top album result:', value=EMOJI['num'][position] + f'**{top_albums[0].title}** | *{top_albums[0].artist}*')
+                    choice_embed.add_field(name='Top album result:',
+                        value=EMOJI['num'][position] + f'**{top_albums[0].title}** | *{top_albums[0].artist}*')
                     choice_options[position] = top_albums[0]
                     position += 1
 
                 choice_prompt = await ctx.send(embed=choice_embed)
                 choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_nums=position)
+
                 if isinstance(choice, TimeoutError):
                     await queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
                     return
@@ -230,11 +236,25 @@ class Voice(commands.Cog):
                         'If you\'re seeing this message, this is probably a bug!'))
                     return
 
-                choice = cast(int, choice)
+                choice = choice_options[choice]
 
-                await play_or_enqueue(QueueItem(choice_options[choice], ctx.author), queue_msg)
+                await play_or_enqueue(QueueItem(choice, ctx.author) if not choice.contents else QueueItem.from_list(choice.contents, ctx.author),
+                    queue_msg)
                 return
-    
+            #endregion play: PLAIN TEXT
+            if url_strings:
+                # TODO: Implement! This needs to handle...
+                # [ ] Spotify track links
+                # [ ] Spotify album links
+                # [ ] Spotify playlist links
+                # [ ] SoundCloud track links
+                # [ ] SoundCloud set links
+                # [ ] YouTube video links
+                # [ ] YouTube playlist links
+                # [ ] YouTube Music song links
+                # [ ] YouTube Music album links
+                pass
+
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         # skip_votes = []
 

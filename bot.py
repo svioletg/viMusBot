@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 from platform import python_version
+import traceback
 
 # External imports
 import aioconsole
@@ -14,12 +15,13 @@ import colorama
 import discord
 from discord.ext import commands
 from pretty_help import PrettyHelp
+import yt_dlp
 
 # Local imports
 import update
 from cogs import cog_general, cog_voice
-from cogs.shared import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, PUBLIC,
-                         PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH)
+from cogs.shared import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, EMOJI, LOG_TRACEBACKS, PUBLIC,
+                         PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH, embedq)
 from utils import miscutil
 from utils.palette import Palette
 from version import VERSION
@@ -33,9 +35,11 @@ discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INF
 
 # Setup bot logging
 log = miscutil.create_logger('viMusBot', Path('vimusbot.log'))
+
 log.info('Logging for bot.py is now active.')
 
 log.info('Python version: %s', python_version())
+log.info('viMusBot version: %s', VERSION)
 
 # Check for updates
 # if __name__ == '__main__':
@@ -63,11 +67,8 @@ skip_votes = [] # TODO: Typing; What does this list contain?
 
 # Clear out downloaded files
 log.info('Removing previously downloaded media files...')
-files = glob.glob('*.*')
-to_remove = [f for f in files if Path(f).suffix in CLEANUP_EXTENSIONS]
-for t in to_remove:
+for t in [f for f in glob.glob('*.*') if Path(f).suffix in CLEANUP_EXTENSIONS]:
     os.remove(t)
-del files, to_remove
 
 # Start bot-related events
 # class Music(commands.Cog):
@@ -661,34 +662,28 @@ bot = commands.Bot(
     help_command = PrettyHelp(False, color=discord.Color(EMBED_COLOR))
 )
 
-# Command error handling
-# @bot.event
-# async def on_command_error(ctx: commands.Context, error):
-#     if isinstance(error, commands.errors.MissingRequiredArgument):
-#         match ctx.command.name:
-#             case 'volume':
-#                 await ctx.send(embed=embedq('An integer between 0 and 100 must be given for volume.'))
-#             case 'analyze':
-#                 await ctx.send(embed=embedq('A spotify track URL is required.'))
-#     elif isinstance(error, commands.CheckFailure):
-#         await ctx.send(embed=embedq('This command is disabled for this instance.', 'If you run this bot, check your `config.yml`.'))
-#     elif isinstance(error, commands.CommandNotFound):
-#         # Just ignore these
-#         pass
-#     elif isinstance(error, yt_dlp.utils.DownloadError):
-#         await ctx.send(embed=embedq('Could not queue; this video may be private or otherwise unavailable.', error))
-#     else:
-#         log.info(f'Error encountered in command `{ctx.command}`.')
-#         log.info(error)
-#         trace = traceback.format_exception(error)
-#         await ctx.send(embed=embedq(error, 'If this issue persists, please check https://github.com/svioletg/viMusBot/issues and submit a new issue if your problem is not listed.'))
-#         # A second traceback is created from this command itself, usually not useful
-#         log.info(f'Full traceback below.\n\n{plt.error}'+''.join(trace[:trace.index('\nThe above exception was the direct cause of the following exception:\n\n')]))
+@bot.event
+async def on_command_error(ctx: commands.Context, error: BaseException):
+    """Handles any exceptions raised by any commands or modules."""
+    match error:
+        case commands.CheckFailure():
+            await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
+                'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
+        case commands.CommandNotFound():
+            pass # Ignore
+        case yt_dlp.utils.DownloadError():
+            await ctx.send(embed=embedq(EMOJI['cancel'] + 'Unable to retrieve video.',
+                'It may be private, or otherwise unavailable.'))
+        case _:
+            # If anything unexpected occurs, log it
+            log.error(error)
+            if LOG_TRACEBACKS:
+                log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
 
 @bot.event
 async def on_ready():
     log.info('Logged in as %s (ID: %s)', bot.user, bot.user.id)
-    log.info('=' * 10)
+    log.info('=' * 20)
     log.info('Ready!')
 
 # Retrieve bot token
@@ -840,6 +835,8 @@ else:
 
 # Begin main thread
 
+asyncio_tasks: dict[str, asyncio.Task] = {}
+
 async def console_thread():
     log.info('Console is active.')
     while True:
@@ -932,12 +929,21 @@ async def console_thread():
                         plt.preview()
                         print()
                     case 'stop':
-                        log.info('Leaving voice if connected...')
+                        log.info('Stopping the bot...')
+                        log.debug('Leaving voice if connected...')
                         # await voice.disconnect()
-                        log.info('Cancelling bot task...')
-                        bot_task.cancel()
-                        log.info('Cancelling console task...')
-                        console_task.cancel()
+                        log.debug('Cancelling bot task...')
+                        asyncio_tasks['bot'].cancel()
+                        try:
+                            await asyncio_tasks['bot']
+                        except asyncio.exceptions.CancelledError:
+                            pass
+                        log.debug('Cancelling console task...')
+                        asyncio_tasks['console'].cancel()
+                        try:
+                            await asyncio_tasks['console']
+                        except asyncio.exceptions.CancelledError:
+                            pass
                     case _:
                         log.info('Unrecognized command "%s"', user_input)
         except Exception as e:
@@ -956,11 +962,12 @@ async def bot_thread():
         await bot.start(token)
 
 async def main():
-    global bot_task, console_task
-
-    bot_task = asyncio.create_task(bot_thread())
-    console_task = asyncio.create_task(console_thread())
-    await asyncio.gather(bot_task, console_task)
+    asyncio_tasks['bot'] = asyncio.create_task(bot_thread())
+    asyncio_tasks['console'] = asyncio.create_task(console_thread())
+    try:
+        await asyncio.gather(asyncio_tasks['bot'], asyncio_tasks['console'])
+    except asyncio.exceptions.CancelledError:
+        pass
 
 if __name__ == '__main__':
     asyncio.run(main())

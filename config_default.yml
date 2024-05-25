@@ -116,6 +116,10 @@ logging-options:
     # others will not show up in the console but are still logged to vimusbot.log 
     # For more about this and what each level represents, see: https://github.com/svioletg/viMusBot/blob/dev/README.md#reading-logs
     console-log-level: "INFO"
+    # Whether to print out full error tracebacks to the console
+    # Tracebacks are always saved to the log file for debugging usage,
+    # but they can take up lots of space in the console, so you can hide them if you wish.
+    log-full-tracebacks: no
     # Choose your preferred log colors (these are only used in console output, log files will have no color codes)
     colors:
         # Run "palette.py" to see a list of choices

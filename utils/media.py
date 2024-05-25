@@ -75,6 +75,10 @@ class MediaInfo:
         self.info: Any = info
         self.yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = yt_info_origin
 
+        self.is_track: bool = False
+        self.is_album: bool = False
+        self.is_playlist: bool = False
+
         self.url: str = ''
         self.title: str = ''
         self.artist: str = ''
@@ -155,10 +159,11 @@ class MediaInfo:
     @classmethod
     def from_ytmusic(cls, info: dict | str) -> Self:
         """Shorthand for getting a MediaInfo object from a `ytmusicapi` source.
-        @info: URL string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
+        @info: URL or plain search query string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
         """
         if isinstance(info, str):
-            info = ytmusic.search(info, filter='songs')[0]
+            results = ytmusic.search(info, filter='songs') or ytmusic.search(info, filter='videos')
+            info = results[0]
         return cls(YOUTUBE, info, yt_info_origin='ytmusic')
     
     @classmethod
@@ -194,6 +199,7 @@ class TrackInfo(MediaInfo):
             - `dict` from `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         MediaInfo.__init__(self, source, info, yt_info_origin)
+        self.contents = [] # Provides a concise way to check if an object is a track or group
         self.isrc: str = '' # ISRC can help for more accurate YouTube searching
 
         if source == SPOTIFY:
@@ -568,7 +574,7 @@ def analyze_spotify_track(url: str) -> tuple:
 
 class YTMusicResults(TypedDict):
     """Contains correctly typed results for `search_ytmusic()`"""
-    songs: Optional[list[TrackInfo]]
+    songs:  Optional[list[TrackInfo]]
     videos: Optional[list[TrackInfo]]
     albums: Optional[list[AlbumInfo]]
 

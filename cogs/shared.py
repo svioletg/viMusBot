@@ -1,8 +1,8 @@
 # Standard imports
+import asyncio
 import logging
 import time
-from asyncio import TimeoutError
-from typing import Any, Iterable, Optional
+from typing import Optional
 
 # External imports
 from discord import Embed, Member, Message, Reaction
@@ -21,6 +21,8 @@ EMBED_COLOR        : int       = int(config.get('embed-color'), 16)
 INACTIVITY_TIMEOUT : int       = config.get('inactivity-timeout')
 CLEANUP_EXTENSIONS : list[str] = config.get('auto-remove')
 DISABLED_COMMANDS  : list[str] = config.get('command-blacklist')
+LOG_LEVEL          : str       = config.get('logging-options.console-log-level')
+LOG_TRACEBACKS     : bool      = config.get('logging-options.log-full-tracebacks')
 
 SHOW_USERS_IN_QUEUE      : bool = config.get('show-users-in-queue')
 ALLOW_SPOTIFY_PLAYLISTS  : bool = config.get('allow-spotify-playlists')
@@ -63,7 +65,7 @@ def timestamp_from_seconds(seconds: int|float) -> str:
     return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
 
 async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
-    prompt_msg: Message, choice_nums: int, timeout_seconds: int=30, delete_after: bool=True) -> int | TimeoutError | ValueError:
+    prompt_msg: Message, choice_nums: int, timeout_seconds: int=30, delete_after: bool=True) -> int | asyncio.TimeoutError | ValueError:
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
     Returns the chosen number if a valid selection was made, otherwise a `TimeoutError` if a timeout occurred,\
@@ -73,7 +75,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
     @choice_nums: How many choices to give. Will always start at 1 and end at `cohice_nums`. Maximum of 10,\
         as that is the highest number an individual emoji can represent.
     @timeout_seconds: (`30`) How long to wait before automatically cancelling the prompt, in seconds.
-    @delete_message: (`True`) Whether to delete the choice prompt after either a timeout has occurred,\
+    @delete_after: (`True`) Whether to delete the choice prompt after either a timeout has occurred,\
         the selection was cancelled, or a valid selection was made.
     """
     # Get reaction menu ready
@@ -96,7 +98,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
 
     try:
         reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check)
-    except TimeoutError as e:
+    except asyncio.TimeoutError as e:
         log.debug('Choice prompt timeout reached.')
         if delete_after:
             await prompt_msg.delete()

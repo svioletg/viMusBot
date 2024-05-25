@@ -7,6 +7,7 @@ import logging
 from discord.ext import commands
 
 # Local imports
+from utils import media
 from cogs.shared import command_aliases, is_command_enabled, embedq
 from version import VERSION
 
