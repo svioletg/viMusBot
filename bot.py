@@ -46,7 +46,7 @@ with open('config_default.yml','r') as f:
     config_default = benedict(yaml.safe_load(f))
 
 with open('config.yml','r') as f:
-    config = benedict(yaml.safe_load(f))
+    config = benedict(yaml.safe_load(f) or {})
 
 print('Importing local packages...')
 
