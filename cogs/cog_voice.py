@@ -7,22 +7,21 @@ import glob
 import logging
 from math import ceil
 import os
+import re
 import time
-from types import SimpleNamespace
 from typing import Optional, Self, cast
 
 # External imports
-from discord import (Embed, FFmpegPCMAudio, Member, Message, NotFound,
-                     PCMVolumeTransformer, User, VoiceClient, VoiceState)
+from discord import Embed, FFmpegPCMAudio, Member, Message, NotFound, PCMVolumeTransformer, User, VoiceClient, VoiceState
 from discord.ext import commands
+import requests
 from yt_dlp import YoutubeDL
 import yt_dlp
 
 # Local imports
-from cogs.common import (EMBED_COLOR, EMOJI, INACTIVITY_TIMEOUT_MINS,
-                         MAXIMUM_CONSECUTIVE_URLS, SHOW_USERS_IN_QUEUE, USE_TOP_MATCH,
-                         command_aliases, embedq, is_command_enabled,
-                         prompt_for_choice, timestamp_from_seconds)
+from cogs.common import EMOJI, command_aliases, embedq, is_command_enabled, prompt_for_choice
+from utils.configuration import EMBED_COLOR, INACTIVITY_TIMEOUT_MINS, MAXIMUM_CONSECUTIVE_URLS, SHOW_USERS_IN_QUEUE, SPOTIFY_PLAYLIST_LIMIT, USE_TOP_MATCH
+from utils.miscutil import timestamp_from_seconds
 from utils import media
 
 log = logging.getLogger('viMusBot')
@@ -232,9 +231,11 @@ class Voice(commands.Cog):
         @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
         """
         log.info('Running "play" command...')
+        log.debug('Args: queries=%s', repr(queries))
 
         async def play_or_enqueue(item: QueueItem | list[QueueItem], queue_msg: Message):
-            """Adds the given `QueueItem` to the media queue. If the queue is empty, the item will attempt to play immediately. Otherwise, the item is appended to the queue.
+            """Adds the given `QueueItem` to the media queue. If the queue is empty, the item will attempt to play immediately.
+            Otherwise, the item is appended to the queue.
 
             @item: Either a single `QueueItem` or a list of `QueueItem`s to queue up.
             """
@@ -249,7 +250,7 @@ class Voice(commands.Cog):
                     await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
                 else:
                     await queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{cast(int, item_index) + 1}'))
-        
+
         # Using -play alone with no args should resume the bot if we're paused
         if not queries:
             if self.voice_client.is_paused():
@@ -339,11 +340,43 @@ class Voice(commands.Cog):
                     queue_msg)
                 return
             #endregion play: PLAIN TEXT
+
             #region play: FROM URL
             if url_strings:
                 if len(url_strings) > MAXIMUM_CONSECUTIVE_URLS:
+                    log.debug('Cancelling play command: too many consecutive URLs.')
                     await ctx.send(embed=embedq(f'Too many URLs provided. (Max: {MAXIMUM_CONSECUTIVE_URLS})'))
                     return
+
+                # Does Spotify even use spotify.link URLs anymore? I can barely test this because I can't seem to get one now
+                url_strings = [requests.get(u, timeout=1).url if u.startswith('https://spotify.link') else u for u in url_strings]
+
+                if len(url_strings) > 1 and any(re.findall(r"(playlist|album|sets)", link) for link in url_strings):
+                    log.debug('Cancelling play command: album/playlist URL present in a set of URLs.')
+                    await ctx.send(embed=embedq('Albums or playlists must be queued on their own.',
+                        'Multi-URL queueing is allowed only for single tracks.'))
+                    return
+
+                # [ ] Handle playlists, albums
+                if re.findall(r"(playlist|album|sets)", url_strings[0]):
+                    log.debug('URL looks like a playlist or an album.')
+                    # Because of the previous checks we know this has to only be one URL, no need to keep the list
+                    url = url_strings[0]
+                    if url.startswith('https://open.spotify.com/'):
+                        if '/album/' in url:
+                            await queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                            yt_album = media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url))
+                            if not yt_album:
+                                await ctx.send(embed=embedq('Couldn\'t find any close matches for this album.'))
+                        if '/playlist/' in url:
+                            playlist = media.PlaylistInfo.from_spotify_url(url)
+                            if len(playlist.contents) > SPOTIFY_PLAYLIST_LIMIT:
+                                await queue_msg.edit(embed=embedq('Too long of a playlist!',
+                                    f'Current limit is set to {SPOTIFY_PLAYLIST_LIMIT}'))
+                                return
+                            await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), queue_msg)
+                            return
+
                 # TODO: Implement! This needs to handle...
                 # [ ] Spotify track links
                 # [ ] Spotify album links
@@ -356,11 +389,9 @@ class Voice(commands.Cog):
                 # [ ] YouTube Music album links
                 pass
             #endregion FROM URL
-    
+
     @join.before_invoke
     @play.before_invoke
-    @pause.before_invoke
-    @stop.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
         """Joins the author's voice channel if no voice client is active."""
         if (not self.voice_client) and ctx.author.voice: # type: ignore

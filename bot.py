@@ -20,10 +20,11 @@ import yt_dlp
 # Local imports
 import update
 from cogs import cog_general, cog_voice
-from cogs.common import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, EMOJI, LOG_TRACEBACKS, PUBLIC,
-                         PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH, embedq)
+from utils.configuration import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, LOG_TRACEBACKS,
+                                 PUBLIC, PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH)
 from utils import miscutil
 from utils.palette import Palette
+from cogs.common import EMOJI, embedq
 from version import VERSION
 
 colorama.init(autoreset=True)

@@ -12,8 +12,7 @@ from typing import Callable
 import colorlog
 
 # Local imports
-from cogs.common import LOG_LEVEL
-import utils.configuration as config
+from utils.configuration import LOG_LEVEL, LOG_COLORS, DISABLE_LOG_COLORS
 from utils.palette import Palette
 
 plt = Palette()
@@ -37,6 +36,11 @@ class Stopwatch:
         print(f'[WATCH <{self.name}>{('/'+label) if label else ''}]: LAP ... {self.lap_end - self.lap_start}')
         self.lap_start = time.perf_counter()
 
+def timestamp_from_seconds(seconds: int | float) -> str:
+    """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
+    # Omit the hour place if not >=60 minutes
+    return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
+
 def time_func(func: Callable, printout: bool=True) -> float:
     """Times the execution of a callable, prints out the result if allowed, and returns the result of the called function
     
@@ -52,7 +56,7 @@ def time_func(func: Callable, printout: bool=True) -> float:
 def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output"""
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
-    use_color: bool = not config.get('logging-options.colors.no-color')
+    use_color: bool = not DISABLE_LOG_COLORS
     new_logger = colorlog.getLogger(logger_name)
     date_format = '%y-%m-%d %H:%M:%S'
     log_string_pre = '[%(asctime)s] [{c_module_}%(module)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\

@@ -42,3 +42,33 @@ def get_default(key: str) -> Any:
 def get_full(config_type: Literal['user', 'default']) -> benedict:
     """Returns the full config benedict object."""
     return CONFIG_DICT if config_type == 'user' else CONFIG_DEFAULT_DICT
+
+# Bot
+PUBLIC                  : bool                 = get('public')
+TOKEN_FILE_PATH         : str                  = get('token-file')
+PUBLIC_PREFIX           : str                  = get('prefixes.public')
+DEV_PREFIX              : str                  = get('prefixes.developer')
+EMBED_COLOR             : int                  = int(get('embed-color'), 16)
+INACTIVITY_TIMEOUT_MINS : int                  = get('inactivity-timeout')
+CLEANUP_EXTENSIONS      : list[str]            = get('auto-remove')
+DISABLED_COMMANDS       : list[str]            = get('command-blacklist')
+COMMAND_ALIASES         : dict[str, list[str]] = get('aliases')
+LOG_LEVEL               : str                  = get('logging-options.console-log-level')
+LOG_COLORS              : dict[str, str]       = get('logging-options.colors')
+DISABLE_LOG_COLORS      : dict[str, str]       = get('logging-options.colors.no-color')
+LOG_TRACEBACKS          : bool                 = get('logging-options.log-full-tracebacks')
+
+SHOW_USERS_IN_QUEUE      : bool = get('show-users-in-queue')
+ALLOW_SPOTIFY_PLAYLISTS  : bool = get('allow-spotify-playlists')
+SPOTIFY_PLAYLIST_LIMIT   : int  = get('spotify-playlist-limit')
+FORCE_MATCH_PROMPT       : bool = get('force-match-prompt')
+USE_TOP_MATCH            : bool = get('use-top-match')
+USE_URL_CACHE            : bool = get('use-url-cache')
+DURATION_LIMIT_SECONDS   : int  = get('duration-limit')
+MAXIMUM_CONSECUTIVE_URLS : int  = get('maximum-urls')
+MAXIMUM_HISTORY_LENGTH   : int  = get('play-history-max')
+
+VOTE_TO_SKIP          : bool = get('vote-to-skip.enabled')
+SKIP_VOTES_TYPE       : str  = get('vote-to-skip.threshold-type')
+SKIP_VOTES_EXACT      : int  = get('vote-to-skip.threshold-exact')
+SKIP_VOTES_PERCENTAGE : int  = get('vote-to-skip.threshold-percentage')
