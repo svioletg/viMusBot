@@ -1,1 +1,1 @@
-py spotifysetup.py
+py -3 spotifysetup.py
