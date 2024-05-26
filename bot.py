@@ -666,7 +666,7 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
         case commands.CommandInvokeError():
             if 'ffmpeg was not found' in repr(error):
                 log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
-                await ctx.send(embed=embedq('Can\'t play audio. Please check the bot\'s logs.'))
+                await ctx.send(embed=embedq(EMOJI['cancel'] + 'Can\'t play audio. Please check the bot\'s logs.'))
             else:
                 log.error(error)
                 if LOG_TRACEBACKS:

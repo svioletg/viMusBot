@@ -28,7 +28,7 @@ def is_command_enabled(ctx: commands.Context) -> bool:
 
 def command_aliases(command: str) -> list[str]:
     """Returns a list of aliases for the given command."""
-    return COMMAND_ALIASES[command] or []
+    return COMMAND_ALIASES.get(command) or []
 
 def embedq(title: str, subtext: Optional[str]=None, color: int=EMBED_COLOR) -> Embed:
     """Shortcut for making embeds for messages."""

@@ -37,7 +37,8 @@ Developer
             - This class largely just acts as a category for three sub-classes: `TrackInfo`, `AlbumInfo`, and `PlaylistInfo`
         - `pytube_track_data()` and `trim_track_data()` removed, made unnecessary by the addition of `MediaInfo`
         - `MediaError` class extending from `Exception` added as a container for media-specific errors; it contains the following sub-classes:
-            - `FormatError` - an exception used for incorrect or unexpected `MediaInfo` formatting
+            - `MediaFormattingError` - an exception used for incorrect or unexpected `MediaInfo` formatting
+            - `LocalFileError` - raised when attempting to instance `TrackInfo` with a local / user-uploaded file on a service like Spotify
         - `search_ytmusic()` renamed to `match_ytmusic_track()`
             - All arguments have been replaced with a single `src_info` argument, which takes a `TrackInfo` object
         - `search_ytmusic_album()` renamed to `match_ytmusic_album()`

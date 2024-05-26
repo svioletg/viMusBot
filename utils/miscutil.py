@@ -38,8 +38,8 @@ class Stopwatch:
 
 def timestamp_from_seconds(seconds: int | float) -> str:
     """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""
-    # Omit the hour place if not >=60 minutes
-    return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds))
+    # Omit the hour place if less than an hour
+    return time.strftime('%M:%S' if seconds < 3600 else '%H:%M:%S', time.gmtime(seconds)).lstrip('0')
 
 def time_func(func: Callable, printout: bool=True) -> float:
     """Times the execution of a callable, prints out the result if allowed, and returns the result of the called function

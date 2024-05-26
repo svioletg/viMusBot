@@ -50,8 +50,11 @@ GENERIC    = MediaSource('generic') # Anything yt_dlp labels as generic
 
 class MediaError(Exception):
     """Base class for media-related exceptions."""
-    class FormatError(Exception):
-        """Used for incorrect or unexpected MediaInfo formatting."""
+
+class MediaFormattingError(MediaError):
+    """Raised for incorrect or unexpected MediaInfo formatting."""
+class LocalFileError(MediaError):
+    """Raised when trying to create a `TrackInfo` object out of a local file, typically as a result of looking through a playlist."""
 
 class MediaInfo:
     """Base class for gathering standardized data from different media sources.
@@ -202,7 +205,7 @@ class TrackInfo(MediaInfo):
         self.isrc: str = '' # ISRC can help for more accurate YouTube searching
 
         if source == SPOTIFY:
-            if 'is_local' in self.info:
+            if self.info['is_local']:
                 raise MediaError('Can\'t create TrackInfo from a local Spotify track.')
             self.length_seconds = int(self.info['duration_ms'] // 1000)
             if 'album' in self.info:
@@ -303,23 +306,24 @@ def track_list_duration(track_list: list[TrackInfo]) -> int:
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]: # type: ignore
     """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
     # TODO: This can take a while, maybe find a way to report status back to bot.py?
-    track_list: list[Any] = []
     object_list: list[TrackInfo] = []
+    log.debug('Looking for MediaInfo group contents...')
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
-        log.debug('Looking for MediaInfo group contents...')
         for n, track in enumerate(track_list):
             log.debug('Getting track %s out of %s...', n + 1, len(track_list))
-            bot_status_callback(f'Looking for tracks... ({n + 1} of {len(track_list)})')
-            if isinstance(group_object, AlbumInfo):
-                object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
-                object_list[-1].thumbnail  = group_object.thumbnail
-                object_list[-1].album_name   = group_object.album_name
-                object_list[-1].release_year = group_object.release_year
+            try:
+                if isinstance(group_object, AlbumInfo):
+                    object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
+                    object_list[-1].thumbnail  = group_object.thumbnail
+                    object_list[-1].album_name   = group_object.album_name
+                    object_list[-1].release_year = group_object.release_year
 
-            elif isinstance(group_object, PlaylistInfo):
-                if 'is_loca' not in track:
+                elif isinstance(group_object, PlaylistInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track['track'])))
+            except LocalFileError:
+                log.debug('Skipping local file: %s', track)
+                continue
         return object_list
 
     if group_object.source == SOUNDCLOUD:
@@ -619,7 +623,7 @@ def match_ytmusic_album(src_info: AlbumInfo, threshold: int=75) -> tuple[AlbumIn
 
     log.info('Finding a YTMusic album match...')
 
-    album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')]
+    album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')[:5]]
 
     for result in album_results:
         if (confidence := compare_media(src_info, result)[0]) >= threshold:

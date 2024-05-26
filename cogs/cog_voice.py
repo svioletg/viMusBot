@@ -91,7 +91,7 @@ class QueueItem:
         """
         return [cls(item, queued_by) for item in playlist]
 
-class MediaQueue(list):
+class MediaQueue(list[QueueItem]):
     """Manages a media queue, keeping track of what's currently playing, what has previously played, whether looping is on, etc."""
     def __init__(self):
         self.is_looping: bool = False
@@ -107,7 +107,7 @@ class MediaQueue(list):
         super().append(item)
 
     def extend(self, item: list[QueueItem]):
-        if not isinstance(item, QueueItem):
+        if any(not isinstance(i, QueueItem) for i in item):
             raise ValueError('Attempt to append a non-QueueItem to a MediaQueue.')
         super().extend(item)
 
@@ -118,7 +118,8 @@ class MediaQueue(list):
             self.extend(to_queue)
             end: int = len(self)
             return start, end
-        else:
+
+        if isinstance(to_queue, QueueItem):
             self.append(to_queue)
             return start
 
@@ -144,7 +145,7 @@ class Voice(commands.Cog):
     @commands.check(is_command_enabled)
     async def join(self, ctx: commands.Context):
         """Joins the same voice channel the command user is connected to."""
-        pass # Will automatically trigger ensure_voice(), nothing else needed
+        await ctx.send(embed=embedq(f'Joining voice channel: {cast(Member, ctx.author).voice.channel.name}'))
 
     @commands.command(aliases=command_aliases('leave'))
     @commands.check(is_command_enabled)
@@ -155,6 +156,7 @@ class Voice(commands.Cog):
             self.media_queue.clear()
             log.info('Leaving voice channel: %s', self.voice_client.channel.name)
             await self.voice_client.disconnect()
+            self.voice_client = None
         else:
             log.debug('No channel to leave.')
     
@@ -185,7 +187,7 @@ class Voice(commands.Cog):
             end = len(self.media_queue)
 
         for num, item in enumerate(self.media_queue[start:end]):
-            submitter_text = self.get_queued_by_text(item.queued_by)
+            submitter_text = self.get_queued_by_text(item.queued_by) # type: ignore
             length_text = f'[{timestamp_from_seconds(item.info.length_seconds)}]' if timestamp_from_seconds(item.info.length_seconds) != '00:00' else ''
             embed.add_field(name=f'#{num + 1 + start}. {item.info.title} {length_text}', value=f'Link: {item.info.url}{submitter_text}', inline=False)
 
@@ -219,6 +221,7 @@ class Voice(commands.Cog):
     @commands.command(aliases=command_aliases('stop'))
     @commands.check(is_command_enabled)
     async def stop(self, ctx: commands.Context):
+        """Stops audio and clears the remaining queue."""
         log.info('Stopping audio and clearing the queue...')
         self.voice_client.stop()
         self.media_queue.clear()
@@ -240,15 +243,18 @@ class Voice(commands.Cog):
             @item: Either a single `QueueItem` or a list of `QueueItem`s to queue up.
             """
             log.info('Adding to queue...')
+            queue_was_empty = self.media_queue == []
             item_index = self.media_queue.queue(item)
-            if (not self.voice_client.is_playing()) and (len(self.media_queue) == 1):
+
+            if isinstance(item, list):
+                item_index = cast(tuple[int, int], item_index)
+                await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
+
+            if (not self.voice_client.is_playing()) and (queue_was_empty):
                 log.info('Voice client is not playing and the queue is empty, going to try playing...')
                 await self.advance_queue(ctx)
             else:
-                if isinstance(item, list):
-                    item_index = cast(tuple[int, int], item_index)
-                    await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
-                else:
+                if isinstance(item, QueueItem):
                     await queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{cast(int, item_index) + 1}'))
 
         # Using -play alone with no args should resume the bot if we're paused
@@ -332,6 +338,7 @@ class Voice(commands.Cog):
                         'If you\'re seeing this message, this is probably a bug!'))
                     return
                 if choice == 0:
+                    await queue_msg.delete()
                     return
 
                 choice = choice_options[choice]
@@ -362,41 +369,58 @@ class Voice(commands.Cog):
                     log.debug('URL looks like a playlist or an album.')
                     # Because of the previous checks we know this has to only be one URL, no need to keep the list
                     url = url_strings[0]
-                    if url.startswith('https://open.spotify.com/'):
-                        if '/album/' in url:
-                            await queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
-                            yt_album = media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url))
-                            if not yt_album:
-                                await ctx.send(embed=embedq('Couldn\'t find any close matches for this album.'))
-                        if '/playlist/' in url:
-                            playlist = media.PlaylistInfo.from_spotify_url(url)
-                            if len(playlist.contents) > SPOTIFY_PLAYLIST_LIMIT:
-                                await queue_msg.edit(embed=embedq('Too long of a playlist!',
-                                    f'Current limit is set to {SPOTIFY_PLAYLIST_LIMIT}'))
+                    # Spotify playlists, albums
+                    if url.startswith('https://open.spotify.com/album/'):
+                        await queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                        if match_result := media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url), threshold=50):
+                            yt_album = match_result[0]
+                            await queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
+                                .add_field(name=yt_album.album_name, value=yt_album.artist)\
+                                .set_image(url=yt_album.thumbnail))
+
+                            confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=queue_msg, yesno=True, delete_after=False)
+
+                            if isinstance(confirmation, TimeoutError):
+                                await queue_msg.edit(embed=embedq('Confirmation timed out.', 'Nothing will be queued.'))
                                 return
-                            await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), queue_msg)
+                            if confirmation == 1:
+                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author), queue_msg)
+                                return
+                            if confirmation == 0:
+                                await queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
+                                return
+                        else:
+                            await queue_msg.edit(embed=embedq('Couldn\'t find any close matches for this album.',
+                                'Try using a source other than Spotify, if possible.'))
                             return
+
+                    if url.startswith('https://open.spotify.com/playlist/'):
+                        playlist = media.PlaylistInfo.from_spotify_url(url)
+                        if len(playlist.contents) > SPOTIFY_PLAYLIST_LIMIT:
+                            await queue_msg.edit(embed=embedq('Too long of a playlist!',
+                                f'Current limit is set to {SPOTIFY_PLAYLIST_LIMIT}'))
+                            return
+                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), queue_msg)
+                        return
 
                 # TODO: Implement! This needs to handle...
                 # [ ] Spotify track links
-                # [ ] Spotify album links
-                # [ ] Spotify playlist links
                 # [ ] SoundCloud track links
                 # [ ] SoundCloud set links
                 # [ ] YouTube video links
                 # [ ] YouTube playlist links
                 # [ ] YouTube Music song links
                 # [ ] YouTube Music album links
-                pass
             #endregion FROM URL
 
     @join.before_invoke
     @play.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
         """Joins the author's voice channel if no voice client is active."""
-        if (not self.voice_client) and ctx.author.voice: # type: ignore
-            log.info('Joining voice channel: %s', ctx.author.voice.channel.name) # type: ignore
-            self.voice_client = await ctx.author.voice.channel.connect() # type: ignore
+        author = cast(Member, ctx.author)
+        if (not self.voice_client) and author.voice:
+            log.info('Joining voice channel: %s', author.voice.channel.name)
+            self.voice_client = await author.voice.channel.connect()
 
     #endregion COMMANDS
 
@@ -409,7 +433,7 @@ class Voice(commands.Cog):
                 await self.now_playing_msg.delete()
         except NotFound:
             log.debug('(First) Now-playing message wasn\'t found, ignoring and continuing...')
-        
+
         log.info('Trying to start playing...')
 
         # Start the player with retrieved URL
@@ -461,7 +485,6 @@ class Voice(commands.Cog):
             log.debug('Locking...')
             self.advance_lock = True
             try:
-                print(self.media_queue)
                 if not self.media_queue:
                     self.voice_client.stop()
                 else:
