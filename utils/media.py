@@ -20,6 +20,7 @@ from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 
 # Local imports
+from cogs.common import timestamp_from_seconds
 import utils.configuration as config
 from utils.miscutil import Stopwatch
 from utils.palette import Palette
@@ -86,6 +87,7 @@ class MediaInfo:
         self.thumbnail: str = ''
         self.album_name: str = ''
         self.release_year: str = ''
+        self.contents: list = []
 
         if source == SPOTIFY:
             self.url            = cast(str, info['external_urls']['spotify'])
@@ -175,6 +177,10 @@ class MediaInfo:
             info = ytdl.extract_info(info, download=False) # type: ignore
         return cls(YOUTUBE, info, yt_info_origin='ytdl')
 
+    def length_hms(self) -> str:
+        """Returns the `length_seconds` attribute in a humanized format."""
+        return timestamp_from_seconds(self.length_seconds)
+
     def check_missing(self):
         """For debugging. Looks for and logs any attributes that may be "empty", in the sense that bool(attribute) would return False.
         Some attributes are safe to leave empty, but this can helpful to diagnose some problems.
@@ -199,7 +205,6 @@ class TrackInfo(MediaInfo):
             - `dict` from `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         MediaInfo.__init__(self, source, info, yt_info_origin)
-        self.contents = [] # Provides a concise way to check if an object is a track or group
         self.isrc: str = '' # ISRC can help for more accurate YouTube searching
 
         if source == SPOTIFY:

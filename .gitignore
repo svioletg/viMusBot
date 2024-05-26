@@ -46,3 +46,5 @@ venv/
 versioningconvention.txt
 new-release.bat
 .markdownlint.json
+ffmpeg.exe
+ffprobe.exe

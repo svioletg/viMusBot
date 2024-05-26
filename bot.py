@@ -20,7 +20,7 @@ import yt_dlp
 # Local imports
 import update
 from cogs import cog_general, cog_voice
-from cogs.shared import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, EMOJI, LOG_TRACEBACKS, PUBLIC,
+from cogs.common import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, EMOJI, LOG_TRACEBACKS, PUBLIC,
                          PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH, embedq)
 from utils import miscutil
 from utils.palette import Palette
@@ -553,10 +553,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in CLEANUP_EXTENSIONS]:
 
 # url_info_cache = {}
 
-def get_queued_by_text(user_object: discord.Member) -> str:
-    username = user_object.nick if user_object.nick else user_object.name
-    return f'\nQueued by {username}' if SHOW_USERS_IN_QUEUE else ''
-
 # def cache_if_succeeded(key: str):
 #     """
 #     Stores result into cache dictionary if retrieval succeeded, or returns result if one already exists
@@ -666,6 +662,14 @@ bot = commands.Bot(
 async def on_command_error(ctx: commands.Context, error: BaseException):
     """Handles any exceptions raised by any commands or modules."""
     match error:
+        case commands.CommandInvokeError():
+            if 'ffmpeg was not found' in repr(error):
+                log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
+                await ctx.send(embed=embedq('Can\'t play audio. Please check the bot\'s logs.'))
+            else:
+                log.error(error)
+                if LOG_TRACEBACKS:
+                    log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
         case commands.CheckFailure():
             await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
                 'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
@@ -687,7 +691,7 @@ async def on_ready():
     log.info('Ready!')
 
 # Retrieve bot token
-log.info('Retrieving token from %s', TOKEN_FILE_PATH)
+log.info('Using token from "%s"...', TOKEN_FILE_PATH)
 
 if not PUBLIC:
     log.warning('Starting in dev mode.')
@@ -956,8 +960,10 @@ async def bot_thread():
     cog_general.log = log
     cog_voice.log = log
     async with bot:
+        log.debug('Adding cog: General')
         await bot.add_cog(cog_general.General(bot))
-        # await bot.add_cog(cog_voice.Voice(bot))
+        log.debug('Adding cog: Voice')
+        await bot.add_cog(cog_voice.Voice(bot))
         log.info('Logging in with token...')
         await bot.start(token)
 

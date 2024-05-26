@@ -12,7 +12,7 @@ from typing import Callable
 import colorlog
 
 # Local imports
-from cogs.shared import LOG_LEVEL
+from cogs.common import LOG_LEVEL
 import utils.configuration as config
 from utils.palette import Palette
 
@@ -55,7 +55,7 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     use_color: bool = not config.get('logging-options.colors.no-color')
     new_logger = colorlog.getLogger(logger_name)
     date_format = '%y-%m-%d %H:%M:%S'
-    log_string_pre = '[%(asctime)s] [{c_module_}%(filename)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\
+    log_string_pre = '[%(asctime)s] [{c_module_}%(module)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\
         ' in {c_func_}%(funcName)s%(reset)s: {c_}%(message)s'
     
     log_string_no_color = re.sub(r"({c_(.*?)})", '', log_string_pre)
@@ -75,7 +75,7 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     
     def get_secondary_log_colors(use_color: bool=True):
         secondary_log_colors = {
-            'module': {l:'blue' if use_color else '' for l in levels},
+            'module': {l:'cyan' if use_color else '' for l in levels},
             'func': {l:'cyan' if use_color else '' for l in levels},
         }
         return secondary_log_colors

@@ -15,11 +15,12 @@ Developer
     - `console()` renamed to `console_thread()` for consistency with `bot_thread()`
     - Many `global` statements have been removed, various variables moved into separate cogs or classes where relevant
     - Cogs have been moved into separate files, located in `cogs/` ([#72](https://github.com/svioletg/viMusBot/issues/72))
-        - `shared.py` created to house methods and configuration options shared between cogs
+        - `common.py` created in this directory to house methods and configuration options shared between cogs
             - Functions moved into this module include: `is_command_enabled()`, `command_aliases()`, `embedq()`, `timestamp_from_seconds()`, `prompt_for_choice()`
                 - `embedq()` no longer uses `*args`, now has proper keyword arguments — `title` (`str`; main, largest text), `subtext` (`str`; shown below `title` in smaller font), and `color` (`int`)
         - `General` cog moved into `cog_general.py`
         - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback ([#76](https://github.com/svioletg/viMusBot/issues/76)); other changes have been made within this file, such as...
+            - `INACTIVITY_TIMEOUT` renamed to `INACTIVITY_TIMEOUT_MINS`
             - `QueueItem`'s class method `generate_from_list()` renamed to `from_list()`
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
@@ -57,6 +58,7 @@ Other
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
         - `console-log-level` (boolean) has been added
         - `log-full-tracebacks` (boolean) has been added
+        - `play-history-max` (int) has been added
         - `colors`:
             - The color entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:
