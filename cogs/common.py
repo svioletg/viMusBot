@@ -44,7 +44,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
     Returns the chosen number if a valid selection was made, otherwise a `TimeoutError` if a timeout occurred,\
-    a `ValueError` if `choice_nums` was greater than 10, or 0 if the selection was cancelled.
+    or a `ValueError` if `choice_nums` was greater than 10. If the prompt was cancelled, 0 will be returned.
 
     @prompt_msg: A `Message` containing the choices that reaction will be added to.
     @result_msg: (`None`) A `Message` that can be edited based on the prompt's outcome.

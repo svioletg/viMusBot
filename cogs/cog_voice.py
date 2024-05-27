@@ -22,7 +22,7 @@ import yt_dlp
 # Local imports
 import utils.configuration as cfg
 from cogs.common import EMOJI, command_aliases, embedq, is_command_enabled, prompt_for_choice
-from utils.miscutil import timestamp_from_seconds
+from utils.miscutil import line, timestamp_from_seconds
 from utils import media
 
 log = logging.getLogger('viMusBot')
@@ -141,6 +141,42 @@ class Voice(commands.Cog):
         self.now_playing_msg: Optional[Message] = None
         self.queue_msg: Optional[Message] = None
 
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: Member, before: VoiceState, after):
+        """Listener for the voice state update event. Currently handles inactivity timeouts and tracks how long audio has been playing."""
+        if not (member.id == self.bot.user.id):
+            return
+        if before.channel is None:
+            # Disconnect after set amount of inactivity
+            if cfg.INACTIVITY_TIMEOUT_MINS == 0:
+                return
+            timeout_counter = 0
+            while True:
+                await asyncio.sleep(1)
+                timeout_counter += 1
+
+                if self.voice_client.is_playing() and not self.voice_client.is_paused():
+                    timeout_counter = 0
+                    self.audio_time_elapsed += 1
+
+                if timeout_counter == cfg.INACTIVITY_TIMEOUT_MINS * 60:
+                    log.info('Leaving voice due to inactivity...')
+                    await self.voice_client.disconnect()
+                if not self.voice_client.is_connected():
+                    log.debug('Voice doesn\'t look connected, waiting three seconds...')
+                    await asyncio.sleep(3)
+                    if not self.voice_client.is_connected():
+                        log.debug('Still disconnected. Discarding voice client reference...')
+                        # Delay discarding this reference until we're sure that we actually disconnected
+                        # Sometimes a brief network hiccup can be detected as not being connected to voice,
+                        # even though the bot is still present in Discord...
+                        # ...in which case, if we discard our reference to it too soon, everything voice-related breaks
+                        self.voice_client = None
+                        break
+                    else:
+                        log.debug('Voice looks connected again. Continuing as normal...')
+
+
     #region COMMANDS
     @commands.command(aliases=command_aliases('join'))
     @commands.check(is_command_enabled)
@@ -234,10 +270,17 @@ class Voice(commands.Cog):
         
         @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
         """
+        ctx.author = cast(Member, ctx.author)
         log.info('Running "play" command...')
+
+        if not ctx.author.voice:
+            log.info('Command author not connected to voice, cancelling.')
+            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
+            return
+
         log.debug('Args: queries=%s', repr(queries))
 
-        async def play_or_enqueue(item: QueueItem | list[QueueItem], queue_msg: Message):
+        async def play_or_enqueue(item: QueueItem | list[QueueItem]):
             """Adds the given `QueueItem` to the media queue. If the queue is empty, the item will attempt to play immediately.
             Otherwise, the item is appended to the queue.
 
@@ -249,14 +292,14 @@ class Voice(commands.Cog):
 
             if isinstance(item, list):
                 item_index = cast(tuple[int, int], item_index)
-                await queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
+                await self.queue_msg.edit(embed=embedq(f'Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
 
             if (not self.voice_client.is_playing()) and (queue_was_empty):
                 log.info('Voice client is not playing and the queue is empty, going to try playing...')
                 await self.advance_queue(ctx)
             else:
                 if isinstance(item, QueueItem):
-                    await queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{cast(int, item_index) + 1}'))
+                    await self.queue_msg.edit(embed=embedq(f'Added {item.info.title} to the queue at spot #{cast(int, item_index) + 1}'))
 
         # Using -play alone with no args should resume the bot if we're paused
         if not queries:
@@ -288,6 +331,7 @@ class Voice(commands.Cog):
         async with ctx.typing():
             log.info('Searching...')
             self.queue_msg = await ctx.send(embed=embedq('Searching...'))
+
             #region play: PLAIN TEXT
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
@@ -298,11 +342,11 @@ class Voice(commands.Cog):
                     log.debug('USE_TOP_MATCH on.')
                     if top_songs:
                         log.debug('Queueing top song...')
-                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author), self.queue_msg)
+                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author))
                         return
                     if top_videos:
                         log.debug('Queueing top video...')
-                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author), self.queue_msg)
+                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author))
                         return
 
                     await ctx.send(embed=embedq('No close matches could be found.'))
@@ -344,8 +388,7 @@ class Voice(commands.Cog):
 
                 choice = choice_options[choice]
 
-                await play_or_enqueue(QueueItem(choice, ctx.author) if not choice.contents else QueueItem.from_list(choice.contents, ctx.author),
-                    self.queue_msg)
+                await play_or_enqueue(QueueItem(choice, ctx.author) if not choice.contents else QueueItem.from_list(choice.contents, ctx.author))
                 return
             #endregion play: PLAIN TEXT
 
@@ -370,14 +413,14 @@ class Voice(commands.Cog):
                     log.debug('URL looks like a playlist or an album.')
                     # Because of the previous checks we know this has to only be one URL, no need to keep the list
                     url = url_strings[0]
-                    # Spotify playlists, albums
+                    # [x] Spotify playlists, albums
                     if url.startswith('https://open.spotify.com/album/'):
                         await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
                         if match_result := media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url), threshold=50):
                             yt_album = match_result[0]
                             await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
                                 .add_field(name=yt_album.album_name, value=yt_album.artist)\
-                                .set_image(url=yt_album.thumbnail))
+                                .set_thumbnail(url=yt_album.thumbnail))
 
                             confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False)
 
@@ -385,7 +428,7 @@ class Voice(commands.Cog):
                                 await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
                                 return
                             if confirmation == 1:
-                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author), self.queue_msg)
+                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author))
                                 return
                             if confirmation == 0:
                                 await self.queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
@@ -401,8 +444,30 @@ class Voice(commands.Cog):
                             await self.queue_msg.edit(embed=embedq('Too long of a playlist!',
                                 f'Current limit is set to {cfg.SPOTIFY_PLAYLIST_LIMIT}'))
                             return
-                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), self.queue_msg)
+                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author))
                         return
+                    # [ ] SoundCloud sets
+                    # [ ] YouTube playlists, YTMusic albums
+                else:
+                    # Single track links
+                    to_queue: list[QueueItem] = []
+                    for n, url in enumerate(url_strings):
+                        log.debug('Checking URL %s of %s: %s', n + 1, len(url_strings), url)
+                        await self.queue_msg.edit(embed=embedq(f'Queueing item {n + 1} of {len(url_strings)}...', url))
+                        if url.startswith('https://open.spotify.com/track/'):
+                            log.debug('Looks like a Spotify URL, creating QueueItem...')
+                            to_queue.append(QueueItem(media.TrackInfo.from_spotify_url(url), ctx.author))
+                        elif url.startswith('https://soundcloud.com/'):
+                            log.debug('Looks like a SoundCloud URL, creating QueueItem...')
+                            to_queue.append(QueueItem(media.TrackInfo.from_soundcloud_url(url), ctx.author))
+                        elif url.startswith('https://music.youtube.com/watch?v=') or url.startswith('https://www.youtube.com/watch?v='):
+                            log.debug('Looks like a YouTube Music or YouTube URL, creating QueueItem...')
+                            to_queue.append(QueueItem(media.TrackInfo.from_ytmusic(url), ctx.author))
+                        else:
+                            log.debug('Creating QueueItem generically...')
+                            to_queue.append(QueueItem(media.TrackInfo.from_other(url), ctx.author))
+                    await play_or_enqueue(to_queue if len(to_queue) > 1 else to_queue[0])
+                    return
 
                 # TODO: Implement! This needs to handle...
                 # [ ] Spotify track links
@@ -436,17 +501,11 @@ class Voice(commands.Cog):
                 await self.now_playing_msg.delete()
         except NotFound:
             log.debug('(First) Now-playing message wasn\'t found, ignoring and continuing...')
-        
-        try:
-            if self.queue_msg:
-                await self.queue_msg.delete()
-        except NotFound:
-            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
 
         # Start the player with retrieved URL
         if item.info.source == media.SPOTIFY:
             log.debug('Spotify source detected, matching to YouTube music if possible...')
-            self.queue_msg = await ctx.send(embed=embedq('Spotify link detected, searching for a YouTube Music match...'))
+            await self.queue_msg.edit(embed=embedq('Spotify link detected, searching for a YouTube Music match...'))
             matches = media.match_ytmusic_track(item.info)
             if isinstance(matches, list):
                 if cfg.USE_TOP_MATCH:
@@ -454,13 +513,20 @@ class Voice(commands.Cog):
                 else:
                     prompt_msg = await ctx.send(embed=embedq('Some close matches were found. Please choose one to queue.',
                         '\n'.join([EMOJI['num'][n + 1] + f' **{track.title}**\n*{track.artist}*' for n, track in enumerate(matches)])))
-                    response = await prompt_for_choice(self.bot, ctx,
+                    choice = await prompt_for_choice(self.bot, ctx,
                         prompt_msg=prompt_msg, choice_nums=len(matches), result_msg=self.queue_msg)
-                    if isinstance(response, asyncio.TimeoutError):
-                        await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
+                    if isinstance(choice, int) and choice != 0:
+                        item.info = matches[choice]
+                    else:
+                        return
             if isinstance(matches, media.TrackInfo):
-                self.info = matches
-                await self.queue_msg.edit(embed=embedq('Match found!'))
+                item.info = matches
+
+        try:
+            if self.queue_msg:
+                await self.queue_msg.delete()
+        except NotFound:
+            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
 
         try:
             log.debug('Creating YTDLSource...')
@@ -480,7 +546,7 @@ class Voice(commands.Cog):
         submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
         embed = Embed(title=self.get_loop_icon() + \
             f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',
-            description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR)
+            description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR).set_thumbnail(url=item.info.thumbnail)
         self.now_playing_msg = await ctx.send(embed=embed)
 
         if self.previous['source']:
@@ -515,38 +581,3 @@ class Voice(commands.Cog):
     # TODO: This could have a better name
     def get_loop_icon(self) -> str:
         return EMOJI['repeat']+' ' if self.media_queue.is_looping else ''
-
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member: Member, before: VoiceState):
-        """Listener for the voice state update event. Currently handles inactivity timeouts and tracks how long audio has been playing."""
-        if not member.id == self.bot.user.id:
-            return
-        elif before.channel is None:
-            # Disconnect after set amount of inactivity
-            if cfg.INACTIVITY_TIMEOUT_MINS == 0:
-                return
-            timeout_counter = 0
-            while True:
-                await asyncio.sleep(1)
-                timeout_counter += 1
-
-                if self.voice_client.is_playing() and not self.voice_client.is_paused():
-                    timeout_counter = 0
-                    self.audio_time_elapsed += 1
-
-                if timeout_counter == cfg.INACTIVITY_TIMEOUT_MINS * 60:
-                    log.info('Leaving voice due to inactivity...')
-                    await self.voice_client.disconnect()
-                if not self.voice_client.is_connected():
-                    log.debug('Voice doesn\'t look connected, waiting three seconds...')
-                    await asyncio.sleep(3)
-                    if not self.voice_client.is_connected():
-                        log.debug('Still disconnected. Discarding voice client reference...')
-                        # Delay discarding this reference until we're sure that we actually disconnected
-                        # Sometimes a brief network hiccup can be detected as not being connected to voice,
-                        # even though the bot is still present in Discord...
-                        # ...in which case, if we discard our reference to it too soon, everything voice-related breaks
-                        self.voice_client = None
-                        break
-                    else:
-                        log.debug('Voice looks connected again. Continuing as normal...')

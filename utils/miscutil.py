@@ -1,6 +1,7 @@
 """General-purpose, miscellaneous utility methods."""
 
 # Standard imports
+from inspect import currentframe
 import logging
 import re
 import time
@@ -35,6 +36,11 @@ class Stopwatch:
         self.lap_end = time.perf_counter()
         print(f'[WATCH <{self.name}>{('/'+label) if label else ''}]: LAP ... {self.lap_end - self.lap_start}')
         self.lap_start = time.perf_counter()
+
+def line():
+    """Prints the current line number. Should only be used for debugging during development."""
+    cf = currentframe()
+    print(f'----= {cf.f_back.f_lineno}')
 
 def timestamp_from_seconds(seconds: int | float) -> str:
     """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds."""

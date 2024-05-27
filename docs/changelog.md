@@ -64,9 +64,17 @@ Other
         - `colors`:
             - The color entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:
-    - `colorlog` now required
-    - `requests` now required
-    - Various package version requirements were updated
+
+```diff
++   ADDED: colorlog        == 6.8.2
++ UPDATED: aioconsole      == 0.7.1
++ UPDATED: python-benedict == 0.33.2
++ UPDATED: requests        == 2.32.2
++ UPDATED: yt_dlp          == 2024.5.26
++ UPDATED: ytmusicapi      == 1.7.3
+- REMOVED: regex
+```
+
 - `envsetup.bat` now runs `py -3` instead of `py`, to make sure the latest version of Python is being used
 
 ## 1.9.0

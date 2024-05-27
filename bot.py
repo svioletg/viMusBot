@@ -913,7 +913,7 @@ async def bot_thread():
         await bot.add_cog(cog_general.General(bot))
         log.debug('Adding cog: Voice')
         await bot.add_cog(cog_voice.Voice(bot))
-        log.info('Logging in with token...')
+        log.info('Logging in with token, please wait for a "Ready!" message before using any commands...')
         await bot.start(token)
 
 async def main():

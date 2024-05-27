@@ -1,4 +1,4 @@
-aioconsole == 0.7.0
+aioconsole == 0.7.1
 colorama == 0.4.6
 colorlog == 6.8.2
 discord.py == 2.3.2
@@ -11,6 +11,6 @@ pytube == 15.0.0
 PyYAML == 6.0.1
 soundcloud_lib == 0.6.1
 spotipy == 2.23.0
-requests == 2.31.0
-yt_dlp == 2024.4.9
-ytmusicapi == 1.7.1
+requests == 2.32.2
+yt_dlp == 2024.5.26
+ytmusicapi == 1.7.3

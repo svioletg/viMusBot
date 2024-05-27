@@ -40,21 +40,28 @@ if cfg.FORCE_MATCH_PROMPT:
 
 # For typing, no functional difference
 class MediaSource(str):
-    """String subclass that represents a media source. Exists only for typing purposes."""
+    """String subclass that represents a media source. Exists only for typing purposes.
+    
+    Every `MediaSource` that exists should be supported by `MediaInfo`."""
+    def __repr__(self):
+        return f'MediaSource("{self}")'
 
 YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
-GENERIC    = MediaSource('generic') # Anything yt_dlp labels as generic, or "we don't know"
+BANDCAMP   = MediaSource('bandcamp')
+OTHER    = MediaSource('other') # Anything yt_dlp labels as generic, or "we don't know"
 
+#region EXCEPTIONS
 class MediaError(Exception):
     """Base class for media-related exceptions."""
-
 class MediaFormattingError(MediaError):
     """Raised for incorrect or unexpected MediaInfo formatting."""
 class LocalFileError(MediaError):
     """Raised when trying to create a `TrackInfo` object out of a local file, typically as a result of looking through a playlist."""
+#endregion
 
+#region MEDIAINFO AND SUBCLASSES
 class MediaInfo:
     """Base class for gathering standardized data from different media sources.
     
@@ -144,11 +151,16 @@ class MediaInfo:
             else:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
         else:
-            raise ValueError(f'MediaSource object received that has no processing route: {source}')
+            raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
+    
+    @classmethod
+    def from_other(cls, url: str) -> Self:
+        """Creates a `MediaInfo` object from whatever information `yt_dlp` returns, if we don't have specific processing for it."""
+        return cls(OTHER, ytdl.extract_info(url, download=False), yt_info_origin='ytdl')
 
     @classmethod
     def from_pytube(cls, info: pytube.YouTube | str) -> Self:
-        """Shorthand for getting a MediaInfo object from a `pytube` source.
+        """Shorthand for getting a `MediaInfo` object from a `pytube` source.
         @info: URL string, or a `pytube.YouTube` object
         """
         if isinstance(info, str):
@@ -157,17 +169,25 @@ class MediaInfo:
 
     @classmethod
     def from_ytmusic(cls, info: dict | str) -> Self:
-        """Shorthand for getting a MediaInfo object from a `ytmusicapi` source.
-        @info: URL or plain search query string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
+        """Shorthand for getting a `MediaInfo` object from a `ytmusicapi` source.
+        @info: URL / video watch id / plain search query string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
         """
         if isinstance(info, str):
+            # If you search YTMusic with a normal YouTube URL it usually gets the right thing,
+            # but using a music.youtube.com URL almost always fails
+            # Using a bare ID, like what you get after "watch?v=", also works well here
+            if video_id := re.findall(r"https://.*youtube\.com/watch\?v=([\w\-]*)", info):
+                info = video_id[0]
+            else:
+                raise ValueError(f'Provided assumed URL string has no video ID within it: {info}')
+            assert isinstance(info, str)
             results = ytmusic.search(info, filter='songs') or ytmusic.search(info, filter='videos')
             info = results[0]
         return cls(YOUTUBE, info, yt_info_origin='ytmusic')
 
     @classmethod
     def from_ytdl(cls, info: dict | str) -> Self:
-        """Shorthand for getting a MediaInfo object from a `yt_dlp` source.
+        """Shorthand for getting a `MediaInfo` object from a `yt_dlp` source.
         @info: URL string, or a dictionary returned by `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         if isinstance(info, str):
@@ -229,12 +249,12 @@ class TrackInfo(MediaInfo):
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
-        """Creates a new TrackInfo from a given Spotify URL."""
+        """Creates a new `TrackInfo` from a Spotify URL."""
         return cls(SPOTIFY, sp.track(url))
 
     @classmethod
     def from_soundcloud_url(cls, url: str) -> Self:
-        """Creates a new TrackInfo object from a SoundCloud URL."""
+        """Creates a new `TrackInfo` object from a SoundCloud URL."""
         return cls(SOUNDCLOUD, sc.resolve(url))
 
 class AlbumInfo(MediaInfo):
@@ -273,7 +293,7 @@ class AlbumInfo(MediaInfo):
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
-        """Creates a new AlbumInfo from a given Spotify URL."""
+        """Creates a new `AlbumInfo` from a Spotify URL."""
         return cls(SPOTIFY, sp.album(url))
 
 class PlaylistInfo(MediaInfo):
@@ -295,16 +315,16 @@ class PlaylistInfo(MediaInfo):
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
-        """Creates a new PlaylistInfo from a given Spotify URL."""
+        """Creates a new `PlaylistInfo` from a given Spotify URL."""
         return cls(SPOTIFY, sp.playlist(url))
 
 def track_list_duration(track_list: list[TrackInfo]) -> int:
-    """Return the sum of track lengths from a list of TrackInfo objects."""
+    """Return the sum of track lengths from a list of `TrackInfo` objects."""
     return int(sum(track.length_seconds for track in track_list))
 
 # Pylint warns about some return paths here returning None, but I can't find a situation where that would happen
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]: # type: ignore
-    """Retrieves a list of TrackInfo objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
+    """Retrieves a list of `TrackInfo` objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
     # TODO: This can take a while, maybe find a way to report status back to bot.py?
     object_list: list[TrackInfo] = []
     log.debug('Looking for MediaInfo group contents...')
@@ -343,10 +363,11 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
         for track in track_list:
             object_list.append(TrackInfo(YOUTUBE, track))
         return object_list
+#endregion MEDIAINFO AND SUBCLASSES
 
-#endregion
+#endregion DEFINE CLASSES
 
-#region CONNECT APIs, ETC.
+#region CONFIGURE APIs, ETC.
 
 # Configure youtube dl
 ytdl_format_options = {
@@ -381,10 +402,10 @@ sp = Spotify(client_credentials_manager = client_credentials_manager)
 # Connect to soundcloud API
 sc = SoundcloudAPI()
 
-#endregion
+#endregion CONFIGURE APIs, ETC.
 
 #region SETUP FINISHED
-#endregion
+#endregion SETUP FINISHED
 
 class Testing:
     """For debugging. Generates every type of MediaInfo object for every valid source."""
