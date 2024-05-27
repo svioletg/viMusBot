@@ -3,6 +3,7 @@
 # Standard imports
 import asyncio
 from collections import deque
+from dataclasses import dataclass
 import glob
 import logging
 from math import ceil
@@ -19,8 +20,8 @@ from yt_dlp import YoutubeDL
 import yt_dlp
 
 # Local imports
+import utils.configuration as cfg
 from cogs.common import EMOJI, command_aliases, embedq, is_command_enabled, prompt_for_choice
-from utils.configuration import EMBED_COLOR, INACTIVITY_TIMEOUT_MINS, MAXIMUM_CONSECUTIVE_URLS, SHOW_USERS_IN_QUEUE, SPOTIFY_PLAYLIST_LIMIT, USE_TOP_MATCH
 from utils.miscutil import timestamp_from_seconds
 from utils import media
 
@@ -56,7 +57,7 @@ class YTDLSource(PCMVolumeTransformer):
 
         self.title = data.get('title')
         self.url = data.get('url')
-        self.id = data.get('id')
+        self.ID = data.get('id')
         self.src = data.get('extractor')
 
     @classmethod
@@ -73,14 +74,14 @@ class YTDLSource(PCMVolumeTransformer):
 
         filename = data['url'] if stream else ytdl.prepare_filename(data) # type: ignore
         src = filename.split('-#-')[0]
-        id = filename.split('-#-')[1]
+        ID = filename.split('-#-')[1]
         return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data) # type: ignore
 
+@dataclass
 class QueueItem:
     """Items which are to be placed inside of a `MediaQueue`, and nothing else. Holds a `TrackInfo` and the user that queued it."""
-    def __init__(self, info: media.TrackInfo, queued_by: User | Member):
-        self.info = info
-        self.queued_by = queued_by
+    info: media.TrackInfo
+    queued_by: User | Member
 
     @classmethod
     def from_list(cls, playlist: list[media.TrackInfo], queued_by: User | Member) -> list[Self]:
@@ -180,7 +181,7 @@ class Voice(commands.Cog):
         queue_time += cast(QueueItem, self.current['item']).info.length_seconds - self.audio_time_elapsed
 
         queue_time = timestamp_from_seconds(queue_time)
-        embed = Embed(title=f'{len(self.media_queue)} items in queue.\n*(Approx. time remaining: {queue_time})*',color=EMBED_COLOR)
+        embed = Embed(title=f'{len(self.media_queue)} items in queue.\n*(Approx. time remaining: {queue_time})*',color=cfg.EMBED_COLOR)
         start = (10 * page) - 10
         end = 10 * page
         if (10 * page) > len(self.media_queue):
@@ -286,28 +287,28 @@ class Voice(commands.Cog):
         # We now have only queries of either one text search, or one or more URLs
         async with ctx.typing():
             log.info('Searching...')
-            queue_msg = await ctx.send(embed=embedq('Searching...'))
+            self.queue_msg = await ctx.send(embed=embedq('Searching...'))
             #region play: PLAIN TEXT
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
                 log.debug('Using plain-text search: %s', text_search)
                 top_songs, top_videos, top_albums = map(media.search_ytmusic_text(text_search).get, ('songs', 'videos', 'albums'))
 
-                if USE_TOP_MATCH:
+                if cfg.USE_TOP_MATCH:
                     log.debug('USE_TOP_MATCH on.')
                     if top_songs:
                         log.debug('Queueing top song...')
-                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author), queue_msg)
+                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author), self.queue_msg)
                         return
                     if top_videos:
                         log.debug('Queueing top video...')
-                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author), queue_msg)
+                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author), self.queue_msg)
                         return
 
                     await ctx.send(embed=embedq('No close matches could be found.'))
                     return
 
-                choice_embed = Embed(color=EMBED_COLOR, title='Please choose a search result to queue...')
+                choice_embed = Embed(color=cfg.EMBED_COLOR, title='Please choose a search result to queue...')
                 choice_options = {}
                 position: int = 0
                 # TODO: Probably can be condensed
@@ -330,29 +331,29 @@ class Voice(commands.Cog):
                 choice_prompt = await ctx.send(embed=choice_embed)
                 choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_nums=position)
 
-                if isinstance(choice, TimeoutError):
-                    await queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
+                if isinstance(choice, asyncio.TimeoutError):
+                    await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
                     return
                 if isinstance(choice, ValueError):
-                    await queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Too many options were provided to the prompt.',
+                    await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Too many options were provided to the prompt.',
                         'If you\'re seeing this message, this is probably a bug!'))
                     return
                 if choice == 0:
-                    await queue_msg.delete()
+                    await self.queue_msg.delete()
                     return
 
                 choice = choice_options[choice]
 
                 await play_or_enqueue(QueueItem(choice, ctx.author) if not choice.contents else QueueItem.from_list(choice.contents, ctx.author),
-                    queue_msg)
+                    self.queue_msg)
                 return
             #endregion play: PLAIN TEXT
 
             #region play: FROM URL
             if url_strings:
-                if len(url_strings) > MAXIMUM_CONSECUTIVE_URLS:
+                if len(url_strings) > cfg.MAXIMUM_CONSECUTIVE_URLS:
                     log.debug('Cancelling play command: too many consecutive URLs.')
-                    await ctx.send(embed=embedq(f'Too many URLs provided. (Max: {MAXIMUM_CONSECUTIVE_URLS})'))
+                    await ctx.send(embed=embedq(f'Too many URLs provided. (Max: {cfg.MAXIMUM_CONSECUTIVE_URLS})'))
                     return
 
                 # Does Spotify even use spotify.link URLs anymore? I can barely test this because I can't seem to get one now
@@ -371,36 +372,36 @@ class Voice(commands.Cog):
                     url = url_strings[0]
                     # Spotify playlists, albums
                     if url.startswith('https://open.spotify.com/album/'):
-                        await queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                        await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
                         if match_result := media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url), threshold=50):
                             yt_album = match_result[0]
-                            await queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
+                            await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
                                 .add_field(name=yt_album.album_name, value=yt_album.artist)\
                                 .set_image(url=yt_album.thumbnail))
 
-                            confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=queue_msg, yesno=True, delete_after=False)
+                            confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False)
 
-                            if isinstance(confirmation, TimeoutError):
-                                await queue_msg.edit(embed=embedq('Confirmation timed out.', 'Nothing will be queued.'))
+                            if isinstance(confirmation, asyncio.TimeoutError):
+                                await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
                                 return
                             if confirmation == 1:
-                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author), queue_msg)
+                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author), self.queue_msg)
                                 return
                             if confirmation == 0:
-                                await queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
+                                await self.queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
                                 return
                         else:
-                            await queue_msg.edit(embed=embedq('Couldn\'t find any close matches for this album.',
+                            await self.queue_msg.edit(embed=embedq('Couldn\'t find any close matches for this album.',
                                 'Try using a source other than Spotify, if possible.'))
                             return
 
                     if url.startswith('https://open.spotify.com/playlist/'):
                         playlist = media.PlaylistInfo.from_spotify_url(url)
-                        if len(playlist.contents) > SPOTIFY_PLAYLIST_LIMIT:
-                            await queue_msg.edit(embed=embedq('Too long of a playlist!',
-                                f'Current limit is set to {SPOTIFY_PLAYLIST_LIMIT}'))
+                        if len(playlist.contents) > cfg.SPOTIFY_PLAYLIST_LIMIT:
+                            await self.queue_msg.edit(embed=embedq('Too long of a playlist!',
+                                f'Current limit is set to {cfg.SPOTIFY_PLAYLIST_LIMIT}'))
                             return
-                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), queue_msg)
+                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author), self.queue_msg)
                         return
 
                 # TODO: Implement! This needs to handle...
@@ -426,6 +427,8 @@ class Voice(commands.Cog):
 
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         """Create a new player from the given `QueueItem` and start playing audio."""
+        log.info('Trying to start playing...')
+
         self.previous = self.current.copy()
 
         try:
@@ -433,10 +436,32 @@ class Voice(commands.Cog):
                 await self.now_playing_msg.delete()
         except NotFound:
             log.debug('(First) Now-playing message wasn\'t found, ignoring and continuing...')
-
-        log.info('Trying to start playing...')
+        
+        try:
+            if self.queue_msg:
+                await self.queue_msg.delete()
+        except NotFound:
+            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
 
         # Start the player with retrieved URL
+        if item.info.source == media.SPOTIFY:
+            log.debug('Spotify source detected, matching to YouTube music if possible...')
+            self.queue_msg = await ctx.send(embed=embedq('Spotify link detected, searching for a YouTube Music match...'))
+            matches = media.match_ytmusic_track(item.info)
+            if isinstance(matches, list):
+                if cfg.USE_TOP_MATCH:
+                    matches = matches[0]
+                else:
+                    prompt_msg = await ctx.send(embed=embedq('Some close matches were found. Please choose one to queue.',
+                        '\n'.join([EMOJI['num'][n + 1] + f' **{track.title}**\n*{track.artist}*' for n, track in enumerate(matches)])))
+                    response = await prompt_for_choice(self.bot, ctx,
+                        prompt_msg=prompt_msg, choice_nums=len(matches), result_msg=self.queue_msg)
+                    if isinstance(response, asyncio.TimeoutError):
+                        await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
+            if isinstance(matches, media.TrackInfo):
+                self.info = matches
+                await self.queue_msg.edit(embed=embedq('Match found!'))
+
         try:
             log.debug('Creating YTDLSource...')
             player = await YTDLSource.from_url(item.info.url, loop=self.bot.loop, stream=False)
@@ -452,26 +477,14 @@ class Voice(commands.Cog):
         self.voice_client.stop()
         self.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
 
-        try:
-            if self.queue_msg:
-                await self.queue_msg.delete()
-        except NotFound:
-            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
-
-        try:
-            if self.now_playing_msg:
-                await self.now_playing_msg.delete()
-        except NotFound:
-            # Sometimes this causes a 404 error and prevents a new "Now playing" message to show
-            # Just ignoring the error sends a message properly so, sure
-            log.debug('Now-playing message wasn\'t found, ignoring and continuing...')
-
         submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
-        embed = Embed(title=f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',description=f'Link: {item.info.url}{submitter_text}',color=EMBED_COLOR)
+        embed = Embed(title=self.get_loop_icon() + \
+            f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',
+            description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR)
         self.now_playing_msg = await ctx.send(embed=embed)
 
         if self.previous['source']:
-            for file in glob.glob(f'*-#-{cast(YTDLSource, self.previous['source']).id}-#-*'):
+            for file in glob.glob(f'*-#-{cast(YTDLSource, self.previous['source']).ID}-#-*'):
                 # Delete last played file
                 try:
                     log.debug('Removing file: %s', file)
@@ -497,7 +510,7 @@ class Voice(commands.Cog):
             log.debug('Attempted call while locked; ignoring...')
 
     def get_queued_by_text(self, member: Member) -> str:
-        return f'\nQueued by {member.nick or member.name}' if SHOW_USERS_IN_QUEUE else ''
+        return f'\nQueued by {member.nick or member.name}' if cfg.SHOW_USERS_IN_QUEUE else ''
 
     # TODO: This could have a better name
     def get_loop_icon(self) -> str:
@@ -510,7 +523,7 @@ class Voice(commands.Cog):
             return
         elif before.channel is None:
             # Disconnect after set amount of inactivity
-            if INACTIVITY_TIMEOUT_MINS == 0:
+            if cfg.INACTIVITY_TIMEOUT_MINS == 0:
                 return
             timeout_counter = 0
             while True:
@@ -521,7 +534,7 @@ class Voice(commands.Cog):
                     timeout_counter = 0
                     self.audio_time_elapsed += 1
 
-                if timeout_counter == INACTIVITY_TIMEOUT_MINS * 60:
+                if timeout_counter == cfg.INACTIVITY_TIMEOUT_MINS * 60:
                     log.info('Leaving voice due to inactivity...')
                     await self.voice_client.disconnect()
                 if not self.voice_client.is_connected():

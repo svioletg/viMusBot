@@ -5,26 +5,25 @@ import asyncio
 import glob
 import logging
 import os
+import traceback
 from pathlib import Path
 from platform import python_version
-import traceback
 
 # External imports
 import aioconsole
 import colorama
 import discord
+import yt_dlp
 from discord.ext import commands
 from pretty_help import PrettyHelp
-import yt_dlp
 
 # Local imports
 import update
+import utils.configuration as cfg
 from cogs import cog_general, cog_voice
-from utils.configuration import (CLEANUP_EXTENSIONS, DEV_PREFIX, EMBED_COLOR, LOG_TRACEBACKS,
-                                 PUBLIC, PUBLIC_PREFIX, SHOW_USERS_IN_QUEUE, TOKEN_FILE_PATH)
+from cogs.common import EMOJI, embedq
 from utils import miscutil
 from utils.palette import Palette
-from cogs.common import EMOJI, embedq
 from version import VERSION
 
 colorama.init(autoreset=True)
@@ -68,7 +67,7 @@ skip_votes = [] # TODO: Typing; What does this list contain?
 
 # Clear out downloaded files
 log.info('Removing previously downloaded media files...')
-for t in [f for f in glob.glob('*.*') if Path(f).suffix in CLEANUP_EXTENSIONS]:
+for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSIONS]:
     os.remove(t)
 
 # Start bot-related events
@@ -587,59 +586,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in CLEANUP_EXTENSIONS]:
 #         return cache_check
 #     return decorator
 
-# # TODO: Maybe try and make duration and title from URL into a single function, lot of copied code
-
-# @cache_if_succeeded(key='duration')
-# def duration_from_url(url: str) -> int|float:
-#     """Automatically detects the source of a given URL, and returns its extracted duration."""
-#     log.debug(f'Getting length of \'{url}\'...')
-#     if 'youtube.com' in url:
-#         try:
-#             return pytube.YouTube(url).length
-#         except Exception as e:
-#             log.info(f'pytube couldn\'t retrieve video length: "{traceback.format_exception(e)[-1]}"; Trying yt-dlp...')
-#             # Continues after this block so this isn't duplicated
-#     elif 'soundcloud.com' in url:
-#         try:
-#             result = media.sc.resolve(url).duration
-#         except TypeError as e:
-#             log.error('Failed to retrieve Soundcloud track.')
-#         return round(result / 1000)
-#     elif 'open.spotify.com' in url:
-#         result = media.spotify_track(url)
-#         return result.length_seconds
-    
-#     # yt-dlp should handle most other URLs
-#     try:
-#         info_dict = ytdl.extract_info(url, download=False)
-#     except yt_dlp.utils.DownloadError as e:
-#         log.info(f'Failed to retrieve video length: {e}')
-#         return None, e
-#     return info_dict.get('duration', 0)
-
-# @cache_if_succeeded(key='title')
-# def title_from_url(url: str) -> str:
-#     """Automatically detects the source of a given URL, and returns its extracted title."""
-#     log.debug(f'Getting title of \'{url}\'...')
-#     if 'youtube.com' in url:
-#         try:
-#             return pytube.YouTube(url).title
-#         except Exception as e:
-#             log.info(f'pytube encountered "{traceback.format_exception(e)[-1]}" during title retrieval. Falling back on yt-dlp.')
-#             # Continues after this block so this isn't duplicated
-#     elif 'soundcloud.com' in url:
-#         return media.sc.resolve(url).title
-#     elif 'open.spotify.com' in url:
-#         return media.spotify_track(url)['title']
-    
-#     # yt-dlp should handle most other URLs
-#     try:
-#         info_dict = ytdl.extract_info(url, download=False)
-#     except yt_dlp.utils.DownloadError as e:
-#         log.info(f'Failed to retrieve title: {e}')
-#         return None, e
-#     return info_dict.get('title', None)
-
 # Establish bot user
 intents = discord.Intents.default()
 intents.messages = True
@@ -650,13 +596,13 @@ intents.guilds = True
 intents.members = True
 
 # Set prefix
-command_prefix = PUBLIC_PREFIX if PUBLIC else DEV_PREFIX
+command_prefix = cfg.PUBLIC_PREFIX if cfg.PUBLIC else cfg.DEV_PREFIX
 
 bot = commands.Bot(
     command_prefix=commands.when_mentioned_or(command_prefix),
     description='',
     intents=intents,
-    help_command = PrettyHelp(False, color=discord.Color(EMBED_COLOR))
+    help_command = PrettyHelp(False, color=discord.Color(cfg.EMBED_COLOR))
 )
 
 @bot.event
@@ -669,7 +615,7 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
                 await ctx.send(embed=embedq(EMOJI['cancel'] + 'Can\'t play audio. Please check the bot\'s logs.'))
             else:
                 log.error(error)
-                if LOG_TRACEBACKS:
+                if cfg.LOG_TRACEBACKS:
                     log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
         case commands.CheckFailure():
             await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
@@ -682,8 +628,10 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
         case _:
             # If anything unexpected occurs, log it
             log.error(error)
-            if LOG_TRACEBACKS:
+            if cfg.LOG_TRACEBACKS:
                 log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
+            await ctx.send(embed=embedq(EMOJI['cancel'] + ' An unexpected error has occurred.',
+                str(error)))
 
 @bot.event
 async def on_ready():
@@ -692,16 +640,16 @@ async def on_ready():
     log.info('Ready!')
 
 # Retrieve bot token
-log.info('Using token from "%s"...', TOKEN_FILE_PATH)
+log.info('Using token from "%s"...', cfg.TOKEN_FILE_PATH)
 
-if not PUBLIC:
+if not cfg.PUBLIC:
     log.warning('Starting in dev mode.')
 
-if Path(TOKEN_FILE_PATH).is_file():
-    with open(TOKEN_FILE_PATH, 'r', encoding='utf-8') as f:
+if Path(cfg.TOKEN_FILE_PATH).is_file():
+    with open(cfg.TOKEN_FILE_PATH, 'r', encoding='utf-8') as f:
         token = f.read()
 else:
-    log.error('Filepath "%s" does not exist; exiting.', TOKEN_FILE_PATH)
+    log.error('Filepath "%s" does not exist; exiting.', cfg.TOKEN_FILE_PATH)
     raise SystemExit(0)
 
 # class Tests:

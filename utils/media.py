@@ -19,9 +19,8 @@ from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 
 # Local imports
-from utils.configuration import FORCE_MATCH_PROMPT, DURATION_LIMIT_SECONDS
+import utils.configuration as cfg
 from utils.miscutil import timestamp_from_seconds
-from utils.miscutil import Stopwatch
 from utils.palette import Palette
 
 log = logging.getLogger('viMusBot')
@@ -32,7 +31,7 @@ plt = Palette()
 bot_status_callback: Callable = lambda message: None
 
 # Useful to point this out if left on accidentally
-if FORCE_MATCH_PROMPT:
+if cfg.FORCE_MATCH_PROMPT:
     log.warning('force-match-prompt is turned on. '+\
         'This is not an inherent problem, but may cause unwanted behavior if left on by accident. '+\
         'Check your config.yml if this is was not intended.')
@@ -46,7 +45,7 @@ class MediaSource(str):
 YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
-GENERIC    = MediaSource('generic') # Anything yt_dlp labels as generic
+GENERIC    = MediaSource('generic') # Anything yt_dlp labels as generic, or "we don't know"
 
 class MediaError(Exception):
     """Base class for media-related exceptions."""
@@ -65,7 +64,8 @@ class MediaInfo:
     def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         """
         @source: A valid MediaSource object.
-        @info: A URL string, or a collection of info to be parsed and used for object creation. Exactly what that should be depends on the subclass.
+        @info: A URL string, or a collection of info to be parsed and used for object creation.\
+            Exactly what that should be depends on the subclass.
         @yt_info_origin: YouTube media can come from three sources: the `pytube` library, the `ytmusicapi` library, and\
             the `yt-dlp` library. If none is specified, it will be automatically determined, however specifying here can save some time.
         """
@@ -642,7 +642,7 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     query = f'{src_info.title} {src_info.artist} {src_info.album_name}'
 
     # Start search
-    if (not FORCE_MATCH_PROMPT) and src_info.isrc:
+    if (not cfg.FORCE_MATCH_PROMPT) and src_info.isrc:
         log.info('Searching for ISRC: %s', src_info.isrc)
         # pytube is more accurate when searching with an ISRC
         pytube_results = pytube.Search(src_info.isrc).results
@@ -681,10 +681,10 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
 
     # Remove videos over the specified duration limit
     for song, video in zip(song_results, video_results):
-        if song.length_seconds > DURATION_LIMIT_SECONDS:
+        if song.length_seconds > cfg.DURATION_LIMIT_SECONDS:
             song_results.pop(song_results.index(song))
 
-        if video.length_seconds > DURATION_LIMIT_SECONDS:
+        if video.length_seconds > cfg.DURATION_LIMIT_SECONDS:
             video_results.pop(video_results.index(video))
 
     track_choices: list[TrackInfo] = []
@@ -695,7 +695,7 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     for result in video_results[:2]:
         track_choices.append(result)
 
-    if FORCE_MATCH_PROMPT:
+    if cfg.FORCE_MATCH_PROMPT:
         log.info('force-match-prompt is enabled, returning choices without checking for matches.')
         return track_choices
 

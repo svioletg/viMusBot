@@ -43,7 +43,8 @@ def get_full(config_type: Literal['user', 'default']) -> benedict:
     """Returns the full config benedict object."""
     return CONFIG_DICT if config_type == 'user' else CONFIG_DEFAULT_DICT
 
-# Bot
+# Consts from config
+
 PUBLIC                  : bool                 = get('public')
 TOKEN_FILE_PATH         : str                  = get('token-file')
 PUBLIC_PREFIX           : str                  = get('prefixes.public')
