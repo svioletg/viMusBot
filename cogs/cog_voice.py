@@ -22,7 +22,7 @@ import yt_dlp
 # Local imports
 import utils.configuration as cfg
 from cogs.common import EMOJI, command_aliases, embedq, is_command_enabled, prompt_for_choice
-from utils.miscutil import line, timestamp_from_seconds
+from utils.miscutil import line, time_func, timestamp_from_seconds
 from utils import media
 
 log = logging.getLogger('viMusBot')
@@ -124,6 +124,11 @@ class MediaQueue(list[QueueItem]):
             self.append(to_queue)
             return start
 
+class AlbumLimitError(Exception):
+    """Raised when a playlist exceeds its maximum length, set by user configuration."""
+class PlaylistLimitError(Exception):
+    """Raised when a playlist exceeds its maximum length, set by user configuration."""
+
 class Voice(commands.Cog):
     """Handles voice and music-related tasks."""
 
@@ -196,7 +201,7 @@ class Voice(commands.Cog):
             self.voice_client = None
         else:
             log.debug('No channel to leave.')
-    
+
     @commands.command(aliases=command_aliases('queue'))
     @commands.check(is_command_enabled)
     async def queue(self, ctx: commands.Context, page: int=1):
@@ -231,6 +236,21 @@ class Voice(commands.Cog):
         embed.description = f'Showing {start + 1} to {end} of {len(self.media_queue)} items. Use -queue [page] to see more.'
         await ctx.send(embed=embed)
 
+    @commands.command(aliases=command_aliases('move'))
+    @commands.check(is_command_enabled)
+    async def move(self, ctx: commands.Context):
+        raise NotImplementedError
+
+    @commands.command(aliases=command_aliases('shuffle'))
+    @commands.check(is_command_enabled)
+    async def shuffle(self, ctx: commands.Context):
+        raise NotImplementedError
+
+    @commands.command(aliases=command_aliases('remove'))
+    @commands.check(is_command_enabled)
+    async def remove(self, ctx: commands.Context):
+        raise NotImplementedError
+
     @commands.command(aliases=command_aliases('clear'))
     @commands.check(is_command_enabled)
     async def clear(self, ctx: commands.Context):
@@ -241,7 +261,17 @@ class Voice(commands.Cog):
             await ctx.send(embed=embedq('Queue is now empty.'))
         else:
             await ctx.send(embed=embedq('Queue is already empty.'))
-    
+
+    @commands.command(aliases=command_aliases('skip'))
+    @commands.check(is_command_enabled)
+    async def skip(self, ctx: commands.Context):
+        raise NotImplementedError
+
+    @commands.command(aliases=command_aliases('loop'))
+    @commands.check(is_command_enabled)
+    async def loop(self, ctx: commands.Context):
+        raise NotImplementedError
+
     @commands.command(aliases=command_aliases('pause'))
     @commands.check(is_command_enabled)
     async def pause(self, ctx: commands.Context):
@@ -254,7 +284,7 @@ class Voice(commands.Cog):
             await ctx.send(embed=embedq('Already paused. Use `play` to unpause.'))
         else:
             await ctx.send(embed=embedq('Nothing to pause.'))
-    
+
     @commands.command(aliases=command_aliases('stop'))
     @commands.check(is_command_enabled)
     async def stop(self, ctx: commands.Context):
@@ -262,12 +292,17 @@ class Voice(commands.Cog):
         log.info('Stopping audio and clearing the queue...')
         self.voice_client.stop()
         self.media_queue.clear()
-    
+
+    @commands.command(aliases=command_aliases('nowplaying'))
+    @commands.check(is_command_enabled)
+    async def nowplaying(self, ctx: commands.Context):
+        raise NotImplementedError
+
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
     async def play(self, ctx: commands.Context, *queries: str):
         """Adds a link to the queue. Plays immediately if the queue is empty.
-        
+
         @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
         """
         ctx.author = cast(Member, ctx.author)
@@ -394,9 +429,9 @@ class Voice(commands.Cog):
 
             #region play: FROM URL
             if url_strings:
-                if len(url_strings) > cfg.MAXIMUM_CONSECUTIVE_URLS:
+                if len(url_strings) > cfg.MAX_CONSECUTIVE_URLS:
                     log.debug('Cancelling play command: too many consecutive URLs.')
-                    await ctx.send(embed=embedq(f'Too many URLs provided. (Max: {cfg.MAXIMUM_CONSECUTIVE_URLS})'))
+                    await ctx.send(embed=embedq(f'Too many URLs provided. (Max: {cfg.MAX_CONSECUTIVE_URLS})'))
                     return
 
                 # Does Spotify even use spotify.link URLs anymore? I can barely test this because I can't seem to get one now
@@ -413,40 +448,61 @@ class Voice(commands.Cog):
                     log.debug('URL looks like a playlist or an album.')
                     # Because of the previous checks we know this has to only be one URL, no need to keep the list
                     url = url_strings[0]
-                    # Spotify playlists, albums
+                    media_list: Optional[media.PlaylistInfo | media.AlbumInfo] = None
+
+                    if url.startswith('https://music.youtube.com/playlist?list=') or url.startswith('https://www.youtube.com/playlist?list='):
+                        # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
+                        media_list = media.PlaylistInfo.from_ytdl(url.replace('music', 'www'))
+
                     if url.startswith('https://open.spotify.com/album/'):
-                        await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
-                        if match_result := media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url), threshold=50):
-                            yt_album = match_result[0]
-                            await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
-                                .add_field(name=yt_album.album_name, value=yt_album.artist)\
-                                .set_thumbnail(url=yt_album.thumbnail))
-
-                            confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False)
-
-                            if isinstance(confirmation, asyncio.TimeoutError):
-                                await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
-                                return
-                            if confirmation == 1:
-                                await play_or_enqueue(QueueItem.from_list(yt_album.contents, ctx.author))
-                                return
-                            if confirmation == 0:
-                                await self.queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
-                                return
-                        else:
-                            await self.queue_msg.edit(embed=embedq('Couldn\'t find any close matches for this album.',
-                                'Try using a source other than Spotify, if possible.'))
-                            return
+                        media_list = media.AlbumInfo.from_spotify_url(url)
 
                     if url.startswith('https://open.spotify.com/playlist/'):
-                        playlist = media.PlaylistInfo.from_spotify_url(url)
-                        if len(playlist.contents) > cfg.SPOTIFY_PLAYLIST_LIMIT:
-                            await self.queue_msg.edit(embed=embedq('Too long of a playlist!',
-                                f'Current limit is set to {cfg.SPOTIFY_PLAYLIST_LIMIT}'))
+                        media_list = media.PlaylistInfo.from_spotify_url(url)
+
+                    if re.findall(r"https://soundcloud\.com/\w+/sets/", url):
+                        media_list = media.soundcloud_set(url)
+
+                    # Final checks
+                    if media_list:
+                        if isinstance(media_list, media.AlbumInfo) and (len(media_list.contents) > cfg.MAX_ALBUM_LENGTH):
+                            await self.queue_msg.edit(embed=embedq(EMOJI['cancel'] + 'Album is too long.',
+                                f'Current limit is set to {cfg.MAX_ALBUM_LENGTH}.'))
                             return
-                        await play_or_enqueue(QueueItem.from_list(playlist.contents, ctx.author))
+                        if isinstance(media_list, media.PlaylistInfo) and (len(media_list.contents) > cfg.MAX_PLAYLIST_LENGTH):
+                            await self.queue_msg.edit(embed=embedq(EMOJI['cancel'] + 'Playlist is too long.',
+                                f'Current limit is set to {cfg.MAX_PLAYLIST_LENGTH}.'))
+                            return
+
+                        if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
+                            # Find a YTMusic equivalent album if we have a Spotify album
+                            await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                            if match_result := media.match_ytmusic_album(media_list, threshold=50):
+                                yt_album = match_result[0]
+                                await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
+                                    .add_field(name=yt_album.album_name, value=yt_album.artist)\
+                                    .set_thumbnail(url=yt_album.thumbnail))
+
+                                confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False)
+
+                                if isinstance(confirmation, asyncio.TimeoutError):
+                                    await self.queue_msg.edit(embed=embedq(f'{EMOJI['cancel']} Choice prompt timed out, nothing queued.'))
+                                    return
+                                if confirmation == 0:
+                                    await self.queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
+                                    return
+                                if confirmation == 1:
+                                    media_list = yt_album
+                            else:
+                                await self.queue_msg.edit(embed=embedq('Couldn\'t find any close matches for this album.',
+                                    'Try using a source other than Spotify, if possible.'))
+                                return
+
+                        # If we've reached here, something was successfully found and can be queued without issue
+                        await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
+                    else:
                         return
-                    # [ ] SoundCloud sets
+
                     # [ ] YouTube playlists, YTMusic albums
                 else:
                     # Single track links
@@ -462,13 +518,18 @@ class Voice(commands.Cog):
                             to_queue.append(QueueItem(media.TrackInfo.from_soundcloud_url(url), ctx.author))
                         elif url.startswith('https://music.youtube.com/watch?v=') or url.startswith('https://www.youtube.com/watch?v='):
                             log.debug('Looks like a YouTube Music or YouTube URL, creating QueueItem...')
-                            to_queue.append(QueueItem(media.TrackInfo.from_ytmusic(url), ctx.author))
+                            to_queue.append(QueueItem(media.TrackInfo.from_pytube(url), ctx.author))
                         else:
                             log.debug('Creating QueueItem generically...')
                             to_queue.append(QueueItem(media.TrackInfo.from_other(url), ctx.author))
                     await play_or_enqueue(to_queue if len(to_queue) > 1 else to_queue[0])
                     return
             #endregion FROM URL
+
+    @commands.command(aliases=command_aliases('analyze'))
+    @commands.check(is_command_enabled)
+    async def analyze(self, ctx: commands.Context):
+        raise NotImplementedError
 
     @join.before_invoke
     @play.before_invoke

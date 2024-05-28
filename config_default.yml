@@ -56,8 +56,11 @@ auto-remove:
 # Allows queueing entire Spotify playlists
 allow-spotify-playlists: yes
 
-# Limit the amount of tracks Spotify playlists can have before queueing
-spotify-playlist-limit: 50
+# Limit the amount of tracks playlists can have before queueing
+playlist-track-limit: 50
+
+# Limit the amount of tracks albums can have before queueing
+album-track-limit: 50
 
 # Automatically queues the top result of a Spotify-YouTube match,
 # regardless of how close the match is

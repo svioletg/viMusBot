@@ -28,6 +28,7 @@ Developer
     - `miscutil.py` created in this directory to house general-purpose utility methods that should be shared between modules
     - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
+        - Now contains variables set and typed from every relevant configuration key, which other modules should use by importing the entire module
     - `spoofy.py` renamed to `media.py`, moved to this directory ([#42](https://github.com/svioletg/viMusBot/issues/42))
     - Changes in `media.py`:
         - `FORCE_NO_MATCH` renamed to `FORCE_MATCH_PROMPT`
@@ -48,6 +49,11 @@ Developer
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
 
+Features
+- "Now playing" messages will now show the track's thumbnail in its embed ([#70](https://github.com/svioletg/viMusBot/issues/70))
+- `-faq` command added to get the bot's FAQ page
+- `-issues` command added to the get the bot's issues page
+
 Fixes
 - Using the `stop` console command will now suppress the resulting `CancelledError`
 
@@ -56,6 +62,7 @@ Other
     - Default value of `use-top-match` set to `no`
     - Default value of `command-blacklist` is now empty
     - `force-no-match` renamed to `force-match-prompt` for clarity
+    - `spotify-playlist-limit` removed, `playlist-track-limit` and `album-track-limit` added in its place (limit applies to any source now)
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
         - `console-log-level` (boolean) has been added

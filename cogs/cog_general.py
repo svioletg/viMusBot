@@ -35,5 +35,17 @@ class General(commands.Cog):
     @commands.check(is_command_enabled)
     async def repository(self, ctx: commands.Context):
         """Returns the link to the viMusBot GitHub repository."""
-        await ctx.send(embed=embedq('You can view the bot\'s code and submit bug reports or feature requests here.',
+        await ctx.send(embed=embedq('viMusBot GitHub repository: https://github.com/svioletg/viMusBot',
             'https://github.com/svioletg/viMusBot\nA GitHub account is required to submit issues.'))
+
+    @commands.command(aliases=command_aliases('faq'))
+    @commands.check(is_command_enabled)
+    async def faq(self, ctx: commands.Context):
+        """Returns a link to viMusBot's FAQ page."""
+        await ctx.send(embed=embedq('viMusBot FAQ page: https://github.com/svioletg/viMusBot/blob/master/docs/faq.md'))
+
+    @commands.command(aliases=command_aliases('issues'))
+    @commands.check(is_command_enabled)
+    async def issues(self, ctx: commands.Context):
+        """Returns a link to viMusBot's FAQ page."""
+        await ctx.send(embed=embedq('viMusBot Issues page: https://github.com/svioletg/viMusBot/issues'))

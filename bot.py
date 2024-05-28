@@ -450,30 +450,28 @@ bot = commands.Bot(
 @bot.event
 async def on_command_error(ctx: commands.Context, error: BaseException):
     """Handles any exceptions raised by any commands or modules."""
-    match error:
-        case commands.CommandInvokeError():
-            if 'ffmpeg was not found' in repr(error):
-                log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
-                await ctx.send(embed=embedq(EMOJI['cancel'] + 'Can\'t play audio. Please check the bot\'s logs.'))
-            else:
-                log.error(error)
-                if cfg.LOG_TRACEBACKS:
-                    log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
-        case commands.CheckFailure():
-            await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
-                'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
-        case commands.CommandNotFound():
-            pass # Ignore
-        case yt_dlp.utils.DownloadError():
-            await ctx.send(embed=embedq(EMOJI['cancel'] + 'Unable to retrieve video.',
-                'It may be private, or otherwise unavailable.'))
-        case _:
-            # If anything unexpected occurs, log it
-            log.error(error)
-            if cfg.LOG_TRACEBACKS:
-                log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
-            await ctx.send(embed=embedq(EMOJI['cancel'] + ' An unexpected error has occurred.',
-                str(error)))
+    if isinstance(error, commands.CommandInvokeError):
+        if 'ffmpeg was not found' in repr(error):
+            log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
+            await ctx.send(embed=embedq(EMOJI['cancel'] + 'Can\'t play audio. Please check the bot\'s logs.'))
+            return
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
+            'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
+        return
+    if isinstance(error, commands.CommandNotFound):
+        return # Ignore these
+    if isinstance(error, yt_dlp.utils.DownloadError):
+        await ctx.send(embed=embedq(EMOJI['cancel'] + 'Unable to retrieve video.',
+            'It may be private, or otherwise unavailable.'))
+        return
+
+    # If anything unexpected occurs, log it
+    log.error(error)
+    if cfg.LOG_TRACEBACKS:
+        log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
+    await ctx.send(embed=embedq(EMOJI['cancel'] + ' An unexpected error has occurred. Check your logs for more information.',
+        str(error)))
 
 @bot.event
 async def on_ready():

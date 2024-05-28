@@ -44,7 +44,7 @@ class MediaSource(str):
     
     Every `MediaSource` that exists should be supported by `MediaInfo`."""
     def __repr__(self):
-        return f'MediaSource("{self}")'
+        return f'<MediaSource "{self}">'
 
 YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
@@ -154,7 +154,7 @@ class MediaInfo:
             raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
     
     def __repr__(self):
-        return f'<{self.__class__.__name__}(source="{self.source}", title="{self.title}", artist="{self.artist}", url="{self.url}", ...)>'
+        return f'<{self.__class__.__name__} source="{self.source}", title="{self.title}", artist="{self.artist}", url="{self.url}", ...>'
 
     @classmethod
     def from_other(cls, url: str) -> Self:
@@ -173,19 +173,13 @@ class MediaInfo:
     @classmethod
     def from_ytmusic(cls, info: dict | str) -> Self:
         """Shorthand for getting a `MediaInfo` object from a `ytmusicapi` source.
-        @info: URL / video watch id / plain search query string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
+        @info: Plain search query string, or a dictionary returned by `ytmusicapi.ytmusic.YTMusic.search()`
         """
         if isinstance(info, str):
-            # If you search YTMusic with a normal YouTube URL it usually gets the right thing,
-            # but using a music.youtube.com URL almost always fails
-            # Using a bare ID, like what you get after "watch?v=", also works well here
-            if video_id := re.findall(r"https://.*youtube\.com/watch\?v=([\w\-]*)", info):
-                info = video_id[0]
-            else:
-                raise ValueError(f'Provided assumed URL string has no video ID within it: {info}')
-            assert isinstance(info, str)
             results = ytmusic.search(info, filter='songs') or ytmusic.search(info, filter='videos')
+            print(results[:3])
             info = results[0]
+            print(info)
         return cls(YOUTUBE, info, yt_info_origin='ytmusic')
 
     @classmethod
@@ -338,7 +332,7 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             try:
                 if isinstance(group_object, AlbumInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
-                    object_list[-1].thumbnail  = group_object.thumbnail
+                    object_list[-1].thumbnail    = group_object.thumbnail
                     object_list[-1].album_name   = group_object.album_name
                     object_list[-1].release_year = group_object.release_year
 
@@ -537,7 +531,7 @@ def compare_media(reference: MediaInfo, compared: MediaInfo,
 def soundcloud_set(url: str) -> PlaylistInfo | AlbumInfo:
     """Retrieves a SoundCloud set and returns either a PlaylistInfo or AlbumInfo where applicable."""
     # Soundcloud playlists and albums use the same URL format, a set
-    response: Any = sc.resolve(url)
+    response = sc.resolve(url)
     if isinstance(response, SoundcloudTrack):
         raise ValueError(f'Tried to retrieve a SoundCloud set with a single track URL: {url}')
 
