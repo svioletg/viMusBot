@@ -117,7 +117,7 @@ class MediaQueue(list[QueueItem]):
         start: int = len(self)
         if isinstance(to_queue, list):
             self.extend(to_queue)
-            end: int = len(self)
+            end: int = len(self) - 1
             return start, end
 
         if isinstance(to_queue, QueueItem):
@@ -413,7 +413,7 @@ class Voice(commands.Cog):
                     log.debug('URL looks like a playlist or an album.')
                     # Because of the previous checks we know this has to only be one URL, no need to keep the list
                     url = url_strings[0]
-                    # [x] Spotify playlists, albums
+                    # Spotify playlists, albums
                     if url.startswith('https://open.spotify.com/album/'):
                         await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
                         if match_result := media.match_ytmusic_album(media.AlbumInfo.from_spotify_url(url), threshold=50):
@@ -468,15 +468,6 @@ class Voice(commands.Cog):
                             to_queue.append(QueueItem(media.TrackInfo.from_other(url), ctx.author))
                     await play_or_enqueue(to_queue if len(to_queue) > 1 else to_queue[0])
                     return
-
-                # TODO: Implement! This needs to handle...
-                # [ ] Spotify track links
-                # [ ] SoundCloud track links
-                # [ ] SoundCloud set links
-                # [ ] YouTube video links
-                # [ ] YouTube playlist links
-                # [ ] YouTube Music song links
-                # [ ] YouTube Music album links
             #endregion FROM URL
 
     @join.before_invoke
@@ -518,15 +509,10 @@ class Voice(commands.Cog):
                     if isinstance(choice, int) and choice != 0:
                         item.info = matches[choice]
                     else:
+                        await self.advance_queue(ctx)
                         return
             if isinstance(matches, media.TrackInfo):
                 item.info = matches
-
-        try:
-            if self.queue_msg:
-                await self.queue_msg.delete()
-        except NotFound:
-            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
 
         try:
             log.debug('Creating YTDLSource...')
@@ -541,6 +527,7 @@ class Voice(commands.Cog):
         self.current['item'] = item
 
         self.voice_client.stop()
+        log.info('Starting audio playback...')
         self.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
 
         submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
@@ -548,6 +535,12 @@ class Voice(commands.Cog):
             f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',
             description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR).set_thumbnail(url=item.info.thumbnail)
         self.now_playing_msg = await ctx.send(embed=embed)
+
+        try:
+            if self.queue_msg:
+                await self.queue_msg.delete()
+        except NotFound:
+            log.debug('Queue message message wasn\'t found, ignoring and continuing...')
 
         if self.previous['source']:
             for file in glob.glob(f'*-#-{cast(YTDLSource, self.previous['source']).ID}-#-*'):

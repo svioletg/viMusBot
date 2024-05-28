@@ -65,7 +65,7 @@ SPOTIFY_PLAYLIST_LIMIT   : int  = get('spotify-playlist-limit')
 FORCE_MATCH_PROMPT       : bool = get('force-match-prompt')
 USE_TOP_MATCH            : bool = get('use-top-match')
 USE_URL_CACHE            : bool = get('use-url-cache')
-DURATION_LIMIT_SECONDS   : int  = get('duration-limit')
+DURATION_LIMIT_SECONDS   : int  = get('duration-limit') * 60 * 60
 MAXIMUM_CONSECUTIVE_URLS : int  = get('maximum-urls')
 MAXIMUM_HISTORY_LENGTH   : int  = get('play-history-max')
 

@@ -101,7 +101,7 @@ class MediaInfo:
             self.url            = cast(str, info.permalink_url)
             self.title          = cast(str, info.title)
             self.artist         = cast(str, info.user['username'])
-            self.thumbnail    = cast(str, info.artwork_url)
+            self.thumbnail      = cast(str, info.artwork_url)
             self.length_seconds = int(info.duration // 1000)
         elif source == YOUTUBE:
             if not self.yt_info_origin:
@@ -153,6 +153,9 @@ class MediaInfo:
         else:
             raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
     
+    def __repr__(self):
+        return f'<{self.__class__.__name__}(source="{self.source}", title="{self.title}", artist="{self.artist}", url="{self.url}", ...)>'
+
     @classmethod
     def from_other(cls, url: str) -> Self:
         """Creates a `MediaInfo` object from whatever information `yt_dlp` returns, if we don't have specific processing for it."""

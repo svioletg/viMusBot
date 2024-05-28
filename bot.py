@@ -1,5 +1,9 @@
 """The main bot script. Running this will start viMusBot."""
 
+# pylint: disable=wrong-import-position
+
+print('Starting up, this can take a few moments...')
+
 # Standard imports
 import asyncio
 import glob
@@ -18,11 +22,10 @@ from discord.ext import commands
 from pretty_help import PrettyHelp
 
 # Local imports
-import update
 import utils.configuration as cfg
 from cogs import cog_general, cog_voice
 from cogs.common import EMOJI, embedq
-from utils import miscutil
+from utils import miscutil, updater
 from utils.palette import Palette
 from version import VERSION
 
@@ -72,14 +75,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 
 # Start bot-related events
 # class Music(commands.Cog):
-#     def __init__(self, bot):
-#         self.bot = bot
-    
-#     audio_start_time: int = 0
-#     audio_time_elapsed: int = 0
-#     paused_at: int = 0
-#     paused_for: int = 0
-
 #     # Playing music / Voice-related
 #     @commands.command(aliases=command_aliases('analyze'))
 #     @commands.check(is_command_enabled)
@@ -116,36 +111,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #             value=str(value)
 #             embed.add_field(name=i.title(),value=value)
 #         await ctx.send(embed=embed)
-
-#     @commands.command(aliases=command_aliases('clear'))
-#     @commands.check(is_command_enabled)
-#     async def clear(self, ctx: commands.Context):
-#         """Clears the entire queue."""
-#         global media_queue
-#         media_queue.clear(ctx)
-#         await ctx.send(embed=embedq('Queue cleared.'))
-
-#     @commands.command(aliases=command_aliases('join'))
-#     @commands.check(is_command_enabled)
-#     async def join(self, ctx):
-#         """Joins the voice channel of the user."""
-#         # This actually just calls ensure_voice below,
-#         # this is only defined so that there's a command in Discord for it
-#         pass
-
-#     @commands.command(aliases=command_aliases('leave'))
-#     @commands.check(is_command_enabled)
-#     async def leave(self, ctx: commands.Context):
-#         """Disconnects the bot from voice."""
-#         global voice
-#         global media_queue
-#         media_queue.clear(ctx)
-#         log.info(f'Leaving voice channel: {ctx.author.voice.channel}')
-#         try:
-#             await voice.disconnect()
-#         except AttributeError:
-#             await ctx.send(embed=embedq('Not connected to voice.'))
-#         voice = None
 
 #     @commands.command(aliases=command_aliases('loop'))
 #     @commands.check(is_command_enabled)
@@ -188,21 +153,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 
 #         await ctx.send(embed=embed)
 
-#     @commands.command(aliases=command_aliases('pause'))
-#     @commands.check(is_command_enabled)
-#     async def pause(self, ctx: commands.Context):
-#         """Pauses the player."""
-#         # Developer note: See on_command_error for how this gets resumed
-#         global paused_at
-#         if voice.is_playing():
-#             paused_at = time.time()
-#             voice.pause()
-#             await ctx.send(embed=embedq('Player has been paused.'))
-#         elif voice.is_paused():
-#             await ctx.send(embed=embedq('Player is already paused.'))
-#         else:
-#             await ctx.send(embed=embedq('Nothing to pause.'))
-    
 #     @commands.command(aliases=command_aliases('play'))
 #     @commands.check(is_command_enabled)
 #     async def play(self, ctx: commands.Context, *queries: str):
@@ -425,45 +375,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #             except Exception as e:
 #                 log.error(e)
 
-#     @commands.command(aliases=command_aliases('queue'))
-#     @commands.check(is_command_enabled)
-#     async def queue(self, ctx: commands.Context, page: int=1):
-#         """Displays the current queue, up to 10 items per page."""
-#         if media_queue.get(ctx) == []:
-#             await ctx.send(embed=embedq('The queue is empty.'))
-#             return
-
-#         total_pages = math.ceil(len(media_queue.get(ctx)) / 10)
-
-#         if page > total_pages:
-#             await ctx.send(embed=embedq(f'Out of range; the current queue has {total_pages} pages.', f'{len(media_queue.get(ctx))} items in total.'))
-#             return
-
-#         queue_time = 0
-#         for item in media_queue.get(ctx):
-#             queue_time += item.duration
-        
-#         queue_time += now_playing.duration - audio_time_elapsed
-        
-#         queue_time = timestamp_from_seconds(queue_time)
-
-#         embed = discord.Embed(title=f'Current queue:\n*Approx. time remaining: {queue_time}*',color=EMBED_COLOR)
-#         start = (10*page)-10
-#         end = (10*page)
-#         if 10*page > len(media_queue.get(ctx)):
-#             end = len(media_queue.get(ctx))
-        
-#         for num, item in enumerate(media_queue.get(ctx)[start:end]):
-#             submitter_text = get_queued_by_text(item.user)
-#             length_text = f'[{timestamp_from_seconds(item.duration)}]' if timestamp_from_seconds(item.duration) != '00:00' else ''
-#             embed.add_field(name=f'#{num+1+start}. {item.title} {length_text}', value=f'Link: {item.url}{submitter_text}', inline=False)
-
-#         try:
-#             embed.description = (f'Showing {start+1} to {end} of {len(media_queue.get(ctx))} items. Use -queue [page] to see more.')
-#         except Exception as e:
-#             log.error(e)
-#         await ctx.send(embed=embed)
-
 #     @commands.command(aliases=command_aliases('remove'))
 #     @commands.check(is_command_enabled)
 #     async def remove(self, ctx: commands.Context, spot: int):
@@ -511,80 +422,11 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #         await ctx.send(embed=embedq('Skipping...'))
 #         await advance_queue(ctx, skip=True)
 
-#     @commands.command(aliases=command_aliases('stop'))
-#     @commands.check(is_command_enabled)
-#     async def stop(self, ctx: commands.Context):
-#         """Stops the player and clears the queue."""
-#         global media_queue
-#         media_queue.clear(ctx)
-#         if voice.is_playing() or voice.is_paused():
-#             voice.stop()
-#             await ctx.send(embed=embedq('Player has been stopped.'))
-#         else:
-#             await ctx.send(embed=embedq('Nothing is playing.'))
-    
-#     @commands.command(aliases=command_aliases('clearcache'))
-#     @commands.check(is_command_enabled)
-#     async def clearcache(self, ctx: commands.Context):
-#         """Removes all information from the current URL cache"""
-#         global url_info_cache
-#         url_info_cache = {}
-#         log.debug(f'URL cache was cleared: {url_info_cache}')
-#         await ctx.send(embed=embedq('URL cache has been emptied.', '' if USE_URL_CACHE else f'{emoji["info"]} URL cache is currently disabled.'))
-
-#     @join.before_invoke
-#     @play.before_invoke
-#     @pause.before_invoke
-#     @stop.before_invoke
-#     async def ensure_voice(self, ctx: commands.Context):
-#         if ctx.voice_client is None:
-#             if ctx.author.voice:
-#                 log.info(f'Joining voice channel: {ctx.author.voice.channel}')
-#                 global voice
-#                 voice = await ctx.author.voice.channel.connect()
-#             else:
-#                 await ctx.send(embed=embedq("You are not connected to a voice channel."))
-
 # ############################################
 # 
 # End of cog definitions.
 # 
 # ############################################
-
-# url_info_cache = {}
-
-# def cache_if_succeeded(key: str):
-#     """
-#     Stores result into cache dictionary if retrieval succeeded, or returns result if one already exists
-
-#     key (str): The dictionary key to check and/or store results
-#     """
-#     def decorator(func):
-#         def cache_check(*args, **kwargs):
-#             # Just run functions normally if caching is disabled
-#             if USE_URL_CACHE == False:
-#                 result = func(*args, **kwargs)
-#                 return result
-#             # Otherwise, check the cache for an existing key to return, or create a new one if none is found (or the value is invalid)
-#             try:
-#                 url = args[0]
-#                 if url not in url_info_cache:
-#                     url_info_cache[url] = {}
-            
-#                 if url_info_cache[url].get(key, None) not in ['', None]:
-#                     # Return stored info
-#                     result = url_info_cache[url][key]
-#                     log.debug(f'{key} of \'{url}\' already stored: {result}')
-#                     return result
-#                 else:
-#                     # Retrieve info normally
-#                     result = func(*args, **kwargs)
-#                     url_info_cache[url][key] = result
-#                     return result
-#             except Exception as e:
-#                 log.error(e)
-#         return cache_check
-#     return decorator
 
 # Establish bot user
 intents = discord.Intents.default()

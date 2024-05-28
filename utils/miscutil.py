@@ -7,7 +7,7 @@ import re
 import time
 from pathlib import Path
 from sys import stdout
-from typing import Callable
+from typing import Callable, Optional
 
 # External imports
 import colorlog
@@ -59,8 +59,9 @@ def time_func(func: Callable, printout: bool=True) -> float:
         print(f'{func} ... completed in ... {tb - ta}s')
     return func_result
 
-def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
-    """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output"""
+def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> logging.Logger:
+    """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output.
+    A file handler is only created if `logfile` has a value."""
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     use_color: bool = not DISABLE_LOG_COLORS
     new_logger = colorlog.getLogger(logger_name)
@@ -99,13 +100,13 @@ def create_logger(logger_name: str, logfile: str | Path) -> logging.Logger:
     stdout_handler = colorlog.StreamHandler(stream=stdout)
     stdout_handler.setFormatter(log_format_colored)
     stdout_handler.setLevel(logging.getLevelName(LOG_LEVEL))
-
-    file_handler = logging.FileHandler(filename=logfile, encoding='utf-8', mode='w')
-    file_handler.setFormatter(log_format_no_color)
-    file_handler.setLevel(logging.DEBUG)
-
     new_logger.addHandler(stdout_handler)
-    new_logger.addHandler(file_handler)
+
+    if logfile:
+        file_handler = logging.FileHandler(filename=logfile, encoding='utf-8', mode='w')
+        file_handler.setFormatter(log_format_no_color)
+        file_handler.setLevel(logging.DEBUG)
+        new_logger.addHandler(file_handler)
 
     new_logger.setLevel(colorlog.DEBUG)
 

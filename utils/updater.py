@@ -27,7 +27,7 @@ def get_latest_tag() -> dict:
 
     return {'tag': latest_tag, 'response_json': latest}
 
-def main() -> None:
+def main():
     print('Checking...')
 
     latest: dict = get_latest_tag()
