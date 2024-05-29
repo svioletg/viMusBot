@@ -1,4 +1,4 @@
-"""Primarily provides methods for searching and returning 
+"""Primarily provides methods for searching and returning
 standardized results from various sources."""
 
 # Standard imports
@@ -41,7 +41,7 @@ if cfg.FORCE_MATCH_PROMPT:
 # For typing, no functional difference
 class MediaSource(str):
     """String subclass that represents a media source. Exists only for typing purposes.
-    
+
     Every `MediaSource` that exists should be supported by `MediaInfo`."""
     def __repr__(self):
         return f'<MediaSource "{self}">'
@@ -64,7 +64,7 @@ class LocalFileError(MediaError):
 #region MEDIAINFO AND SUBCLASSES
 class MediaInfo:
     """Base class for gathering standardized data from different media sources.
-    
+
     Retrieves common attributes that can be obtained the same way regardless of type (Track, Album, Playlist).
     Generally should not be called directly; use the appropriate subclass instead.
     """
@@ -152,7 +152,7 @@ class MediaInfo:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
         else:
             raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
-    
+
     def __repr__(self):
         return f'<{self.__class__.__name__} source="{self.source}", title="{self.title}", artist="{self.artist}", url="{self.url}", ...>'
 
@@ -473,7 +473,7 @@ def compare_media(reference: MediaInfo, compared: MediaInfo,
         **kwargs) -> tuple[int, dict[str, bool]]:
     """Compares the data from two MediaInfo objects, and returns a percentage of how close they are overall, along with the individual
     matching factors themselves.
-    
+
     @reference: MediaInfo object to compare against
     @compared: MediaInfo object to be compared
     @mode: Either 'fuzz' or 'strict'; 'fuzz' uses fuzzy matching to determine whether something should clear a check,\
@@ -599,7 +599,7 @@ class YTMusicResults(TypedDict):
 
 def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
-    
+
     @query: String to search with.
     @results: Maximum number of search results to return, per each category.
     """
@@ -632,7 +632,7 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
 def match_ytmusic_album(src_info: AlbumInfo, threshold: int=75) -> tuple[AlbumInfo, int] | None:
     """Attempts to find an album on YTMusic that matches `src_info`'s attributes as closely as possible.
     Returns the matched album if the threshold was reached, along with a "confidence" score.
-    
+
     @src_info: `AlbumInfo` to find a match for.
     @threshold: (`75`) Percentage of how close a match should be in order to get returned, otherwise `None` is returned.
     """
