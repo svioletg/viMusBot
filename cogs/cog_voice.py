@@ -22,7 +22,7 @@ import yt_dlp
 # Local imports
 import utils.configuration as cfg
 from cogs.common import EMOJI, command_aliases, embedq, is_command_enabled, prompt_for_choice
-from utils.miscutil import line, time_func, timestamp_from_seconds
+from utils.miscutil import timestamp_from_seconds
 from utils import media
 
 log = logging.getLogger('viMusBot')
@@ -50,6 +50,7 @@ ffmpeg_options = {
 }
 
 class YTDLSource(PCMVolumeTransformer):
+    """Creates an AudioSource using yt_dlp."""
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
 
@@ -62,6 +63,7 @@ class YTDLSource(PCMVolumeTransformer):
 
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=False):
+        """Creates a YTDLSource from a URL."""
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
@@ -73,8 +75,8 @@ class YTDLSource(PCMVolumeTransformer):
             raise e
 
         filename = data['url'] if stream else ytdl.prepare_filename(data) # type: ignore
-        src = filename.split('-#-')[0]
-        ID = filename.split('-#-')[1]
+        src = filename.split('-#-')[0] # pylint: disable=unused-variable
+        ID = filename.split('-#-')[1] # pylint: disable=unused-variable
         return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data) # type: ignore
 
 @dataclass
@@ -136,18 +138,23 @@ class Voice(commands.Cog):
         self.bot = bot
         self.voice_client: Optional[VoiceClient] = None
         self.media_queue = MediaQueue()
-        self.advance_lock: bool = False
         self.play_history: deque = deque(maxlen=5)
+        self.advance_lock: bool = False
+
+        self.skip_votes_placed: list[Member] = []
+
         self.paused_at: float = 0.0
         self.pause_duration: float = 0.0
         self.audio_time_elapsed: float = 0.0
+
         self.current: dict[str, Optional[YTDLSource | QueueItem]] = {'source': None, 'item': None}
         self.previous = self.current.copy()
+
         self.now_playing_msg: Optional[Message] = None
         self.queue_msg: Optional[Message] = None
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member: Member, before: VoiceState, after):
+    async def on_voice_state_update(self, member: Member, before: VoiceState, after): # pylint: disable=unused-variable
         """Listener for the voice state update event. Currently handles inactivity timeouts and tracks how long audio has been playing."""
         if not (member.id == self.bot.user.id):
             return
@@ -193,6 +200,10 @@ class Voice(commands.Cog):
     @commands.check(is_command_enabled)
     async def leave(self, ctx: commands.Context):
         """Leaves the currently connected to voice channel."""
+        if not cast(Member, ctx.author).voice:
+            log.info('Command author not connected to voice, cancelling.')
+            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
+            return
         if self.voice_client.is_connected():
             log.info('Clearing the queue...')
             self.media_queue.clear()
@@ -265,7 +276,33 @@ class Voice(commands.Cog):
     @commands.command(aliases=command_aliases('skip'))
     @commands.check(is_command_enabled)
     async def skip(self, ctx: commands.Context):
-        raise NotImplementedError
+        """Skips the current track. If vote-to-skip is disabled for this bot, it will be skipped immediately."""
+        ctx.author = cast(Member, ctx.author)
+        if not ctx.author.voice:
+            log.info('Command author not connected to voice, cancelling.')
+            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
+            return
+
+        if self.voice_client.is_playing() or self.voice_client.is_paused():
+            if cfg.VOTE_TO_SKIP:
+                skip_ratio = ((len(self.skip_votes_placed) / len(ctx.author.voice.channel.members)) * 100)
+                if ctx.author not in self.skip_votes_placed:
+                    self.skip_votes_placed.append(ctx.author)
+                    await ctx.send(embed=embedq('Voted to skip. '+
+                        f'({len(self.skip_votes_placed)}/{cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact'\
+                        else ceil(len(ctx.author.voice.channel.members) * (cfg.SKIP_VOTES_PERCENTAGE / 100))})',
+                        subtext=f'Vote-skipping mode is set to "{cfg.SKIP_VOTES_TYPE}"'))
+                else:
+                    await ctx.send(embed=embedq('You have already voted to skip.'))
+
+            if (not cfg.VOTE_TO_SKIP)\
+                or (cfg.SKIP_VOTES_TYPE == 'exact') and (self.skip_votes_placed == cfg.SKIP_VOTES_EXACT)\
+                or (cfg.SKIP_VOTES_TYPE == 'percentage') and (skip_ratio >= cfg.SKIP_VOTES_PERCENTAGE):
+                await ctx.send(embed=embedq('Skipping...'))
+                self.voice_client.stop()
+                await self.advance_queue(ctx, skipping=True)
+        else:
+            await ctx.send(embed=embedq('Nothing to skip.'))
 
     @commands.command(aliases=command_aliases('loop'))
     @commands.check(is_command_enabled)

@@ -71,6 +71,6 @@ USE_URL_CACHE           : bool = get('use-url-cache')
 DURATION_LIMIT_SECONDS  : int  = get('duration-limit') * 60 * 60
 
 VOTE_TO_SKIP          : bool = get('vote-to-skip.enabled')
-SKIP_VOTES_TYPE       : str  = get('vote-to-skip.threshold-type')
 SKIP_VOTES_EXACT      : int  = get('vote-to-skip.threshold-exact')
 SKIP_VOTES_PERCENTAGE : int  = get('vote-to-skip.threshold-percentage')
+SKIP_VOTES_TYPE       : Literal['percentage', 'exact'] = get('vote-to-skip.threshold-type')
