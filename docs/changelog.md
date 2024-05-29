@@ -11,6 +11,7 @@ Developer
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
     - `-reload` debug command removed
+    - `-analyze` command removed
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
     - `console()` renamed to `console_thread()` for consistency with `bot_thread()`
     - Many `global` statements have been removed, various variables moved into separate cogs or classes where relevant
@@ -58,6 +59,7 @@ Fixes
 - Using the `stop` console command will now suppress the resulting `CancelledError`
 
 Other
+- `-analyze` command removed
 - Config changes:
     - Default value of `use-top-match` set to `no`
     - Default value of `command-blacklist` is now empty

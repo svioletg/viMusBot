@@ -22,9 +22,14 @@ EMOJI = {
     ],
 }
 
-def is_command_enabled(ctx: commands.Context) -> bool:
+async def is_command_enabled(ctx: commands.Context) -> bool:
     """Checks whether this command's name is found in the configuration's list of disabled commands."""
-    return not ctx.command.name in cfg.DISABLED_COMMANDS
+    if not ctx.command.name in cfg.DISABLED_COMMANDS:
+        return True
+    else:
+        await ctx.send(embed=embedq(EMOJI['cancel'] + ' This command is disabled.',
+            'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
+        return False
 
 def command_aliases(command: str) -> list[str]:
     """Returns a list of aliases for the given command."""

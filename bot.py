@@ -453,16 +453,14 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
     if isinstance(error, commands.CommandInvokeError):
         if 'ffmpeg was not found' in repr(error):
             log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
-            await ctx.send(embed=embedq(EMOJI['cancel'] + 'Can\'t play audio. Please check the bot\'s logs.'))
+            await ctx.send(embed=embedq(EMOJI['cancel'] + ' Can\'t play audio. Please check the bot\'s logs.'))
             return
     if isinstance(error, commands.CheckFailure):
-        await ctx.send(embed=embedq(EMOJI['cancel'] + 'This command is disabled.',
-            'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
-        return
+        return # These are handled individually, ignore
     if isinstance(error, commands.CommandNotFound):
         return # Ignore these
     if isinstance(error, yt_dlp.utils.DownloadError):
-        await ctx.send(embed=embedq(EMOJI['cancel'] + 'Unable to retrieve video.',
+        await ctx.send(embed=embedq(EMOJI['cancel'] + ' Unable to retrieve video.',
             'It may be private, or otherwise unavailable.'))
         return
 

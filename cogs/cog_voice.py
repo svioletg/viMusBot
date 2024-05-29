@@ -131,6 +131,15 @@ class AlbumLimitError(Exception):
 class PlaylistLimitError(Exception):
     """Raised when a playlist exceeds its maximum length, set by user configuration."""
 
+async def author_in_vc(ctx: commands.Context) -> bool:
+    """Checks whether the command author is connected to a voice channel before allowing it to run."""
+    command_author = cast(Member, ctx.author)
+    if not command_author.voice:
+        log.info('Command author not connected to voice, cancelling.')
+        await ctx.send(embed=embedq(EMOJI['cancel'] + ' You must be connected to a voice channel to do this.'))
+        return False
+    return True
+
 class Voice(commands.Cog):
     """Handles voice and music-related tasks."""
 
@@ -192,18 +201,16 @@ class Voice(commands.Cog):
     #region COMMANDS
     @commands.command(aliases=command_aliases('join'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def join(self, ctx: commands.Context):
         """Joins the same voice channel the command user is connected to."""
         await ctx.send(embed=embedq(f'Joining voice channel: {cast(Member, ctx.author).voice.channel.name}'))
 
     @commands.command(aliases=command_aliases('leave'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def leave(self, ctx: commands.Context):
         """Leaves the currently connected to voice channel."""
-        if not cast(Member, ctx.author).voice:
-            log.info('Command author not connected to voice, cancelling.')
-            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
-            return
         if self.voice_client.is_connected():
             log.info('Clearing the queue...')
             self.media_queue.clear()
@@ -249,21 +256,25 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('move'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def move(self, ctx: commands.Context):
         raise NotImplementedError
 
     @commands.command(aliases=command_aliases('shuffle'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def shuffle(self, ctx: commands.Context):
         raise NotImplementedError
 
     @commands.command(aliases=command_aliases('remove'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def remove(self, ctx: commands.Context):
         raise NotImplementedError
 
     @commands.command(aliases=command_aliases('clear'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def clear(self, ctx: commands.Context):
         """Removes everything from the queue."""
         log.info('Clearing the queue...')
@@ -275,25 +286,24 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('skip'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def skip(self, ctx: commands.Context):
         """Skips the current track. If vote-to-skip is disabled for this bot, it will be skipped immediately."""
         ctx.author = cast(Member, ctx.author)
-        if not ctx.author.voice:
-            log.info('Command author not connected to voice, cancelling.')
-            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
-            return
+        vote_requirement_real = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else cfg.SKIP_VOTES_PERCENTAGE
+        vote_requirement_display = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else f'{cfg.SKIP_VOTES_PERCENTAGE}%%'
 
         if self.voice_client.is_playing() or self.voice_client.is_paused():
             if cfg.VOTE_TO_SKIP:
-                skip_ratio = ((len(self.skip_votes_placed) / len(ctx.author.voice.channel.members)) * 100)
                 if ctx.author not in self.skip_votes_placed:
                     self.skip_votes_placed.append(ctx.author)
                     await ctx.send(embed=embedq('Voted to skip. '+
                         f'({len(self.skip_votes_placed)}/{cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact'\
                         else ceil(len(ctx.author.voice.channel.members) * (cfg.SKIP_VOTES_PERCENTAGE / 100))})',
-                        subtext=f'Vote-skipping mode is set to "{cfg.SKIP_VOTES_TYPE}"'))
+                        subtext=f'Vote-skipping mode is set to "{cfg.SKIP_VOTES_TYPE}", and {cfg.SKIP_VOTES_EXACT}'))
                 else:
                     await ctx.send(embed=embedq('You have already voted to skip.'))
+                skip_ratio = (len(self.skip_votes_placed) / len(ctx.author.voice.channel.members)) * 100
 
             if (not cfg.VOTE_TO_SKIP)\
                 or (cfg.SKIP_VOTES_TYPE == 'exact') and (self.skip_votes_placed == cfg.SKIP_VOTES_EXACT)\
@@ -306,11 +316,13 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('loop'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def loop(self, ctx: commands.Context):
         raise NotImplementedError
 
     @commands.command(aliases=command_aliases('pause'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def pause(self, ctx: commands.Context):
         """Pauses the player."""
         if self.voice_client.is_playing():
@@ -324,6 +336,7 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('stop'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def stop(self, ctx: commands.Context):
         """Stops audio and clears the remaining queue."""
         log.info('Stopping audio and clearing the queue...')
@@ -337,20 +350,16 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def play(self, ctx: commands.Context, *queries: str):
         """Adds a link to the queue. Plays immediately if the queue is empty.
 
         @queries: Can either be a single URL string, a list of URL strings, or a non-URL string for text searching
         """
-        ctx.author = cast(Member, ctx.author)
         log.info('Running "play" command...')
-
-        if not ctx.author.voice:
-            log.info('Command author not connected to voice, cancelling.')
-            await ctx.send(embed=embedq('You must be connected to a voice channel to do this.'))
-            return
-
         log.debug('Args: queries=%s', repr(queries))
+
+        ctx.author = cast(Member, ctx.author)
 
         async def play_or_enqueue(item: QueueItem | list[QueueItem]):
             """Adds the given `QueueItem` to the media queue. If the queue is empty, the item will attempt to play immediately.
@@ -539,8 +548,6 @@ class Voice(commands.Cog):
                         await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
                     else:
                         return
-
-                    # [ ] YouTube playlists, YTMusic albums
                 else:
                     # Single track links
                     to_queue: list[QueueItem] = []
@@ -563,11 +570,6 @@ class Voice(commands.Cog):
                     return
             #endregion FROM URL
 
-    @commands.command(aliases=command_aliases('analyze'))
-    @commands.check(is_command_enabled)
-    async def analyze(self, ctx: commands.Context):
-        raise NotImplementedError
-
     @join.before_invoke
     @play.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
@@ -578,6 +580,8 @@ class Voice(commands.Cog):
             self.voice_client = await author.voice.channel.connect()
 
     #endregion COMMANDS
+    #region END OF COMMANDS
+    #endregion END OF COMMANDS
 
     async def play_item(self, item: QueueItem, ctx: commands.Context):
         """Create a new player from the given `QueueItem` and start playing audio."""
@@ -654,6 +658,7 @@ class Voice(commands.Cog):
         if not self.advance_lock and (skipping or not self.voice_client.is_playing()):
             log.debug('Locking...')
             self.advance_lock = True
+            self.skip_votes_placed.clear()
             try:
                 if not self.media_queue:
                     self.voice_client.stop()
@@ -667,8 +672,10 @@ class Voice(commands.Cog):
             log.debug('Attempted call while locked; ignoring...')
 
     def get_queued_by_text(self, member: Member) -> str:
+        """Returns the nickname (if set, username otherwise) of who queued the current item if that is enabled,
+        otherwise an empty string."""
         return f'\nQueued by {member.nick or member.name}' if cfg.SHOW_USERS_IN_QUEUE else ''
 
-    # TODO: This could have a better name
     def get_loop_icon(self) -> str:
-        return EMOJI['repeat']+' ' if self.media_queue.is_looping else ''
+        """Returns a looping emoji is looping is enabled, nothing otherwise."""
+        return EMOJI['repeat'] + ' ' if self.media_queue.is_looping else ''
