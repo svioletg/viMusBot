@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 
 # External imports
-from discord import Embed, Member, Message, Reaction
+from discord import Embed, Member, Message, NotFound, Reaction
 from discord.ext import commands
 
 # Local imports
@@ -35,6 +35,14 @@ def command_aliases(command: str) -> list[str]:
     """Returns a list of aliases for the given command."""
     return cfg.COMMAND_ALIASES.get(command) or []
 
+async def edit_or_send(ctx: commands.Context, target: Optional[Message], **kwargs) -> Message:
+    """Checks if the given Message object exists (is `None` or not), edits it if so, creates and sends a new message if not.
+    Returns the edited or sent message. **kwargs will be passed to the message constructor.
+    
+    @target: `Message` to target for editing"""
+    message: Message = await target.edit(**kwargs) if target else await ctx.send(**kwargs)
+    return message
+
 def embedq(title: str, subtext: Optional[str]=None, color: int=cfg.EMBED_COLOR) -> Embed:
     """Shortcut for making embeds for messages."""
     return Embed(title=title, description=subtext, color=color)
@@ -45,11 +53,10 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
     yesno: bool=False,
     choice_nums: int=0,
     timeout_seconds: int=30,
-    delete_prompt: bool=True) -> int | asyncio.TimeoutError | ValueError:
+    delete_prompt: bool=True) -> int:
     """Adds reactions to a given Message (`prompt_msg`) and returns the outcome.
 
-    Returns the chosen number if a valid selection was made, otherwise a `TimeoutError` if a timeout occurred,\
-    or a `ValueError` if `choice_nums` was greater than 10. If the prompt was cancelled, 0 will be returned.
+    Returns the chosen number if a valid selection was made, 0 if the prompt was cancelled.
 
     @prompt_msg: A `Message` containing the choices that reaction will be added to.
     @result_msg: (`None`) A `Message` that can be edited based on the prompt's outcome.
@@ -85,7 +92,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
 
     try:
         reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check)
-    except asyncio.TimeoutError as e:
+    except asyncio.TimeoutError:
         log.debug('Choice prompt timeout reached.')
         if result_msg:
             await result_msg.edit(embed=embedq(EMOJI['cancel'] + ' Prompt timed out.'))
@@ -93,7 +100,6 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
             await result_msg.delete()
         if delete_prompt:
             await prompt_msg.delete()
-        return e
 
     log.debug('Received a valid reaction.')
 

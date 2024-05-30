@@ -38,10 +38,6 @@ vote-to-skip:
 # Toggles whether -nowplaying and -queue will show names of who queued what
 show-users-in-queue: yes
 
-# Toggles the usage of the URL cache, which is intended to slightly speed up queuing times
-# You may disable this if it is causing problems for you (if it is, please submit an issue reporting the bug)
-use-url-cache: yes
-
 # List of file extensions the bot will detect and delete on startup; must start with a "."
 auto-remove:
     - ".part"
@@ -78,7 +74,7 @@ duration-limit: 5
 maximum-urls: 5
 
 # Maximum number of tracks to save and show with the bot's "-history" command
-# Setting to 0 will disable it entirely
+# Setting to 0 will disable it entirely; cannot be set higher than 20
 play-history-max: 5
 
 # Leave the voice channel if nothing has been playing for this many minutes

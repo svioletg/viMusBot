@@ -10,6 +10,8 @@ Developer
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library ([#73](https://github.com/svioletg/viMusBot/issues/73))
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
+    - No longer have to use `try/except` blocks for 404 errors resulting from editing/deleting messages, the issue was that the reference variables weren't getting properly set to `None` when `some_message.delete()` was called, so the reference pointed to nothing
+    - `duration_from_url()` and `title_from_url()` removed, any functions related to URL caching removed, now irrelevant
     - `-reload` debug command removed
     - `-analyze` command removed
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
@@ -57,6 +59,7 @@ Features
 
 Fixes
 - Using the `stop` console command will now suppress the resulting `CancelledError`
+- Properly fixed an issue with 404 errors when trying to edit or delete bot messages
 
 Other
 - `-analyze` command removed
@@ -65,6 +68,7 @@ Other
     - Default value of `command-blacklist` is now empty
     - `force-no-match` renamed to `force-match-prompt` for clarity
     - `spotify-playlist-limit` removed, `playlist-track-limit` and `album-track-limit` added in its place (limit applies to any source now)
+    - `use-url-cache` removed
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
         - `console-log-level` (boolean) has been added

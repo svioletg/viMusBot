@@ -30,12 +30,6 @@ plt = Palette()
 # Function to communicate with the bot and send status messages, useful for long tasks
 bot_status_callback: Callable = lambda message: None
 
-# Useful to point this out if left on accidentally
-if cfg.FORCE_MATCH_PROMPT:
-    log.warning('force-match-prompt is turned on. '+\
-        'This is not an inherent problem, but may cause unwanted behavior if left on by accident. '+\
-        'Check your config.yml if this is was not intended.')
-
 #region DEFINE CLASSES
 
 # For typing, no functional difference

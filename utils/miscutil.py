@@ -28,7 +28,7 @@ class Stopwatch:
         self.name = name
         self.lap_start: float = 0.0
         self.lap_end: float = 0.0
-    
+
     def lap(self, label: str=''):
         """Prints out the time elapsed between now and the last call to `lap()`.
         @label: A message to attach. Useful for more clearly indicating progress or line numbers.
@@ -49,7 +49,7 @@ def timestamp_from_seconds(seconds: int | float) -> str:
 
 def time_func(func: Callable, printout: bool=True) -> float:
     """Times the execution of a callable, prints out the result if allowed, and returns the result of the called function
-    
+
     @printout: Whether to print a string containing the time elapsed
     """
     ta = time.perf_counter()
@@ -68,9 +68,10 @@ def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> loggi
     date_format = '%y-%m-%d %H:%M:%S'
     log_string_pre = '[%(asctime)s] [{c_module_}%(module)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\
         ' in {c_func_}%(funcName)s%(reset)s: {c_}%(message)s'
-    
+
     log_string_no_color = re.sub(r"({c_(.*?)})", '', log_string_pre)
     log_string_no_color = re.sub(r"%\(reset\)s", '', log_string_no_color)
+
     log_string_colored = re.sub(r"({c_(.*?)})", r'%(\2log_color)s', log_string_pre)
 
     def get_log_colors(use_color: bool=True):
@@ -83,7 +84,7 @@ def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> loggi
             'CRITICAL': 'red,bg_white' if use_color else ''
         }
         return log_colors
-    
+
     def get_secondary_log_colors(use_color: bool=True):
         secondary_log_colors = {
             'module': {l:'cyan' if use_color else '' for l in levels},
