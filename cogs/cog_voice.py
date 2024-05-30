@@ -290,7 +290,7 @@ class Voice(commands.Cog):
     async def skip(self, ctx: commands.Context):
         """Skips the current track. If vote-to-skip is disabled for this bot, it will be skipped immediately."""
         ctx.author = cast(Member, ctx.author)
-        vote_requirement_real = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else cfg.SKIP_VOTES_PERCENTAGE
+        vote_requirement_real = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else ceil(len(ctx.author.voice.channel.members) * (cfg.SKIP_VOTES_PERCENTAGE / 100))
         vote_requirement_display = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else f'{cfg.SKIP_VOTES_PERCENTAGE}%%'
 
         if self.voice_client.is_playing() or self.voice_client.is_paused():
@@ -298,16 +298,13 @@ class Voice(commands.Cog):
                 if ctx.author not in self.skip_votes_placed:
                     self.skip_votes_placed.append(ctx.author)
                     await ctx.send(embed=embedq('Voted to skip. '+
-                        f'({len(self.skip_votes_placed)}/{cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact'\
-                        else ceil(len(ctx.author.voice.channel.members) * (cfg.SKIP_VOTES_PERCENTAGE / 100))})',
-                        subtext=f'Vote-skipping mode is set to "{cfg.SKIP_VOTES_TYPE}", and {cfg.SKIP_VOTES_EXACT}'))
+                        f'({len(self.skip_votes_placed)}/{vote_requirement_real})',
+                        subtext=f'Vote-skipping mode is set to "{cfg.SKIP_VOTES_TYPE}", and {vote_requirement_display} votes are required.'))
                 else:
                     await ctx.send(embed=embedq('You have already voted to skip.'))
-                skip_ratio = (len(self.skip_votes_placed) / len(ctx.author.voice.channel.members)) * 100
 
             if (not cfg.VOTE_TO_SKIP)\
-                or (cfg.SKIP_VOTES_TYPE == 'exact') and (self.skip_votes_placed == cfg.SKIP_VOTES_EXACT)\
-                or (cfg.SKIP_VOTES_TYPE == 'percentage') and (skip_ratio >= cfg.SKIP_VOTES_PERCENTAGE):
+                or (len(self.skip_votes_placed) >= vote_requirement_real):
                 await ctx.send(embed=embedq('Skipping...'))
                 self.voice_client.stop()
                 await self.advance_queue(ctx, skipping=True)
