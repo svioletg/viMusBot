@@ -186,7 +186,7 @@ class MediaInfo:
         return cls(YOUTUBE, info, yt_info_origin='ytdl')
 
     def length_hms(self) -> str:
-        """Returns the `length_seconds` attribute in a humanized format."""
+        """Returns the `length_seconds` attribute in HH:MM:SS or MM:SS format, whichever is applicable."""
         return timestamp_from_seconds(self.length_seconds)
 
     def check_missing(self):
@@ -398,7 +398,7 @@ sc = SoundcloudAPI()
 #region SETUP FINISHED
 #endregion SETUP FINISHED
 
-class Testing:
+class Tests:
     """For debugging. Generates every type of MediaInfo object for every valid source."""
     def __init__(self):
         self.t = {
@@ -449,13 +449,13 @@ class Testing:
     @staticmethod
     def verall() -> None:
         """Testing method. Runs verify for every result returned."""
-        r = Testing()
+        r = Tests()
         for n, i in enumerate((r.t, r.p, r.a)):
             src = ['SINGLE TRACK,', 'PLAYLIST', 'ALBUM'][n]
             print(f'---## {src} ##---')
             for j in i:
                 print(f'---| {j} |---')
-                Testing.verify(i[j])
+                Tests.verify(i[j])
 
 # Define matching logic
 def compare_media(reference: MediaInfo, compared: MediaInfo,

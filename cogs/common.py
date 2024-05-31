@@ -22,6 +22,9 @@ EMOJI = {
     ],
 }
 
+class SilentCancel(commands.CommandError):
+    """Raised to cancel commands where "return" wouldn't work, like the `Voice` cog's `ensure_voice()`"""
+
 async def is_command_enabled(ctx: commands.Context) -> bool:
     """Checks whether this command's name is found in the configuration's list of disabled commands."""
     if not ctx.command.name in cfg.DISABLED_COMMANDS:

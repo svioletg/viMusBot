@@ -2,28 +2,32 @@
 
 # Standard imports
 import asyncio
-from collections import deque
-from dataclasses import dataclass
 import glob
 import logging
-from math import ceil
 import os
+import random
 import re
 import time
+from collections import deque
+from dataclasses import dataclass
+from math import ceil
 from typing import Optional, Self, cast
+from unittest.mock import MagicMock
 
-# External imports
-from discord import Embed, FFmpegPCMAudio, Member, Message, PCMVolumeTransformer, User, VoiceClient, VoiceState
-from discord.ext import commands
 import requests
-from yt_dlp import YoutubeDL
 import yt_dlp
+# External imports
+from discord import (Embed, FFmpegPCMAudio, Member, Message,
+                     PCMVolumeTransformer, User, VoiceClient, VoiceState)
+from discord.ext import commands
+from yt_dlp import YoutubeDL
 
 # Local imports
 import utils.configuration as cfg
-from cogs.common import EMOJI, command_aliases, edit_or_send, embedq, is_command_enabled, prompt_for_choice
-from utils.miscutil import timestamp_from_seconds
+from cogs.common import (EMOJI, SilentCancel, command_aliases, edit_or_send,
+                         embedq, is_command_enabled, prompt_for_choice)
 from utils import media
+from utils.miscutil import timestamp_from_seconds
 
 log = logging.getLogger('viMusBot')
 
@@ -353,7 +357,11 @@ class Voice(commands.Cog):
     @commands.command(aliases=command_aliases('nowplaying'))
     @commands.check(is_command_enabled)
     async def nowplaying(self, ctx: commands.Context):
-        raise NotImplementedError
+        """Shows what's currently playing, if any exists."""
+        if self.voice_client.is_playing():
+            await ctx.send(embed=self.embed_now_playing())
+        else:
+            await ctx.send(embed=embedq('Nothing is playing.'))
 
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
@@ -400,6 +408,9 @@ class Voice(commands.Cog):
                 self.voice_client.resume()
                 await ctx.send(embed=embedq('Player is resuming.'))
                 self.pause_duration = time.time() - self.paused_at
+            elif (not self.voice_client.is_playing()) and (self.media_queue != []):
+                await ctx.send(embed=embedq('Starting queue...'))
+                await self.advance_queue(ctx, skipping=True)
             else:
                 await ctx.send(embed=embedq('No URL or search terms given.'))
             return
@@ -502,11 +513,10 @@ class Voice(commands.Cog):
 
                     if re.findall(r"https://(?:music\.|www\.|)youtube\.com/playlist\?list=", url):
                         # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
-                        media_list = media.PlaylistInfo.from_ytdl(url.replace('music.', 'www.'))
+                        media_list = media.PlaylistInfo.from_ytdl(url.replace('Voice.', 'www.'))
 
                     if url.startswith('https://open.spotify.com/album/'):
                         media_list = media.AlbumInfo.from_spotify_url(url)
-
                     if url.startswith('https://open.spotify.com/playlist/'):
                         media_list = media.PlaylistInfo.from_spotify_url(url)
 
@@ -575,7 +585,11 @@ class Voice(commands.Cog):
             #endregion FROM URL
 
     @join.before_invoke
+    @leave.before_invoke
     @play.before_invoke
+    @skip.before_invoke
+    @stop.before_invoke
+    @nowplaying.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
         """Joins the author's voice channel if no voice client is active."""
         author = cast(Member, ctx.author)
@@ -589,13 +603,35 @@ class Voice(commands.Cog):
                 await ctx.send(embed=embedq('No voice connection found.',
                     'The bot will automatically connect to a voice channel if one of these commands are used: '+
                     f'{', '.join(auto_connect_commands)}'))
+                raise SilentCancel
 
     #endregion COMMANDS
     #region END OF COMMANDS
     #endregion END OF COMMANDS
 
-    async def play_item(self, item: QueueItem, ctx: commands.Context):
-        """Create a new player from the given `QueueItem` and start playing audio."""
+    def get_queued_by_text(self, member: Member) -> str:
+        """Returns the nickname (if set, username otherwise) of who queued the current item if that is enabled,
+        otherwise an empty string."""
+        return f'\nQueued by {member.nick or member.name}' if cfg.SHOW_USERS_IN_QUEUE else ''
+
+    def get_loop_icon(self) -> str:
+        """Returns a looping emoji is looping is enabled, nothing otherwise."""
+        return EMOJI['repeat'] + ' ' if self.media_queue.is_looping else ''
+
+    def embed_now_playing(self) -> Embed:
+        """Constructs and returns the "Now playing" message embed."""
+        item = cast(QueueItem, self.current['item'])
+        submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
+        embed = Embed(title=self.get_loop_icon() + \
+            f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',
+            description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR).set_thumbnail(url=item.info.thumbnail)
+        return embed
+
+    async def make_and_start_player(self, item: QueueItem, ctx: commands.Context):
+        """Create a new player from the given `QueueItem` and starts playing audio.
+        Handles matching individual Spotify tracks to YTVoice.
+
+        Use `advance_queue()` to attempt moving the queue along, do not use this function directly."""
         log.info('Trying to start playing...')
 
         self.previous = self.current.copy()
@@ -641,11 +677,7 @@ class Voice(commands.Cog):
         log.info('Starting audio playback...')
         self.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
 
-        submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
-        embed = Embed(title=self.get_loop_icon() + \
-            f'{self.get_loop_icon()}Now playing: {item.info.title} [{item.info.length_hms()}]',
-            description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR).set_thumbnail(url=item.info.thumbnail)
-        self.now_playing_msg = await ctx.send(embed=embed)
+        self.now_playing_msg = await ctx.send(embed=self.embed_now_playing())
 
         if self.queue_msg:
             self.queue_msg = await self.queue_msg.delete()
@@ -672,7 +704,7 @@ class Voice(commands.Cog):
                 if not self.media_queue:
                     self.voice_client.stop()
                 else:
-                    await self.play_item(self.media_queue.pop(0), ctx)
+                    await self.make_and_start_player(self.media_queue.pop(0), ctx)
             finally:
                 # finally statement makes sure we still unlock if an error occurs
                 log.debug('Tasks finished; unlocking...')
@@ -680,11 +712,167 @@ class Voice(commands.Cog):
         elif self.advance_lock:
             log.debug('Attempted call while locked; ignoring...')
 
-    def get_queued_by_text(self, member: Member) -> str:
-        """Returns the nickname (if set, username otherwise) of who queued the current item if that is enabled,
-        otherwise an empty string."""
-        return f'\nQueued by {member.nick or member.name}' if cfg.SHOW_USERS_IN_QUEUE else ''
+# #region TESTS
+# class Tests:
+#     test_sources = ['youtube', 'spotify', 'bandcamp', 'soundcloud']
+#     test_urls = {
+#             'single': {
+#                 'valid': {
+#                     'youtube':    ['https://www.youtube.com/watch?v=bNpEUbWOBiM',
+#                                    'https://www.youtube.com/watch?v=3XAhEUHt3zY',
+#                                    'https://www.youtube.com/watch?v=Q-i1XZc8ZwA'],
+#                     'spotify':    ['https://open.spotify.com/track/1E2WTcYLP1dFe1tiGDwRmT?si=e83bb1fcb80640ad',
+#                                    'https://open.spotify.com/track/0WHtcCpZnoyFlQg3Mf2cdN?si=73230e1b24084038',
+#                                    'https://open.spotify.com/track/56k2ztFw7hQRzDeoe80pJo?si=90310e0adbf0472a'],
+#                     'bandcamp':   ['https://jeffrosenstock.bandcamp.com/track/graveyard-song',
+#                                    'https://jeffrosenstock.bandcamp.com/track/9-10',
+#                                    'https://jeffrosenstock.bandcamp.com/track/leave-it-in-the-sun'],
+#                     'soundcloud': ['https://soundcloud.com/sethgibbsmusic/rain',
+#                                    'https://soundcloud.com/weeppiko/like-a-thunder',
+#                                    'https://soundcloud.com/griffinmcelroy/the-adventure-zone-ethersea-theme']
+#                 },
+#                 'invalid': {
+#                     'youtube':    ['https://www.youtube.com/watch?v=THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'spotify':    ['https://open.spotify.com/track/THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/track/THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/THISISANINVALIDURLANDDOESNTEXIST']
+#                 }
+#             },
+#             'playlist': {
+#                 'valid': {
+#                     'youtube':    ['https://www.youtube.com/playlist?list=PL0uKqjIajhzGshCt76OeXLspFh5MmM-Vu',
+#                                    'https://www.youtube.com/playlist?list=PL67cMGyeB5sEh3ZjGgo8oXzIrbDggG1gs',
+#                                    'https://www.youtube.com/playlist?list=OLAK5uy_m-FE5IenHYY2Fd1M2RX-k11yKohFrvZi0'],
+#                     'spotify':    ['https://open.spotify.com/playlist/7IjLgeYeUkFzNvBirgfsAf?si=c55c2848887249da',
+#                                    'https://open.spotify.com/playlist/1FkZjVP9O80Chh37YhyKaU?si=d12241575b444d45',
+#                                    'https://open.spotify.com/playlist/3jlpvgHatDehrSrR72DYVq?si=932b79272c7c4a30'],
+#                     'bandcamp':   ['https://jeffrosenstock.bandcamp.com/album/hellmode',
+#                                    'https://jeffrosenstock.bandcamp.com/album/post',
+#                                    'https://jeffrosenstock.bandcamp.com/album/no-dream'],
+#                     'soundcloud': ['https://soundcloud.com/sethgibbsmusic/sets/2019-releases',
+#                                    'https://soundcloud.com/sethgibbsmusic/sets/original-tracks-2020',
+#                                    'https://soundcloud.com/sethgibbsmusic/sets/remixes']
+#                 },
+#                 'invalid': {
+#                     'youtube':    ['https://www.youtube.com/playlist?list=THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'spotify':    ['https://open.spotify.com/playlist/THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/sets/THISISANINVALIDURLANDDOESNTEXIST']
+#                 }
+#             },
+#             'album': {
+#                 'valid': {
+#                     'youtube':    ['https://Voice.youtube.com/playlist?list=OLAK5uy_lQT8aLCDHiFu4_NkoxHt1VSfUBpjSIwHY',
+#                                    'https://Voice.youtube.com/playlist?list=OLAK5uy_kb8kfsyt08s2Z29752CH_lelHdl_JDwgg',
+#                                    'https://Voice.youtube.com/playlist?list=OLAK5uy_mp-RVdXLFGSC62WMsBlrqlF3RlZatyowA'],
+#                     'spotify':    ['https://open.spotify.com/album/1KMfjy6MmPorahRjxhTnxm?si=CS0F1ZFsQqSsn0xH_ahDiA',
+#                                    'https://open.spotify.com/album/74QTwjBLo1eLqpjL320rXX?si=1ehOqrxBR8WjHftNReHAtw',
+#                                    'https://open.spotify.com/album/3fn4HfVz5dhmE0PG24rh6h?si=tFUiBS7iSq6QGg-rNNgXkg'],
+#                     'bandcamp':   ['https://jeffrosenstock.bandcamp.com/album/hellmode',
+#                                    'https://jeffrosenstock.bandcamp.com/album/post',
+#                                    'https://jeffrosenstock.bandcamp.com/album/no-dream'],
+#                     'soundcloud': ['https://soundcloud.com/sethgibbsmusic/sets/2019-releases',
+#                                    'https://soundcloud.com/sethgibbsmusic/sets/original-tracks-2020',
+#                                    'https://soundcloud.com/sethgibbsmusic/sets/remixes']
+#                 },
+#                 'invalid': {
+#                     'youtube':    ['https://Voice.youtube.com/playlist?list=WROOOOOOOOONGLIIIIIIIIIIIINK'],
+#                     'spotify':    ['https://open.spotify.com/album/THISISALSOINCORRECTNOTAREALALBUM'],
+#                     'bandcamp':   ['https://THISISANINVALIDURLANDDOESNTEXIST.bandcamp.com/album/THISISANINVALIDURLANDDOESNTEXIST'],
+#                     'soundcloud': ['https://soundcloud.com/THISISANINVALIDURLANDDOESNTEXIST/sets/THISISANINVALIDURLANDDOESNTEXIST']
+#                 }
+#             }
+#         }
 
-    def get_loop_icon(self) -> str:
-        """Returns a looping emoji is looping is enabled, nothing otherwise."""
-        return EMOJI['repeat'] + ' ' if self.media_queue.is_looping else ''
+#     def __init__(self, inst: Voice):
+#         self.inst = inst
+
+#     @classmethod
+#     async def test_play(cls, source: str, flags: Optional[list[str]]=None) -> Optional[dict]:
+#         """NOT a completely comprehensive test, but covers most common bases
+
+#         Valid flags:
+#         - `invalid` = Use an intentionally invalid URL
+#         - `multiple` = Use multiple URLs
+#         - `playlist` = Use a playlist URL
+#         - `album` = Use an album URL
+
+#         "playlist" and "album" can't be used together
+#         """
+#         debugctx = MagicMock(spec=commands.Context)
+#         # if (not bypass_ctx) and (debugctx is None):
+#         #     log.error('Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
+#         #     return
+
+#         if source not in cls.test_sources + ['any', 'mixed']:
+#             log.error('Invalid source; aborting test. Valid sources are: %s', {', '.join(cls.test_sources)})
+#             return
+
+#         flags = flags or []
+
+#         valid: str = 'invalid' if 'invalid' in flags else 'valid'
+#         playlist_or_album: str | bool = 'playlist' if 'playlist' in flags else 'album' if 'album' in flags else False
+#         multiple_urls: bool = 'multiple' in flags
+
+#         passed: bool = False
+#         conclusion: str = ''
+#         arguments: str = f'SOURCE? {source} | VALID? {valid} | MULTIPLE? {multiple_urls} | PLAYLIST/ALBUM? {playlist_or_album}'
+
+#         log.info('### START TEST! play command; {arguments}')
+
+#         if 'playlist' in flags and 'album' in flags:
+#             log.error('Invalid flags; aborting test. The "playlist" and "album" flags cannot be used together.')
+#             return
+
+#         src = random.choice(cls.test_sources) if source in ['any', 'mixed'] else source
+#         url_type = playlist_or_album if playlist_or_album else 'single'
+
+#         await Voice.ensure_voice(Voice, debugctx)
+#         if not multiple_urls:
+#             await Voice.play(Voice, debugctx, random.choice(cls.test_urls[url_type][valid][src]))
+#             if voice.is_playing():
+#                 conclusion = 'voice client is playing. Test likely passed.'
+#                 log.info(conclusion); passed = True
+#             else:
+#                 if valid == 'invalid':
+#                     conclusion = 'voice client is not playing, and an intentionally invalid URL was used. Test likely passed.'
+#                     log.info(conclusion); passed = True
+#                 else:
+#                     conclusion = 'voice client is not playing, but a valid URL was used. Test likely failed.'
+#                     log.info(conclusion)
+#         else:
+#             urls = []
+#             if source == 'mixed':
+#                 for s in cls.test_sources:
+#                     urls.append(random.choice(cls.test_urls[url_type][valid][s]))
+#             else:
+#                 urls = cls.test_urls[url_type][valid][src]
+
+#             await Voice.play(Voice, debugctx, *urls)
+#             if voice.is_playing() and media_queue.get(debugctx) != []:
+#                 conclusion = f'Voice client is playing and the queue is not empty. Test likely passed.'
+#                 log.info(conclusion); passed = True
+#             else:
+#                 if valid == 'invalid':
+#                     conclusion = f'Voice client is not playing, and an intentionally invalid URL was used. Test likely passed.'
+#                     log.info(conclusion); passed = True
+#                 elif playlist_or_album:
+#                     conclusion = f'Voice client is not playing, all URLs were valid, but multiple {playlist_or_album} URLs were used. Test likely passed.'
+#                     log.info(conclusion); passed = True
+#                 elif media_queue.get(debugctx) != []:
+#                     conclusion = f'Voice client is not playing, but the queue is not empty. Test likely failed.'
+#                     log.info(conclusion)
+#                 else:
+#                     conclusion = f'Voice client is not playing, but all valid URLs were used. Test likely failed.'
+#                     log.info(conclusion)
+
+#         log.info(f'Waiting 2 seconds...')
+#         time.sleep(2)
+#         log.info(f'Clearing media queue and stopping voice client...')
+#         media_queue.clear(debugctx)
+#         voice.stop()
+#         log.info(f'Waiting 2 seconds...')
+#         time.sleep(2)
+#         log.info(f'### END TEST!')
+#         return {'passed': passed, 'arguments': arguments, 'conclusion': conclusion}
+# #endregion TESTS

@@ -24,6 +24,8 @@ Developer
         - `General` cog moved into `cog_general.py`
         - `Voice` cog moved into `cog_voice.py`, along with most functions and classes related to voice connection and audio playback ([#76](https://github.com/svioletg/viMusBot/issues/76)); other changes have been made within this file, such as...
             - `INACTIVITY_TIMEOUT` renamed to `INACTIVITY_TIMEOUT_MINS`
+            - `play_item()` moved here and renamed to `make_and_start_player()`
+            - `advance_queue()` moved here
             - `QueueItem`'s class method `generate_from_list()` renamed to `from_list()`
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
@@ -83,7 +85,8 @@ Other
 + UPDATED: aioconsole      == 0.7.1
 + UPDATED: python-benedict == 0.33.2
 + UPDATED: requests        == 2.32.2
-+ UPDATED: yt_dlp          == 2024.5.26
++ UPDATED: spotipy         == 2.24.0
++ UPDATED: yt_dlp          == 2024.5.27
 + UPDATED: ytmusicapi      == 1.7.3
 - REMOVED: regex
 ```
