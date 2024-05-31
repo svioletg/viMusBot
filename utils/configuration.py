@@ -71,7 +71,14 @@ EMBED_COLOR             : int                  = int(get('embed-color'), 16) # A
 INACTIVITY_TIMEOUT_MINS : int                  = check_type('inactivity-timeout', int)
 CLEANUP_EXTENSIONS      : list[str]            = check_type('auto-remove', list)
 DISABLED_COMMANDS       : list[str]            = check_type('command-blacklist', list)
-COMMAND_ALIASES         : dict[str, list[str]] = check_type('aliases', dict)
+
+user_aliases = check_type('aliases', dict)
+default_aliases = get_default('aliases')
+COMMAND_ALIASES: dict[str, list[str]] = {
+    **{key: (val + default_aliases[key] if key in default_aliases else val) for key, val in user_aliases.items()},
+    **{key: (val + user_aliases[key] if key in user_aliases else val) for key, val in default_aliases.items()}
+}
+del user_aliases, default_aliases
 # TODO: Merge user and default aliases dicts recursively, and check for conflicts
 # existing: list[str] = []
 # for key, val in COMMAND_ALIASES:
