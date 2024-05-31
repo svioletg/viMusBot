@@ -12,6 +12,7 @@ Developer
 - Changes in `bot.py`:
     - No longer have to use `try/except` blocks for 404 errors resulting from editing/deleting messages, the issue was that the reference variables weren't getting properly set to `None` when `some_message.delete()` was called, so the reference pointed to nothing
     - `duration_from_url()` and `title_from_url()` removed, any functions related to URL caching removed, now irrelevant
+    - `-test` debug command added
     - `-reload` debug command removed
     - `-analyze` command removed
     - `debugctx` variable and `-dctx` command removed, test commands will grab a `Context` object automatically
@@ -55,6 +56,7 @@ Developer
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs
 
 Features
+- A "roulette mode" has been added, which if enabled with the `-roulette` command (which will flip the switch by default, or you can explicitly use `-roulette on` or `-roulette off`) will choose a random song to play from the current queue each time a song finishes, rather than going in order like normal
 - "Now playing" messages will now show the track's thumbnail in its embed ([#70](https://github.com/svioletg/viMusBot/issues/70))
 - `-faq` command added to get the bot's FAQ page
 - `-issues` command added to the get the bot's issues page
@@ -71,6 +73,7 @@ Other
     - `force-no-match` renamed to `force-match-prompt` for clarity
     - `spotify-playlist-limit` removed, `playlist-track-limit` and `album-track-limit` added in its place (limit applies to any source now)
     - `use-url-cache` removed
+    - `clearcache` entry in `aliases` removed
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
         - `console-log-level` (boolean) has been added

@@ -65,9 +65,6 @@ log.info('viMusBot version: %s', VERSION)
 
 #     log.info('Changelog: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md')
 
-skip_votes_remaining: int = 0
-skip_votes = [] # TODO: Typing; What does this list contain?
-
 # Clear out downloaded files
 log.info('Removing previously downloaded media files...')
 for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSIONS]:
@@ -136,291 +133,12 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #             await ctx.send(embed=embedq('An unexpected error occurred.'))
 #             log.error(e)
 
-#     @commands.command(aliases=command_aliases('nowplaying'))
-#     @commands.check(is_command_enabled)
-#     async def nowplaying(self, ctx: commands.Context):
-#         """Shows the currently playing track."""
-#         if voice is None:
-#             await ctx.send(embed=embedq('Not connected to a voice channel.'))
-#             return
-
-#         if not voice.is_playing() and not voice.is_paused():
-#             embed = discord.Embed(title=f'Nothing is playing.',color=EMBED_COLOR)
-#         else:
-#             elapsed = timestamp_from_seconds(audio_time_elapsed)
-#             submitter_text = get_queued_by_text(now_playing.user)
-#             embed = discord.Embed(title=f'{get_loop_icon()}Now playing: {now_playing.title} [{elapsed} / {now_playing.duration_stamp}]',description=f'Link: {now_playing.weburl}{submitter_text}\nElapsed time may not be precisely accurate, due to minor network hiccups.',color=EMBED_COLOR)
-
-#         await ctx.send(embed=embed)
-
-#     @commands.command(aliases=command_aliases('play'))
-#     @commands.check(is_command_enabled)
-#     async def play(self, ctx: commands.Context, *queries: str):
-#         """Adds a link to the queue. Plays immediately if the queue is empty."""
-#         if len(queries) == 0:
-#             if voice.is_paused():
-#                 voice.resume()
-#                 await ctx.send(embed=embedq('Player is resuming.'))
-#                 global paused_for
-#                 paused_for = time.time() - paused_at
-#             else:
-#                 await ctx.send(embed=embedq('No URL or search terms given.'))
-#             return
-
-#         global qmessage
-#         qmessage = await ctx.send(embed=embedq('Trying to queue...'))
-
-#         multiple_urls = False
-
-#         url_count = text_count = 0
-#         for q in queries:
-#             if q.startswith('https://'):
-#                 url_count += 1
-#                 if url_count > 1 and re.search(r'(/sets/|playlist\?list=|/album/|/playlist/)', q) is not None:
-#                     await qmessage.edit(embed=embedq('Cannot queue multiple albums or playlists at once.'))
-#                     return
-#             else:
-#                 text_count += 1
-        
-#         if url_count > 0 and text_count > 0:
-#             await qmessage.edit(embed=embedq('Queries must be either all URLs or a single text query.'))
-#             return
-        
-#         query_type = 'link' if url_count > 0 else 'text'
-
-#         if query_type == 'text':
-#             query = ' '.join(queries)
-#         elif query_type == 'link':
-#             multiple_urls = len(queries) > 1
-#             if not multiple_urls:
-#                 # Prevent yt-dlp from grabbing the playlist the track is from
-#                 url = queries[0].split('&list=')[0]
-
-#         log.info('Found multiple URLs.' if multiple_urls else 'Found a single URL or query.')
-
-#         async with ctx.typing():
-#             if multiple_urls:
-#                 if len(queries) > MAXIMUM_CONSECUTIVE_URLS:
-#                     await qmessage.edit(embed=embedq('Too many URLs were given.', f'Current limit is {MAXIMUM_CONSECUTIVE_URLS}.'+
-#                         'Edit `maximum-urls` in `config.yml` to change this.'))
-#                     return
-#                 try:
-#                     objlist = QueueItem.generate_from_list(queries, ctx.author)
-#                     if objlist[0] != []:
-#                         queue_batch(ctx, objlist[0])
-#                         await qmessage.edit(embed=embedq(f'Queued {len(objlist[0])} items.'))
-#                         if objlist[1] != []:
-#                             await qmessage.edit(embed=embedq(f'Failed to retrieve {len(objlist[1])} URL{'s' if len(objlist[1]) > 1 else ''}:', f'{'\n'.join(objlist[1])}'))
-#                         if not voice.is_playing():
-#                             log.info('Voice client is not playing; starting...')
-#                             await advance_queue(ctx)
-#                     else:
-#                         await qmessage.edit(embed=embedq('Failed to retrieve all URLs; nothing added to the queue.'))
-#                     return
-#                 except Exception as e:
-#                     log.error(e)
-            
-#             # Search with text if no url is provided
-#             if query_type == 'text':
-#                 await qmessage.edit(embed=embedq('Searching by text...'))
-#                 log.debug('Link not detected, searching by text.')
-#                 log.info(f'Searching: "{query}"')
-
-#                 top_song, top_video = media.ytmusic_top_results(query)
-
-#                 if (top_song is None) and (top_video is None):
-#                     await qmessage.edit(embed=embedq('No song or video match could be found for your query.'))
-#                     return
-
-#                 if top_song is not None:
-#                     top_song['url'] = 'https://www.youtube.com/watch?v=' + top_song['videoId']
-#                 if top_video is not None:
-#                     top_video['url'] = 'https://www.youtube.com/watch?v=' + top_video['videoId']
-                
-#                 if top_song is None:
-#                     log.info('No song result found; using video result...')
-#                     url = top_video['url']
-#                 elif top_video is None:
-#                     log.info('No video result found; using song result...')
-#                     url = top_song['url']
-#                 elif top_song['url'] == top_video['url']:
-#                     log.info('Song and video results were identical; using song result...')
-#                     url = top_song['url']
-#                 else:
-#                     log.info(f'Prompting user for song/video choice.')
-#                     embed = discord.Embed(title='Please choose an option:', color=EMBED_COLOR)
-#                     embed.add_field(name=f'Top song result: {top_song["title"]}', value=top_song['url'], inline=False)
-#                     embed.add_field(name=f'Top video result: {top_video["title"]}', value=top_video['url'], inline=False)
-
-#                     prompt = await ctx.send(embed=embed)
-#                     choice = await prompt_for_choice(ctx, prompt, 2)
-#                     if choice is None:
-#                         await qmessage.delete()
-#                         return
-#                     else:
-#                         await qmessage.edit(embed=embedq('Queueing choice...'))
-#                     url = (top_song['url'], top_video['url'])[choice-1]
-
-#             # Locate youtube equivalent if spotify link given
-#             if 'https://spotify.link/' in url:
-#                 # Resolve mobile share link to a usable URL
-#                 log.info(f'Resolving spotify.link URL... ({url})')
-#                 try:
-#                     url = requests.get(url).url
-#                     log.info(f'Resolved to {url}')
-#                 except Exception as e:
-#                     log.info(f'Failed; aborting play command and showing traceback...')
-#                     log.error(e)
-#                     await qmessage.edit(embed=embedq('Failed to resolve Spotify link. Please use an "open.spotify.com" link instead of "spotify.link" if possible.'))
-#                     return
-
-#             if 'https://open.spotify.com' in url:
-#                 log.debug('Spotify URL received from play command.')
-#                 log.info('Checking for playlist...')
-#                 if '/playlist/' in url and ALLOW_SPOTIFY_PLAYLISTS:
-#                     log.info('Spotify playlist detected.')
-#                     await qmessage.edit(embed=embedq('Trying to queue Spotify playlist...'))
-#                     playlist_result = media.spotify_playlist(url)
-
-#                     if isinstance(playlist_result, tuple):
-#                         code = playlist_result[1].http_status
-#                         match code:
-#                             case 400:
-#                                 log.info('Could not retrieve playlist; the URL seems invalid.')
-#                                 await qmessage.edit(embed=embedq('Could not retrieve playlist; the URL seems invalid. (HTTP 400)'))
-#                                 return
-#                             case 404:
-#                                 log.info('Could not retrieve playlist; the playlist is likely private.')
-#                                 await qmessage.edit(embed=embedq('Could not retrieve playlist; the playlist is likely private. (HTTP 404)'))
-#                                 return
-#                             case _:
-#                                 log.info(f'Could not retrieve playlist; an unknown error occurred: HTTP {code}')
-#                                 await qmessage.edit(embed=embedq(f'Could not retrieve playlist; HTTP {code}'))
-#                                 return
-
-#                     objlist = QueueItem.generate_from_list(playlist_result, ctx.author)[0]
-#                     if len(objlist) > SPOTIFY_PLAYLIST_LIMIT:
-#                         await qmessage.edit(embed=embedq('Spotify playlist limit exceeded.'))
-#                         return
-                    
-#                     queue_batch(ctx, objlist)
-#                     list_name = media.sp.playlist(url)['name']
-#                     await qmessage.edit(embed=embedq(f'Queued {len(objlist)} items from {list_name}.'))
-#                     if not voice.is_playing():
-#                         log.info('Voice client is not playing; starting...')
-#                         await advance_queue(ctx)
-#                     return
-#                 elif not ALLOW_SPOTIFY_PLAYLISTS:
-#                     await ctx.send(embed=embedq(
-#                         'Spotify playlists are currently disabled in this bot\'s configuration.',
-#                         'Contact whoever is hosting your bot if you believe this is a mistake.'
-#                         )
-#                     )
-#                     return
-
-#                 log.info('Checking for album...')
-#                 if 'https://open.spotify.com/album/' in url:
-#                     log.info('Spotify album detected.')
-#                     album_info = media.spotify_album(url)
-
-#                     if isinstance(album_info, tuple):
-#                         await qmessage.edit(embed=embedq('Could not retrieve album; the URL seems invalid.'))
-#                         return
-
-#                     url = media.match_ytmusic_album(album_info['title'], album_info['artist'], album_info['year'])
-#                     if url is None:
-#                         await qmessage.edit(embed=embedq('No match could be found.'))
-#                         return
-            
-#             # Determines if the input was a playlist or album; any Spotify links should have already been handled
-#             valid = ['playlist?list=', '/sets/', '/album/']
-#             if any(item in url for item in valid):
-#                 log.info('URL is a non-Spotify playlist.')
-#                 objlist = QueueItem.generate_from_list(url, ctx.author)
-#                 if isinstance(objlist, tuple):
-#                     await qmessage.edit(embed=embedq('Could not retrieve playlist.'))
-#                     return
-#                 queue_batch(ctx, objlist)
-#                 await ctx.send(embed=embedq(f'Queued {len(objlist)} items.'))
-#                 if not voice.is_playing():
-#                     await advance_queue(ctx)
-#                 return
-#             else:
-#                 # Runs if the input given was not a playlist
-#                 log.info('URL is not a playlist.')
-#                 log.info('Checking duration...')
-#                 duration = duration_from_url(url)
-
-#                 if isinstance(duration, tuple):
-#                     log.info(f'Couldn\'t retrieve duration; aborting play command: {duration[1]}')
-#                     await qmessage.edit(embed=embedq('Could not retrieve URL; the content may be unavailable, or the URL may be invalid.'))
-#                     return
-
-#                 if duration > DURATION_LIMIT*60*60:
-#                     log.info('Item over duration limit; not queueing.')
-#                     await qmessage.edit(embed=embedq(f'Cannot queue items longer than {DURATION_LIMIT} hours.'))
-#                     return
-
-#             # Queue or start the player
-#             try:
-#                 log.info('Adding to queue...')
-#                 if not voice.is_playing() and media_queue.get(ctx) == []:
-#                     media_queue.get(ctx).append(QueueItem(url, ctx.author))
-#                     log.info('Voice client is not playing; starting...')
-#                     await advance_queue(ctx)
-#                 else:
-#                     media_queue.get(ctx).append(QueueItem(url, ctx.author))
-#                     title = media_queue.get(ctx)[-1].title
-#                     await qmessage.edit(embed=embedq(f'Added {title} to the queue at spot #{len(media_queue.get(ctx))}'))
-#             except Exception as e:
-#                 log.error(e)
-
-#     @commands.command(aliases=command_aliases('remove'))
-#     @commands.check(is_command_enabled)
-#     async def remove(self, ctx: commands.Context, spot: int):
-#         """Removes an item from the queue. Use -q to get its number."""
-#         await ctx.send(embed=embedq(f'Removed {media_queue.get(ctx).pop(spot-1).title} from the queue.'))
-
 #     @commands.command(aliases=command_aliases('shuffle'))
 #     @commands.check(is_command_enabled)
 #     async def shuffle(self, ctx: commands.Context):
 #         """Randomizes the order of the queue."""
 #         random.shuffle(media_queue.get(ctx))
 #         await ctx.send(embed=embedq('Queue has been shuffled.'))
-
-#     @commands.command(aliases=command_aliases('skip'))
-#     @commands.check(is_command_enabled)
-#     async def skip(self, ctx: commands.Context):
-#         """Skips the currently playing media."""
-#         log.info('Skipping track...')
-#         if voice is None:
-#             await ctx.send(embed=embedq('Not connected to a voice channel.'))
-#             return
-#         elif not voice.is_playing() and len(media_queue.get(ctx)) == 0:
-#             await ctx.send(embed=embedq('Nothing to skip.'))
-#             return
-
-#         # Update number of skip votes required based on members joined in voice channel
-#         global skip_votes
-#         global skip_votes_remaining
-#         skip_votes_remaining = int((len(voice.channel.members)) * (SKIP_VOTES_PERCENTAGE/100)) if SKIP_VOTES_TYPE == "percentage" else SKIP_VOTES_EXACT
-
-#         if VOTE_TO_SKIP:
-#             if ctx.author not in skip_votes:
-#                 skip_votes.append(ctx.author)
-#             else:
-#                 await ctx.send(embed=embedq('You have already voted to skip.'))
-#                 return
-
-#             voteskip_message = await ctx.send(embed=embedq(f'Voted to skip. {len(skip_votes)}/{skip_votes_remaining} needed.'))
-#             if len(skip_votes) >= skip_votes_remaining:
-#                 await voteskip_message.delete()
-#             else:
-#                 return
-        
-#         voice.pause()
-#         await ctx.send(embed=embedq('Skipping...'))
-#         await advance_queue(ctx, skip=True)
 
 # ############################################
 # 
@@ -463,6 +181,10 @@ bot = commands.Bot(
 @bot.event
 async def on_command_error(ctx: commands.Context, error: BaseException):
     """Handles any exceptions raised by any commands or modules."""
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(embed=embedq(EMOJI['cancel'] + ' Not enough command arguments given.',
+            'Use the `help` command to see the correct syntax.'))
+        return
     if isinstance(error, commands.CommandInvokeError):
         if 'ffmpeg was not found' in repr(error):
             log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
@@ -471,6 +193,7 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
     if isinstance(error, NotImplementedError):
         await ctx.send(embed=embedq(EMOJI['cancel'] + f' The command `{ctx.command.name}` is not implemented yet,'+
             'but is planned to be in the future.'))
+        return
     if isinstance(error, yt_dlp.utils.DownloadError):
         await ctx.send(embed=embedq(EMOJI['cancel'] + ' Unable to retrieve video.',
             'It may be private, or otherwise unavailable.'))

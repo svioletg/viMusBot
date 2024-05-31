@@ -104,9 +104,6 @@ aliases:
         - "gh"
     skip:
         - "s"
-    clearcache:
-        - "emptycache"
-        - "flushcache"
 
 # Any commands listed here will be disabled from use - do not include a prefix before the name
 command-blacklist:
