@@ -32,10 +32,11 @@ vote-to-skip:
 ```
 
 `config_default.yml` has comments for each value, but I've also compiled every setting and its type + valid values on this page, to provide more thorough information.
+As an additional note, in your configuration you can also use `yes` / `no` in place of `true` / `false` if you prefer.
 
 ## Glossary — General Options
 
-Written in alphabetical order. All information below should be accurate as of version **1.9.0**.
+Written in alphabetical order. All information below should be accurate as of version **2.0.0**.
 
 ### `aliases`
 
@@ -50,6 +51,18 @@ aliases:
     move:
         - "m"
         - "mv"
+```
+
+### `album-track-limit`
+
+> Prevents queueing an album longer than this limit.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+album-track-limit: 20
 ```
 
 ### `allow-spotify-playlists`
@@ -116,7 +129,7 @@ duration-limit: 2
 embed-color: "ff00aa"
 ```
 
-### `force-no-match`
+### `force-match-prompt`
 
 > Forces the bot to think its not found any Spotify-YouTube match, thus bringing up the choice prompt every time. *This is primarily used for **debugging**, and should be left turned off in most cases.*
 
@@ -125,7 +138,7 @@ embed-color: "ff00aa"
 **Example:**
 
 ```yaml
-force-no-match: false
+force-match-prompt: false
 ```
 
 ### `inactivity-timeout`
@@ -144,24 +157,22 @@ inactivity-timeout: 10
 
 > A key containing various options regarding how the bot will log its status out to the console. All of these options are only for customizing what you see in your command prompt or terminal — regardless of what you set here, everything will be saved in `vimusbot.log` for troubleshooting.
 
-### `logging-options` → `show-console-logs`
+### `logging-options` → `console-log-level`
 
-> Enables or disables printing logs to the console for `bot.py` and `spoofy.py` separately.
+> Sets the "log level" for what you see in the console. Shows any logs including and higher than that level's priority.
 
-**Valid options:** `true` or `false` for each file key
+**Valid options:** In order of ascending priority: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
 
 **Example:**
 
 ```yaml
 logging-options:
-    show-console-logs:
-        bot.py: true
-        spoofy.py: false
+    console-log-level: "INFO"
 ```
 
-### `logging-options` → `show-verbose-logs`
+### `logging-options` → `log-full-tracebacks`
 
-> Some logs are marked as "verbose", typically meaning they contain more detailed or specific information about a task being performed. These are useful for debugging and troubleshooting, however some may see them as clutter, so this allows you to disable such logs from appearing in the console. Verbose logs are still written to `vimusbot.log` regardless.
+> Whether to log the entire traceback upon encountering an error. Again, tracebacks are still saved to the logfile no matter what, this only toggles them in the console window.
 
 **Valid options:** `true` or `false`
 
@@ -169,21 +180,7 @@ logging-options:
 
 ```yaml
 logging-options:
-    show-verbose-logs: false
-```
-
-### `logging-options` → `ignore-logs-from`
-
-> Allows you to specify functions that you wish to hide logs from in the console. Function names are shown in **blue** (by default) if your console supports color — they appear after the filename (e.g `[bot.py]`).
-
-**Valid options:** a list of strings containing valid function names
-
-**Example:**
-
-```yaml
-logging-options:
-    ignore-logs-from:
-        - "search_ytmusic"
+    log-full-tracebacks: false
 ```
 
 ### `logging-options` → `colors`
@@ -213,8 +210,7 @@ darkblue
 logging-options:
     colors:
         no-color: false # set to "true" to completely disable colored output
-        bot-py: "yellow" # only the text that reads [bot.py]
-        spoofy-py: "lime" # only the text that reads [spoofy.py]
+        module: "blue" # used for file names
         warn: "gold" # non-urgent warnings and notices
         error: "red" # used for tracebacks, and other complete failures
         timer: "magenta" # used for the time since the last log shown at the end
@@ -231,6 +227,18 @@ logging-options:
 
 ```yaml
 maximum-urls: 3
+```
+
+### `playlist-track-limit`
+
+> Prevents queueing a playlist longer than this limit.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+playlist-track-limit: 20
 ```
 
 ### `prefixes`
@@ -271,18 +279,6 @@ public: true
 show-users-in-queue: true
 ```
 
-### `spotify-playlist-limit`
-
-> Prevents queueing a Spotify playlist longer than this limit.
-
-**Valid options:** any positive number
-
-**Example:**
-
-```yaml
-spotify-playlist-limit: 20
-```
-
 ### `token-file`
 
 > The path to use for the file your Discord bot token is stored in. By default this is `token.txt`, and you generally shouldn't have to change this. This is largely provided for debugging purposes.
@@ -305,18 +301,6 @@ token-file: "token.txt"
 
 ```yaml
 use-top-match: true
-```
-
-### `use-url-cache`
-
-> Enables or disables the use of the bot's URL caching system, which can slightly speed up the process of queueing in general.
-
-**Valid options:** `true` or `false`
-
-**Example:**
-
-```yaml
-use-url-cache: true
 ```
 
 ### `vote-to-skip`

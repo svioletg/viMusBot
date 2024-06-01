@@ -4,6 +4,7 @@
 import itertools
 import logging
 import urllib.request
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,7 +15,7 @@ from benedict import benedict
 log = logging.getLogger('viMusBot')
 
 CONFIG_PATHS: dict[str, str] = {
-    'user': 'config.yml', 
+    'user': 'config.yml',
     'default': 'config_default.yml'
 }
 
@@ -59,37 +60,79 @@ def get_full(config_type: Literal['user', 'default']) -> benedict:
 
 log.info('Checking config...')
 
+# Configuration path changes should be kept here to provide suggestions to the user for dead paths
+# Key should be the affected keypath, value should be a message to show
+# "Recent" is largely subjective
+RECENT_CONFIG_CHANGES = {
+    'force-no-match': 'Renamed to "force-match-prompt"',
+    'spotify-playlist-limit': 'Removed; replaced by "playlist-track-limit" and "album-track-limit"',
+    'use-url-cache': 'Removed; previous method of caching is no longer needed due to changes in how media info is processed',
+    'aliases.clearcache': 'Removed',
+    'logging-options.show-console-logs': 'Removed; replaced by "logging-options.console-log-level" and "logging-options.log-full-tracebacks"',
+    'logging-options.show-verbose-logs': 'Removed; replaced by "logging-options.console-log-level" and "logging-options.log-full-tracebacks"',
+    'logging-options.ignore-logs-from': 'Removed',
+    'logging-options.colors.bot-py': 'Removed; replaced by "logging-options.colors.module" which is used for all filenames',
+    'logging-options.colors.spoofy-py': 'Removed; replaced by "logging-options.colors.module" which is used for all filenames'
+}
+
+if dead_paths := [path for path in CONFIG_DICT.keypaths() if path not in CONFIG_DEFAULT_DICT.keypaths()]:
+    log.warning('One or more "dead paths" were found:')
+    for path in dead_paths:
+        reason = RECENT_CONFIG_CHANGES.get(path, '')
+        log.warning('- Config key "%s" is no longer used. %s', path, f'({reason})')
+    log.warning('Any options set at these paths will not be used; '+
+        'check the latest changelog for any recent changes in the config structure.')
+
 # For the sake of not making this module a nightmare code-wise, these checks are NOT comprehensive
 # i.e. we can check if it's a list, but not if it's a list of some certain type(s).
 # Just a surface-level check to catch any immediate problems
 
-PUBLIC                  : bool                 = check_type('public', bool)
-TOKEN_FILE_PATH         : str                  = check_type('token-file', str)
-PUBLIC_PREFIX           : str                  = check_type('prefixes.public', str)
-DEV_PREFIX              : str                  = check_type('prefixes.developer', str)
-EMBED_COLOR             : int                  = int(get('embed-color'), 16) # A ValueError here means this isn't a valid hex code
-INACTIVITY_TIMEOUT_MINS : int                  = check_type('inactivity-timeout', int)
-CLEANUP_EXTENSIONS      : list[str]            = check_type('auto-remove', list)
-DISABLED_COMMANDS       : list[str]            = check_type('command-blacklist', list)
+PUBLIC                  : bool      = check_type('public', bool)
+TOKEN_FILE_PATH         : str       = check_type('token-file', str)
+PUBLIC_PREFIX           : str       = check_type('prefixes.public', str)
+DEV_PREFIX              : str       = check_type('prefixes.developer', str)
+EMBED_COLOR             : int       = int(get('embed-color'), 16) # A ValueError here means this isn't a valid hex code
+INACTIVITY_TIMEOUT_MINS : int       = check_type('inactivity-timeout', int)
+CLEANUP_EXTENSIONS      : list[str] = check_type('auto-remove', list)
+DISABLED_COMMANDS       : list[str] = check_type('command-blacklist', list)
 
-user_aliases = check_type('aliases', dict)
-default_aliases = get_default('aliases')
-COMMAND_ALIASES: dict[str, list[str]] = {
-    **{key: (val + default_aliases[key] if key in default_aliases else val) for key, val in user_aliases.items()},
-    **{key: (val + user_aliases[key] if key in user_aliases else val) for key, val in default_aliases.items()}
-}
-del user_aliases, default_aliases
-# TODO: Merge user and default aliases dicts recursively, and check for conflicts
-# existing: list[str] = []
-# for key, val in COMMAND_ALIASES:
-#     if val in existing:
-#         log.warning('The command alias "%s" is set for multiple commands: %s', val)
-#         log.warning('This will likely cause issues when attempting to use these aliases.')
+def get_combined_aliases() -> dict[str, list[str]]:
+    """Merges the user-set and default command alias dictionaries into one."""
+    user_aliases: dict[str, list[str]] = check_type('aliases', dict)
+    default_aliases: dict[str, list[str]] = get_default('aliases')
+    aliases = defaultdict(list)
+    for key, val in itertools.chain(user_aliases.items(), default_aliases.items()):
+        aliases[key].extend(val)
+    # Use set here to remove duplicates
+    aliases = {key: list(set(val)) for key, val in aliases.items()}
+    return aliases
 
-LOG_LEVEL               : str                  = check_type('logging-options.console-log-level', str)
-LOG_COLORS              : dict[str, str]       = check_type('logging-options.colors', dict)
-DISABLE_LOG_COLORS      : bool                 = check_type('logging-options.colors.no-color', bool)
-LOG_TRACEBACKS          : bool                 = check_type('logging-options.log-full-tracebacks', bool)
+COMMAND_ALIASES: dict[str, list[str]] = get_combined_aliases()
+
+def check_alias_conflicts() -> dict[str, list[str]]:
+    """Check for and return any aliases that are aliased to multiple commands."""
+    alias_map: dict[str, list[str]] = {}
+    conflicting: dict[str, list[str]] = {}
+    for cmd, aliases in COMMAND_ALIASES.items():
+        for a in aliases:
+            if a not in alias_map:
+                alias_map[a] = [cmd]
+            else:
+                alias_map[a].append(cmd)
+                conflicting[a] = alias_map[a]
+    return conflicting
+
+if conflicts := check_alias_conflicts():
+    log.error('Conflicting command aliases were found:')
+    for alias, commands in conflicts.items():
+        log.error('- Alias "%s" is set for: %s', alias, ', '.join(commands))
+    log.error('The same alias can not be used for multiple commands; please edit your config file.')
+    raise SystemExit
+
+LOG_LEVEL               : str            = check_type('logging-options.console-log-level', str)
+LOG_COLORS              : dict[str, str] = check_type('logging-options.colors', dict)
+DISABLE_LOG_COLORS      : bool           = check_type('logging-options.colors.no-color', bool)
+LOG_TRACEBACKS          : bool           = check_type('logging-options.log-full-tracebacks', bool)
 
 SHOW_USERS_IN_QUEUE     : bool = check_type('show-users-in-queue', bool)
 MAX_HISTORY_LENGTH      : int  = max(check_type('play-history-max', int), 20)

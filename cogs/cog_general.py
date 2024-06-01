@@ -7,7 +7,7 @@ import logging
 from discord.ext import commands
 
 # Local imports
-from cogs.common import command_aliases, is_command_enabled, embedq
+from cogs.common import command_aliases, embedq, is_command_enabled
 from version import VERSION
 
 log = logging.getLogger('viMusBot')

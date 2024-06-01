@@ -58,8 +58,10 @@ Developer
 Features
 - A "roulette mode" has been added, which if enabled with the `-roulette` command (which will flip the switch by default, or you can explicitly use `-roulette on` or `-roulette off`) will choose a random song to play from the current queue each time a song finishes, rather than going in order like normal
 - "Now playing" messages will now show the track's thumbnail in its embed ([#70](https://github.com/svioletg/viMusBot/issues/70))
+- Multiple messages are prefixed with relevant emoji to act as status icons
 - `-faq` command added to get the bot's FAQ page
 - `-issues` command added to the get the bot's issues page
+- User configuration will now be checked and validation on startup, to catch surface-level issues and warn of them or exit the script if it would not be able to continue
 
 Fixes
 - Using the `stop` console command will now suppress the resulting `CancelledError`
@@ -69,16 +71,16 @@ Other
 - `-analyze` command removed
 - Config changes:
     - Default value of `use-top-match` set to `no`
-    - Default value of `command-blacklist` is now empty
+    - Default value of `command-blacklist` now set to `test` alone
     - `force-no-match` renamed to `force-match-prompt` for clarity
     - `spotify-playlist-limit` removed, `playlist-track-limit` and `album-track-limit` added in its place (limit applies to any source now)
     - `use-url-cache` removed
     - `clearcache` entry in `aliases` removed
+    - `play-history-max` (int) has been added
     - In `logging-options`:
         - `show-console-logs`, `show-verbose-logs`, and `ignore-logs-from` have all been removed
         - `console-log-level` (boolean) has been added
         - `log-full-tracebacks` (boolean) has been added
-        - `play-history-max` (int) has been added
         - `colors`:
             - The color entries for filenames like `bot-py` have been removed, `module` added in their place, all files/modules will be shown as the same color if colored console logs are enabled
 - Changes in `requirements.txt`:

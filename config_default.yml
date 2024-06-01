@@ -49,6 +49,7 @@ auto-remove:
     - ".webm"
     - ".opus"
 
+# TODO: Turn this into a general playlist option
 # Allows queueing entire Spotify playlists
 allow-spotify-playlists: yes
 
@@ -107,7 +108,7 @@ aliases:
 
 # Any commands listed here will be disabled from use - do not include a prefix before the name
 command-blacklist:
-    -
+    - "test"
 
 # Set various options for output logs
 logging-options:

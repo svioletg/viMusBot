@@ -22,8 +22,9 @@ from discord.ext import commands
 
 # Local imports
 import utils.configuration as cfg
-from cogs.common import (EMOJI, EMOJI_NUM, SilentCancel, command_aliases, edit_or_send,
-                         embedq, is_command_enabled, prompt_for_choice)
+from cogs.common import (EMOJI, EMOJI_NUM, SilentCancel, command_aliases,
+                         edit_or_send, embedq, is_command_enabled,
+                         prompt_for_choice)
 from cogs.test_voice import VoiceTest
 from utils import media
 from utils.miscutil import timestamp_from_seconds
@@ -207,7 +208,7 @@ class Voice(commands.Cog):
     @commands.check(is_command_enabled)
     async def test(self, ctx: commands.Context, to_test: str, *args):
         """Runs a test for the given command name.
-        
+
         @to_test: The name of the test to run. Usually a command's name.
         """
         tester = VoiceTest(self)
@@ -290,7 +291,7 @@ class Voice(commands.Cog):
     async def roulette(self, ctx: commands.Context, toggle: str=''):
         """Toggles "roulette" mode. If no argument is given, roulette mode will be turned on if its currently off, and vice versa.
         Alternatively, you can use "roulette on" or "roulette off" to toggle it explicitly.
-        
+
         If roulette mode is enabled, the queue will be used as a pool of random choices instead of a strict order.
         In other words, instead of moving to the next song when one finishes playing, a random choice from the queue will be selected to play.
         """
@@ -655,7 +656,7 @@ class Voice(commands.Cog):
 
     def embed_now_playing(self, show_elapsed: bool=True) -> Embed:
         """Constructs and returns the "Now playing" message embed.
-        
+
         @show_elapsed: Show the elapsed time alongside the track length, i.e. "1:02 / 2:56"
         """
         # TODO: Indicate if roulette mode is on

@@ -141,9 +141,9 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #         await ctx.send(embed=embedq('Queue has been shuffled.'))
 
 # ############################################
-# 
+#
 # End of cog definitions.
-# 
+#
 # ############################################
 
 # Establish bot user
@@ -233,7 +233,7 @@ async def console_thread():
             #     if PUBLIC:
             #         print('Debugging commands are disabled in public mode.')
             #         continue
-                
+
             #     # TODO: Some sort of help command would be good
             #     params = user_input.split()
 
@@ -265,9 +265,9 @@ async def console_thread():
             #                 test_result_string += f'{f'{plt.green}PASS' if result['passed'] else f'{plt.red}FAIL'} | ARGS: {result['arguments']}\n'
             #                 if result['passed']:
             #                     test_results['pass'].append((result['arguments'], result['conclusion']))
-            #                 else: 
+            #                 else:
             #                     test_results['fail'].append((result['arguments'], result['conclusion']))
-                        
+
             #             test_sources: list[str] = Tests.test_sources + ['any', 'mixed']
             #             test_start: float = time.time()
             #             tests_run: int = 0
@@ -276,9 +276,9 @@ async def console_thread():
             #                 # 'invalid', 'single', and 'no-list' will be skipped over by the test function
             #                 # They're just here to make generating the combinations easier
             #                 test_conditions = itertools.product(
-            #                     test_sources, 
-            #                     ['valid', 'invalid'], 
-            #                     ['single', 'multiple'], 
+            #                     test_sources,
+            #                     ['valid', 'invalid'],
+            #                     ['single', 'multiple'],
             #                     ['no-list', 'playlist', 'album']
             #                     )
             #                 for src, valid, multiple_urls, playlist_or_album in test_conditions:
