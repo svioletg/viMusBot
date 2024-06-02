@@ -63,11 +63,10 @@ log.info('Checking config...')
 # Configuration path changes should be kept here to provide suggestions to the user for dead paths
 # Key should be the affected keypath, value should be a message to show
 # "Recent" is largely subjective
-RECENT_CONFIG_CHANGES = {
+RECENT_CONFIG_CHANGES: dict[str, str] = {
     'force-no-match': 'Renamed to "force-match-prompt"',
     'spotify-playlist-limit': 'Removed; replaced by "playlist-track-limit" and "album-track-limit"',
     'use-url-cache': 'Removed; previous method of caching is no longer needed due to changes in how media info is processed',
-    'aliases.clearcache': 'Removed',
     'logging-options.show-console-logs': 'Removed; replaced by "logging-options.console-log-level" and "logging-options.log-full-tracebacks"',
     'logging-options.show-verbose-logs': 'Removed; replaced by "logging-options.console-log-level" and "logging-options.log-full-tracebacks"',
     'logging-options.ignore-logs-from': 'Removed',
@@ -75,10 +74,11 @@ RECENT_CONFIG_CHANGES = {
     'logging-options.colors.spoofy-py': 'Removed; replaced by "logging-options.colors.module" which is used for all filenames'
 }
 
-if dead_paths := [path for path in CONFIG_DICT.keypaths() if path not in CONFIG_DEFAULT_DICT.keypaths()]:
+# Don't warn about alias paths, not every command has a default and it won't harm much, so it can be confusing otherwise
+if dead_paths := [path for path in CONFIG_DICT.keypaths() if (path not in CONFIG_DEFAULT_DICT.keypaths()) and (not path.startswith('aliases.'))]:
     log.warning('One or more "dead paths" were found:')
     for path in dead_paths:
-        reason = RECENT_CONFIG_CHANGES.get(path, '')
+        reason = RECENT_CONFIG_CHANGES.get(path, 'No reason specified')
         log.warning('- Config key "%s" is no longer used. %s', path, f'({reason})')
     log.warning('Any options set at these paths will not be used; '+
         'check the latest changelog for any recent changes in the config structure.')

@@ -1,3 +1,5 @@
+"""Common tools to share between cogs."""
+
 # Standard imports
 import asyncio
 import itertools
@@ -13,19 +15,23 @@ import utils.configuration as cfg
 
 log = logging.getLogger('viMusBot')
 
-EMOJI: dict[str, str] = {
-    'cancel': '❌',
-    'confirm': '✅',
-    'play': '▶️',
-    'pause': '⏸️',
-    'in': '📥',
-    'out': '📤',
-    'repeat': '🔁',
-    'shuffle': '🔀',
-    'info': 'ℹ️',
-}
-
-EMOJI_NUM: list[str] = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+class EmojiStr:
+    """Shortcuts for certain emoji used by the bot."""
+    # General
+    num: list[str] = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+    cancel: str = '❌'
+    confirm: str = '✅'
+    info: str = 'ℹ️'
+    arrow_r: str = '➡️'
+    # Media
+    play: str = '▶️'
+    pause: str = '⏸️'
+    skip: str = '⏭️'
+    repeat: str = '🔁'
+    repeat_one: str = '🔂'
+    shuffle: str = '🔀'
+    inbox: str = '📥'
+    outbox: str = '📤'
 
 class SilentCancel(commands.CommandError):
     """Raised to cancel commands where "return" wouldn't work, like the `Voice` cog's `ensure_voice()`"""
@@ -35,7 +41,7 @@ async def is_command_enabled(ctx: commands.Context) -> bool:
     if not ctx.command.name in cfg.DISABLED_COMMANDS:
         return True
     else:
-        await ctx.send(embed=embedq(EMOJI['cancel'] + ' This command is disabled.',
+        await ctx.send(embed=embedq(EmojiStr.cancel + ' This command is disabled.',
             'Commands can be disabled or "blacklisted" via `config.yml`. If this is unintended, check your configuration.'))
         return False
 
@@ -94,59 +100,47 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
         raise ValueError('choice_nums must be greater than 0 if this is not a yes/no dialog.')
 
     if not yesno:
-        if choice_nums > len(EMOJI_NUM):
+        if choice_nums > len(EmojiStr.num):
             raise ValueError('choice_nums can not be greater than 10.')
 
         for i in range(choice_nums):
-            await prompt_msg.add_reaction(EMOJI_NUM[i + 1])
+            await prompt_msg.add_reaction(EmojiStr.num[i + 1])
     else:
-        await prompt_msg.add_reaction(EMOJI['confirm'])
-    await prompt_msg.add_reaction(EMOJI['cancel'])
+        await prompt_msg.add_reaction(EmojiStr.confirm)
+    await prompt_msg.add_reaction(EmojiStr.cancel)
 
     def check(reaction: Reaction, user: Member) -> bool:
-        return user == ctx.message.author and (str(reaction.emoji) in EMOJI_NUM + [EMOJI['confirm']] or str(reaction.emoji) == EMOJI['cancel'])
+        return (user == ctx.message.author) and (str(reaction.emoji) in EmojiStr.num + [EmojiStr.confirm, EmojiStr.cancel])
 
     log.debug('Waiting for reaction...')
 
-    try:
-        reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check)
-    except asyncio.TimeoutError:
-        log.debug('Choice prompt timeout reached.')
+    async def handle_messages(result_msg_embed: Embed) -> None:
         if result_msg:
-            await result_msg.edit(embed=embedq(EMOJI['cancel'] + ' Prompt timed out.'))
+            await result_msg.edit(embed=result_msg_embed)
             await asyncio.sleep(3)
             await result_msg.delete()
         if delete_prompt:
             await prompt_msg.delete()
+
+    try:
+        reaction, user = await bot.wait_for('reaction_add', timeout=timeout_seconds, check=check) # pylint: disable=unused-variable
+    except asyncio.TimeoutError:
+        log.debug('Choice prompt timeout reached.')
+        await handle_messages(embedq(EmojiStr.cancel + ' Prompt timed out.'))
 
     log.debug('Received a valid reaction.')
 
-    if str(reaction) == EMOJI['cancel']:
+    if str(reaction) == EmojiStr.cancel:
         log.debug('Selection cancelled.')
-        if result_msg:
-            await result_msg.edit(embed=embedq(EMOJI['cancel'] + ' Selection cancelled.'))
-            await asyncio.sleep(3)
-            await result_msg.delete()
-        if delete_prompt:
-            await prompt_msg.delete()
+        await handle_messages(embedq(EmojiStr.cancel + ' Selection cancelled.'))
         return 0
 
-    if str(reaction) == EMOJI['confirm']:
+    if str(reaction) == EmojiStr.confirm:
         log.debug('Selection confirmed.')
-        if result_msg:
-            await result_msg.edit(embed=embedq(EMOJI['confirm'] + ' Selection confirmed.'))
-            await asyncio.sleep(3)
-            await result_msg.delete()
-        if delete_prompt:
-            await prompt_msg.delete()
+        await handle_messages(embedq(EmojiStr.confirm + ' Selection confirmed.'))
         return 1
 
-    choice = EMOJI_NUM.index(str(reaction))
+    choice = EmojiStr.num.index(str(reaction))
     log.debug('%s selected.', choice)
-    if result_msg:
-        await result_msg.edit(embed=embedq(EMOJI['confirm'] + f' Option #{choice} selected.'))
-        await asyncio.sleep(3)
-        await result_msg.delete()
-    if delete_prompt:
-        await prompt_msg.delete()
+    await handle_messages(embedq(EmojiStr.confirm + f' Option #{choice} selected.'))
     return choice

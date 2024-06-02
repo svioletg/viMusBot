@@ -24,7 +24,7 @@ from pretty_help import PrettyHelp
 # Local imports
 import utils.configuration as cfg
 from cogs import cog_general, cog_voice
-from cogs.common import EMOJI, SilentCancel, embedq
+from cogs.common import EmojiStr, SilentCancel, embedq
 from utils import miscutil, updater
 from utils.palette import Palette
 from version import VERSION
@@ -133,13 +133,6 @@ for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSION
 #             await ctx.send(embed=embedq('An unexpected error occurred.'))
 #             log.error(e)
 
-#     @commands.command(aliases=command_aliases('shuffle'))
-#     @commands.check(is_command_enabled)
-#     async def shuffle(self, ctx: commands.Context):
-#         """Randomizes the order of the queue."""
-#         random.shuffle(media_queue.get(ctx))
-#         await ctx.send(embed=embedq('Queue has been shuffled.'))
-
 # ############################################
 #
 # End of cog definitions.
@@ -182,20 +175,20 @@ bot = commands.Bot(
 async def on_command_error(ctx: commands.Context, error: BaseException):
     """Handles any exceptions raised by any commands or modules."""
     if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(embed=embedq(EMOJI['cancel'] + ' Not enough command arguments given.',
+        await ctx.send(embed=embedq(EmojiStr.cancel + ' Not enough command arguments given.',
             'Use the `help` command to see the correct syntax.'))
         return
     if isinstance(error, commands.CommandInvokeError):
         if 'ffmpeg was not found' in repr(error):
             log.error('FFmpeg was not found. It must be present either in the bot\'s directory or your system\'s PATH in order to play audio.')
-            await ctx.send(embed=embedq(EMOJI['cancel'] + ' Can\'t play audio. Please check the bot\'s logs.'))
+            await ctx.send(embed=embedq(EmojiStr.cancel + ' Can\'t play audio. Please check the bot\'s logs.'))
             return
     if isinstance(error, NotImplementedError):
-        await ctx.send(embed=embedq(EMOJI['cancel'] + f' The command `{ctx.command.name}` is not implemented yet,'+
+        await ctx.send(embed=embedq(EmojiStr.cancel + f' The command `{ctx.command.name}` is not implemented yet,'+
             'but is planned to be in the future.'))
         return
     if isinstance(error, yt_dlp.utils.DownloadError):
-        await ctx.send(embed=embedq(EMOJI['cancel'] + ' Unable to retrieve video.',
+        await ctx.send(embed=embedq(EmojiStr.cancel + ' Unable to retrieve video.',
             'It may be private, or otherwise unavailable.'))
         return
     if isinstance(error, SilentCancel | commands.CheckFailure | commands.CommandNotFound):
@@ -205,7 +198,7 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
     log.error(error)
     if cfg.LOG_TRACEBACKS:
         log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
-    await ctx.send(embed=embedq(EMOJI['cancel'] + ' An unexpected error has occurred. Check your logs for more information.',
+    await ctx.send(embed=embedq(EmojiStr.cancel + ' An unexpected error has occurred. Check your logs for more information.',
         str(error)))
 
 @bot.event
