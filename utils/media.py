@@ -43,7 +43,6 @@ class MediaSource(str):
 YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
-BANDCAMP   = MediaSource('bandcamp')
 OTHER      = MediaSource('other') # Uses yt_dlp's extract_info(), should have basic common attributes
 
 #region EXCEPTIONS
@@ -145,17 +144,20 @@ class MediaInfo:
             else:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
         elif source == OTHER:
-            self.info           = cast(dict, self.info)
-            self.url            = cast(str, self.info['webpage_url'])
-            self.title          = cast(str, self.info.get('title', ''))
-            self.artist         = cast(str, self.info.get('uploader', ''))
-            self.length_seconds = int(self.info.get('duration', 0))
-            self.thumbnail      = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
+            self._process_generic()
         else:
             raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
 
     def __repr__(self):
         return f'<{self.__class__.__name__} source="{self.source}", title="{self.title}", artist="{self.artist}", url="{self.url}", ...>'
+
+    def _process_generic(self) -> None:
+        self.info           = cast(dict, self.info)
+        self.url            = cast(str, self.info['webpage_url'])
+        self.title          = cast(str, self.info.get('title', ''))
+        self.artist         = cast(str, self.info.get('uploader', ''))
+        self.length_seconds = int(self.info.get('duration', 0))
+        self.thumbnail      = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
 
     @classmethod
     def from_other(cls, url: str) -> Self:
@@ -292,6 +294,8 @@ class AlbumInfo(MediaInfo):
                 self.release_year   = cast(str, self.info['year'])
             elif self.yt_info_origin == 'ytdl':
                 self.length_seconds = track_list_duration(self.contents)
+        elif source == OTHER:
+            self.length_seconds = track_list_duration(self.contents)
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -305,7 +309,7 @@ class PlaylistInfo(MediaInfo):
         self.contents: list[TrackInfo] = get_group_contents(self)
 
         if source == SPOTIFY:
-            self.thumbnail    = cast(str, self.info['images'][0]['url'])
+            self.thumbnail      = cast(str, self.info['images'][0]['url'])
             self.length_seconds = track_list_duration(self.contents)
         elif source == SOUNDCLOUD:
             pass
@@ -314,6 +318,8 @@ class PlaylistInfo(MediaInfo):
                 raise ValueError('ytmusic origin should not be used to instantiate PlaylistInfo.')
             if self.yt_info_origin == 'ytdl':
                 self.length_seconds = track_list_duration(self.contents)
+        elif source == OTHER:
+            self.length_seconds = track_list_duration(self.contents)
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -364,6 +370,11 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
 
         for track in track_list:
             object_list.append(TrackInfo(YOUTUBE, track))
+        return object_list
+
+    if group_object.source == OTHER:
+        track_list = group_object.info['entries']
+        object_list = [TrackInfo.from_other(track['url']) for track in track_list]
         return object_list
 #endregion MEDIAINFO AND SUBCLASSES
 

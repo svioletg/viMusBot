@@ -585,44 +585,46 @@ class Voice(commands.Cog):
                 if re.findall(r"https://(?:music\.|www\.|)youtube\.com/playlist\?list=", url):
                     # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
                     media_list = media.PlaylistInfo.from_ytdl(url.replace('music.', 'www.'))
-                if url.startswith('https://open.spotify.com/album/'):
+                elif url.startswith('https://open.spotify.com/album/'):
                     media_list = media.AlbumInfo.from_spotify_url(url)
-                if url.startswith('https://open.spotify.com/playlist/'):
+                elif url.startswith('https://open.spotify.com/playlist/'):
                     media_list = media.PlaylistInfo.from_spotify_url(url)
-                if re.findall(r"https://soundcloud\.com/\w+/sets/", url):
+                elif re.findall(r"https://soundcloud\.com/\w+/sets/", url):
                     media_list = media.soundcloud_set(url)
+                elif re.findall(r"https://\w+\.bandcamp\.com/album/", url):
+                    media_list = media.AlbumInfo.from_other(url)
+                else:
+                    media_list = media.PlaylistInfo.from_other(url)
 
                 # Final checks
-                if media_list:
-                    if isinstance(media_list, media.AlbumInfo) and (len(media_list.contents) > cfg.MAX_ALBUM_LENGTH):
-                        await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Album is too long.',
-                            f'Current limit is set to {cfg.MAX_ALBUM_LENGTH}.'))
-                        return
-                    if isinstance(media_list, media.PlaylistInfo) and (len(media_list.contents) > cfg.MAX_PLAYLIST_LENGTH):
-                        await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Playlist is too long.',
-                            f'Current limit is set to {cfg.MAX_PLAYLIST_LENGTH}.'))
-                        return
-
-                    if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
-                        # Find a YTMusic equivalent album if we have a Spotify album
-                        await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
-                        if match_result := media.match_ytmusic_album(media_list, threshold=50):
-                            yt_album = match_result[0]
-                            await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?') \
-                                .add_field(name=yt_album.album_name, value=yt_album.artist).set_thumbnail(url=yt_album.thumbnail))
-
-                            if await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False) == 1:
-                                media_list = yt_album
-                            else:
-                                return
-                        else:
-                            await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Couldn\'t find any close matches for this album.',
-                                'Try using a source other than Spotify, if possible.'))
-                            return
-
-                    # If we've reached here, something was successfully found and can be queued without issue
-                    await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
+                if isinstance(media_list, media.AlbumInfo) and (len(media_list.contents) > cfg.MAX_ALBUM_LENGTH):
+                    await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Album is too long.',
+                        f'Current limit is set to {cfg.MAX_ALBUM_LENGTH}.'))
                     return
+                if isinstance(media_list, media.PlaylistInfo) and (len(media_list.contents) > cfg.MAX_PLAYLIST_LENGTH):
+                    await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Playlist is too long.',
+                        f'Current limit is set to {cfg.MAX_PLAYLIST_LENGTH}.'))
+                    return
+
+                if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
+                    # Find a YTMusic equivalent album if we have a Spotify album
+                    await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                    if match_result := media.match_ytmusic_album(media_list, threshold=50):
+                        yt_album = match_result[0]
+                        await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?') \
+                            .add_field(name=yt_album.album_name, value=yt_album.artist).set_thumbnail(url=yt_album.thumbnail))
+
+                        if await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False) == 1:
+                            media_list = yt_album
+                        else:
+                            return
+                    else:
+                        await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Couldn\'t find any close matches for this album.',
+                            'Try using a source other than Spotify, if possible.'))
+                        return
+
+                # If we've reached here, something was successfully found and can be queued without issue
+                await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
                 return
             else:
                 # Single track links
