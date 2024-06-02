@@ -44,6 +44,7 @@ log.info('Logging for bot.py is now active.')
 log.info('Python version: %s', python_version())
 log.info('viMusBot version: %s', VERSION)
 
+# TODO: Make sure updater is up to snuff
 # Check for updates
 # if __name__ == '__main__':
 #     log.info('Running on version %s; checking for updates...', VERSION)
@@ -69,75 +70,6 @@ log.info('viMusBot version: %s', VERSION)
 log.info('Removing previously downloaded media files...')
 for t in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSIONS]:
     os.remove(t)
-
-# Start bot-related events
-# class Music(commands.Cog):
-#     # Playing music / Voice-related
-#     @commands.command(aliases=command_aliases('analyze'))
-#     @commands.check(is_command_enabled)
-#     async def analyze(self, ctx: commands.Context, spotifyurl: str):
-#         """Returns spotify API information regarding a track."""
-#         info = media.spotify_track(spotifyurl)
-#         title = info['title']
-#         artist = info['artist']
-#         result = media.analyze_spotify_track(spotifyurl)
-#         data = result[0]
-#         skip = result[1]
-#         # Assemble embed object
-#         embed = discord.Embed(title=f'Spotify data for {title} by {artist}', description='Things like key, tempo, and time signature are estimated, and therefore not necessarily accurate.', color=EMBED_COLOR)
-#         # Put key, time sig, and tempo at the top
-#         embed.add_field(name='Key',value=data['key'])
-#         data.pop('key')
-#         embed.add_field(name='Tempo',value=data['tempo'])
-#         data.pop('tempo')
-#         embed.add_field(name='Time Signature',value=data['time_signature'])
-#         data.pop('time_signature')
-
-#         # Add the rest
-#         for i in data:
-#             if i in skip:
-#                 continue
-
-#             value=data[i]
-#             # Change decimals to percentages
-#             # Exclude loudness
-#             if isinstance(data[i], (int, float)):
-#                 if data[i]<1 and i!='loudness':
-#                     value=str(round(data[i]*100,2))+'%'
-
-#             value=str(value)
-#             embed.add_field(name=i.title(),value=value)
-#         await ctx.send(embed=embed)
-
-#     @commands.command(aliases=command_aliases('loop'))
-#     @commands.check(is_command_enabled)
-#     async def loop(self, ctx: commands.Context):
-#         """Toggles looping for the current track."""
-#         global loop_this
-#         # Inverts the boolean
-#         loop_this = not loop_this
-#         log.info(f'Looping {["disabled", "enabled"][loop_this]}.')
-#         await ctx.send(embed=embedq(f'{get_loop_icon()}Looping {["disabled", "enabled"][loop_this]}.'))
-
-#     @commands.command(aliases=command_aliases('move'))
-#     @commands.check(is_command_enabled)
-#     async def move(self, ctx: commands.Context, old: int, new: int):
-#         """Moves a queue item from <old> to <new>."""
-#         try:
-#             to_move = media_queue.get(ctx)[old-1].title
-#             media_queue.get(ctx).insert(new-1, media_queue.get(ctx).pop(old-1))
-#             await ctx.send(embed=embedq(f'Moved {to_move} to #{new}.'))
-#         except IndexError as e:
-#             await ctx.send(embed=embedq('The selected number is out of range.'))
-#         except Exception as e:
-#             await ctx.send(embed=embedq('An unexpected error occurred.'))
-#             log.error(e)
-
-# ############################################
-#
-# End of cog definitions.
-#
-# ############################################
 
 # Establish bot user
 intents = discord.Intents.default()
@@ -219,110 +151,33 @@ async def console_thread():
             user_input = user_input.lower().strip()
             if user_input == '':
                 continue
-
-            # Console debugging commands
-            if user_input.startswith('test'):
-                pass
-            #     if PUBLIC:
-            #         print('Debugging commands are disabled in public mode.')
-            #         continue
-
-            #     # TODO: Some sort of help command would be good
-            #     params = user_input.split()
-
-            #     if params[1] == 'play':
-            #         if len(params) < 3:
-            #             print('Not enough arguments. Usage: test play <source> [flags] (available flags: invalid, multiple, playlist, album)')
-            #             print('You can also use "test play all" to run every combination of this test. This can take several minutes.')
-            #             continue
-            #         if params[2] != 'all':
-            #             test_start = time.time()
-            #             result = await Tests.test_play(params[2], flags=params[3:])
-            #             if result is None:
-            #                 # Returns None if the test was aborted
-            #                 continue
-            #             print(f'{plt.gold}ARGS: {result["arguments"]} {plt.reset}\n{result["conclusion"]}')
-            #             test_end = time.time()
-            #             print(f'Test finished in {plt.magenta}{test_end - test_start}s')
-            #         elif params[2] == 'all':
-            #             # Run full test suite of all combinations
-            #             confirmation = await aioconsole.ainput('> About to run every combination of -play test. This could take several minutes. Continue? (y/n) ')
-            #             if confirmation.lower() != 'y':
-            #                 print('> Aborted.')
-            #                 continue
-
-            #             test_results: dict[str, list] = {'pass': [], 'fail': []}
-            #             test_result_string: str = ''
-            #             def add_test_result(result: tuple[bool, dict]):
-            #                 nonlocal test_results, test_result_string
-            #                 test_result_string += f'{f'{plt.green}PASS' if result['passed'] else f'{plt.red}FAIL'} | ARGS: {result['arguments']}\n'
-            #                 if result['passed']:
-            #                     test_results['pass'].append((result['arguments'], result['conclusion']))
-            #                 else:
-            #                     test_results['fail'].append((result['arguments'], result['conclusion']))
-
-            #             test_sources: list[str] = Tests.test_sources + ['any', 'mixed']
-            #             test_start: float = time.time()
-            #             tests_run: int = 0
-            #             # Go through all test combinations
-            #             try:
-            #                 # 'invalid', 'single', and 'no-list' will be skipped over by the test function
-            #                 # They're just here to make generating the combinations easier
-            #                 test_conditions = itertools.product(
-            #                     test_sources,
-            #                     ['valid', 'invalid'],
-            #                     ['single', 'multiple'],
-            #                     ['no-list', 'playlist', 'album']
-            #                     )
-            #                 for src, valid, multiple_urls, playlist_or_album in test_conditions:
-            #                     add_test_result(await Tests.test_play(src, flags=[valid, multiple_urls, playlist_or_album]))
-            #                     tests_run += 1
-            #                     log.info(f'{plt.blue}{tests_run}{plt.reset} tests run, of which '+
-            #                         f'{plt.green}{len(test_results['pass'])} have passed, and '+
-            #                         f'{plt.red}{len(test_results['fail'])} have failed.'
-            #                         )
-            #             except Exception as e:
-            #                 log.error(e)
-            #                 log.info(f'{plt.red}Traceback encountered, tests aborted.')
-
-            #             test_end: float = time.time()
-            #             test_duration: float = math.floor(test_end - test_start)
-
-            #             print(f'Finished {plt.blue}{tests_run}{plt.reset} tests.')
-            #             # print(test_result_string)
-            #             print(f'FINISHED IN {plt.magenta}{timestamp_from_seconds(test_duration)} or {test_duration}s{plt.reset} | PASS/FAIL: {plt.green}{len(test_results['pass'])}{plt.reset}/{plt.red}{len(test_results['fail'])}')
-            #             if test_results['fail'] != []:
-            #                 print('FAILED TESTS:')
-            #                 for arguments, conclusion in test_results['fail']:
-            #                     print(f'ARGS: {plt.gold}{arguments}\n{plt.reset}{conclusion}')
-            #             else:
-            #                 print(f'{plt.green}ALL TESTS PASSED')
-            else:
-                match user_input:
-                    case 'colors':
-                        plt.preview()
-                        print()
-                    case 'stop':
-                        log.info('Stopping the bot...')
-                        log.debug('Leaving voice if connected...')
-                        # await voice.disconnect()
-                        log.debug('Cancelling bot task...')
-                        asyncio_tasks['bot'].cancel()
-                        try:
-                            await asyncio_tasks['bot']
-                        except asyncio.exceptions.CancelledError:
-                            pass
-                        log.debug('Cancelling console task...')
-                        asyncio_tasks['console'].cancel()
-                        try:
-                            await asyncio_tasks['console']
-                        except asyncio.exceptions.CancelledError:
-                            pass
-                    case _:
-                        log.info('Unrecognized command "%s"', user_input)
+            match user_input:
+                case 'colors':
+                    plt.preview()
+                    print()
+                case 'stop':
+                    log.info('Stopping the bot...')
+                    log.debug('Leaving voice if connected...')
+                    # await voice.disconnect()
+                    log.debug('Cancelling bot task...')
+                    asyncio_tasks['bot'].cancel()
+                    try:
+                        await asyncio_tasks['bot']
+                    except asyncio.exceptions.CancelledError:
+                        pass
+                    log.debug('Cancelling console task...')
+                    asyncio_tasks['console'].cancel()
+                    try:
+                        await asyncio_tasks['console']
+                    except asyncio.exceptions.CancelledError:
+                        pass
+                case _:
+                    log.info('Unrecognized command "%s"', user_input)
         except Exception as e:
             log.info('Error encountered in console thread!')
             log.error(e)
+            if cfg.LOG_TRACEBACKS:
+                log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(e)))
 
 async def bot_thread():
     log.info('Starting bot thread...')
