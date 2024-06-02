@@ -305,7 +305,7 @@ class PlaylistInfo(MediaInfo):
         self.contents: list[TrackInfo] = get_group_contents(self)
 
         if source == SPOTIFY:
-            self.thumbnail    = cast(str, self.info['images'][0]['url']) # TODO: This grabs the uncropped image, find out if that's a problem
+            self.thumbnail    = cast(str, self.info['images'][0]['url'])
             self.length_seconds = track_list_duration(self.contents)
         elif source == SOUNDCLOUD:
             pass
@@ -475,7 +475,6 @@ class Tests:
 
 # Define matching logic
 def compare_media(reference: MediaInfo, compared: MediaInfo,
-        mode: Literal['fuzz', 'strict'] = 'fuzz',
         fuzz_threshold: int = 75,
         ignore_title: bool = False,
         ignore_artist: bool = False,
@@ -486,8 +485,6 @@ def compare_media(reference: MediaInfo, compared: MediaInfo,
 
     @reference: MediaInfo object to compare against
     @compared: MediaInfo object to be compared
-    @mode: Either 'fuzz' or 'strict'; 'fuzz' uses fuzzy matching to determine whether something should clear a check,\
-        where 'strict' only checks for exact matches
     @fuzz_threshold: If using 'fuzz' mode, this is the minimum ratio a match must clear to pass the check
     @ignore_title: Forces a title matching check to pass
     @ignore_artist: Forces an artist matching check to pass
@@ -511,17 +508,9 @@ def compare_media(reference: MediaInfo, compared: MediaInfo,
     reference.title = re.sub(details_check, '', reference.title)
     compared.title = re.sub(details_check, '', compared.title)
 
-    if mode == 'fuzz':
-        matching_title = fuzz.ratio(reference.title.lower(), compared.title.lower()) > title_threshold
-        matching_artist = fuzz.ratio(reference.artist.lower(), compared.artist.lower()) > artist_threshold
-        matching_album = fuzz.ratio(reference.album_name.lower(), compared.album_name.lower()) > album_threshold
-    elif mode == 'strict': # TODO: Maybe deprecate strict mode
-        matching_title = reference.title.lower() in compared.title.lower() or (
-            reference.title.split(' - ')[0].lower() in compared.title.lower()
-            and reference.title.split(' - ')[1].lower() in compared.title.lower()
-            )
-        matching_artist = reference.artist.lower() in compared.artist.lower()
-        matching_album = reference.album_name.lower() in compared.album_name.lower()
+    matching_title = fuzz.ratio(reference.title.lower(), compared.title.lower()) > title_threshold
+    matching_artist = fuzz.ratio(reference.artist.lower(), compared.artist.lower()) > artist_threshold
+    matching_album = fuzz.ratio(reference.album_name.lower(), compared.album_name.lower()) > album_threshold
 
     # Do not count tracks that are specific/alternate version,
     # unless said keyword matches the original Spotify title
@@ -613,6 +602,7 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     @query: String to search with.
     @results: Maximum number of search results to return, per each category.
     """
+    # TODO: Albums don't seem to return thumbnails here
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
 
     results: YTMusicResults = {'songs': None, 'videos': None, 'albums': None}

@@ -14,7 +14,7 @@ class CommonMsg:
     """Common bot responses kept here for convenience."""
     @staticmethod
     def queue_is_empty() -> Embed:
-        return embedq(f'{EmojiStr.cancel} Queue is empty, no effect.')
+        return embedq(f'{EmojiStr.cancel} Queue is empty.')
 
     @staticmethod
     def queue_out_of_range(queue_length: int) -> Embed:

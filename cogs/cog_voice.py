@@ -255,6 +255,22 @@ class Voice(commands.Cog):
             f'Showing {start + 1} to {end} of {len(self.media_queue)} items. Use -queue [page] to see more.'
         await ctx.send(embed=embed)
 
+    @commands.command(aliases=command_aliases('history'))
+    @commands.check(is_command_enabled)
+    async def history(self, ctx: commands.Context):
+        """Shows the 5 most recently played tracks."""
+        if not any(item is not None for item in self.play_history):
+            await ctx.send(embed=embedq(EmojiStr.cancel + ' Play history is empty.'))
+            return
+
+        history_embed = embedq('Recently played:')
+        for n, item in enumerate(self.play_history):
+            if not item:
+                continue
+            history_embed.add_field(name=f'#{n + 1}. {item.info.title}', value=item.info.artist, inline=False)
+
+        await ctx.send(embed=history_embed)
+
     @commands.command(aliases=command_aliases('move'))
     @commands.check(is_command_enabled)
     @commands.check(author_in_vc)
@@ -729,9 +745,11 @@ class Voice(commands.Cog):
         Use `advance_queue()` to attempt moving the queue along, do not use this function directly."""
         log.info('Trying to start playing...')
 
+        self.audio_time_elapsed = 0.0
+
         if item != self.previous_item:
             if self.previous_item:
-                self.play_history.append(self.previous_item)
+                self.play_history.appendleft(self.previous_item)
 
             if self.now_playing_msg:
                 self.now_playing_msg = await self.now_playing_msg.delete()
