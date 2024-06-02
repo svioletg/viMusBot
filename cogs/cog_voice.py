@@ -2,7 +2,6 @@
 
 # Standard imports
 import asyncio
-import glob
 import logging
 import os
 import random
@@ -28,38 +27,22 @@ from cogs.common import (EmojiStr, SilentCancel, command_aliases, edit_or_send,
 from cogs.messages import CommonMsg
 from cogs.test_voice import VoiceTest
 from utils import media
-from utils.miscutil import timestamp_from_seconds
+from utils.miscutil import seconds_to_hms
 
 log = logging.getLogger('viMusBot')
 
 # Configure youtube dl
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-#-%(id)s-#-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': False,
-    'no_warnings': False,
-    'default_search': 'auto',
-    'extract_flat': True,
-    'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes
-}
+ytdl = yt_dlp.YoutubeDL(media.ytdl_format_options)
 
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
-ffmpeg_options = {
-    'options': '-vn',
-}
+ffmpeg_options = media.ffmpeg_options
 
 class YTDLSource(PCMVolumeTransformer):
     """Creates an AudioSource using yt_dlp."""
-    def __init__(self, source, *, data, volume=0.5):
+    def __init__(self, source, *, data, filepath: Path, volume: float=0.5):
         super().__init__(source, volume)
 
         self.data = data
+        self.filepath = filepath
 
         self.title = data.get('title')
         self.url = data.get('url')
@@ -82,7 +65,7 @@ class YTDLSource(PCMVolumeTransformer):
         filename = data['url'] if stream else ytdl.prepare_filename(data) # type: ignore
         src = filename.split('-#-')[0] # pylint: disable=unused-variable
         ID = filename.split('-#-')[1] # pylint: disable=unused-variable
-        return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data) # type: ignore
+        return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data, filepath=Path(filename)) # type: ignore
 
 @dataclass
 class QueueItem:
@@ -154,6 +137,11 @@ class Voice(commands.Cog):
         self.voice_client: Optional[VoiceClient] = None
         self.media_queue = MediaQueue()
         self.play_history: deque[Optional[QueueItem]] = deque([None, None, None, None, None], maxlen=5)
+        self.current_item: Optional[QueueItem] = None
+        self.previous_item: Optional[QueueItem] = None
+        self.files_to_del: list[Path] = []
+        self.player: Optional[YTDLSource] = None
+
         self.advance_lock: bool = False
 
         self.skip_votes_placed: list[Member] = []
@@ -161,8 +149,6 @@ class Voice(commands.Cog):
         self.paused_at: float = 0.0
         self.pause_duration: float = 0.0
         self.audio_time_elapsed: float = 0.0
-
-        self.current_item: Optional[QueueItem] = None
 
         self.now_playing_msg: Optional[Message] = None
         self.queue_msg: Optional[Message] = None
@@ -229,6 +215,8 @@ class Voice(commands.Cog):
         if self.voice_client.is_connected():
             log.info('Clearing the queue...')
             self.media_queue.clear()
+            self.current_item = None
+            self.previous_item = None
             log.info('Leaving voice channel: %s', self.voice_client.channel.name)
             await self.voice_client.disconnect()
             self.voice_client = None
@@ -248,10 +236,9 @@ class Voice(commands.Cog):
             await ctx.send(embed=CommonMsg.queue_out_of_range(len(self.media_queue)))
             return
 
-        queue_length_seconds = sum(item.info.length_seconds for item in self.media_queue)
-        queue_length_seconds += cast(QueueItem, self.current_item).info.length_seconds - self.audio_time_elapsed
+        queue_length_seconds = seconds_to_hms(sum(item.info.length_seconds for item in self.media_queue) +
+            self.current_item.info.length_seconds - self.audio_time_elapsed)
 
-        queue_length_seconds = timestamp_from_seconds(queue_length_seconds)
         embed = embedq(title=f'{len(self.media_queue)} items in queue.\n*(Approx. time remaining: {queue_length_seconds})*',)
         start = (10 * page) - 10
         end = 10 * page
@@ -279,22 +266,20 @@ class Voice(commands.Cog):
         if self.media_queue == []:
             await ctx.send(embed=CommonMsg.queue_is_empty())
             return
-
         if (origin < 1) or (destination < 1):
             await ctx.send(embed=embedq(EmojiStr.cancel + ' Origin or destination can\'t be less than 1.'))
             return
-
         if destination >= len(self.media_queue):
             await ctx.send(embed=CommonMsg.queue_out_of_range(len(self.media_queue)))
             return
-
         if origin == destination:
             await ctx.send(embed=embedq(EmojiStr.cancel + ' Origin and destination can\'t be the same.'))
             return
 
         self.media_queue.insert(destination - 1, origin_item := self.media_queue.pop(origin - 1))
-        await ctx.send(embed=embedq(EmojiStr.arrow_r + f' Moved #{origin} ({origin_item.info.title}) ' +
-            f'{'up' if destination < origin else 'down'} to spot #{destination}.'))
+        direction = 'up' if destination < origin else 'down'
+        await ctx.send(embed=embedq(EmojiStr.arrow_u if direction == 'up' else EmojiStr.arrow_d + f' Moved #{origin} ({origin_item.info.title}) ' +
+            f'{direction} to spot #{destination}.'))
 
     @commands.command(aliases=command_aliases('shuffle'))
     @commands.check(is_command_enabled)
@@ -311,6 +296,7 @@ class Voice(commands.Cog):
 
     @commands.command(aliases=command_aliases('roulette'))
     @commands.check(is_command_enabled)
+    @commands.check(author_in_vc)
     async def roulette(self, ctx: commands.Context, toggle: str=''):
         """Toggles "roulette" mode. If no argument is given, roulette mode will be turned on if its currently off, and vice versa.
         Alternatively, you can use "roulette on" or "roulette off" to toggle it explicitly.
@@ -392,7 +378,7 @@ class Voice(commands.Cog):
     async def loop(self, ctx: commands.Context, toggle: str=''):
         """Toggles looping the current track. If no argument is given, looping will be turned on if its currently off, and vice versa.
         Alternatively, you can use "loop on" or "loop off" to toggle it explicitly.
-        
+
         Using `skip` while looping is enabled will skip to the next track in queue, and begin looping that."""
         if toggle in ['on', 'off']:
             self.media_queue.is_looping = {'on': True, 'off': False}[toggle]
@@ -428,6 +414,8 @@ class Voice(commands.Cog):
         log.info('Stopping audio and clearing the queue...')
         self.voice_client.stop()
         self.media_queue.clear()
+        self.current_item = None
+        self.previous_item = None
 
     @commands.command(aliases=command_aliases('nowplaying'))
     @commands.check(is_command_enabled)
@@ -495,15 +483,11 @@ class Voice(commands.Cog):
         plain_strings: list[str] = []
 
         for item in queries:
-            if item.startswith('https://'):
-                url_strings.append(item)
-            else:
-                plain_strings.append(item)
-
-        if url_strings and plain_strings:
-            log.debug('Both URLs and plain text detected; cancelling.')
-            await ctx.send(f'{EmojiStr.cancel} URLs and plain search terms can\'t be used at the same time.')
-            return
+            (url_strings if item.startswith('https://') else plain_strings).append(item)
+            if url_strings and plain_strings:
+                log.debug('Both URLs and plain text detected; cancelling.')
+                await ctx.send(f'{EmojiStr.cancel} URLs and plain-text search terms can\'t be used at the same time.')
+                return
 
         # We now have only queries of either one text search, or one or more URLs
         async with ctx.typing():
@@ -534,8 +518,7 @@ class Voice(commands.Cog):
 
                 choice_embed = Embed(color=cfg.EMBED_COLOR, title='Please choose a search result to queue...')
 
-                def assemble_choices(target_embed: Embed, info_list: list[Optional[list[media.TrackInfo]]],
-                        name_list: list[str]) -> tuple[dict, Embed]:
+                def assemble_choices(target_embed: Embed, info_list: list, name_list: list[str]) -> tuple[dict, Embed]:
                     options: dict = {}
                     position: int = 0
                     for item, name in zip(info_list, name_list):
@@ -550,109 +533,101 @@ class Voice(commands.Cog):
 
                 choice_prompt = await ctx.send(embed=choice_embed)
                 choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_nums=len(choice_options), result_msg=self.queue_msg)
+                self.queue_msg = None
                 if choice == 0:
                     return
 
                 choice = choice_options[choice]
-
                 await play_or_enqueue(QueueItem(choice, ctx.author) if not choice.contents else QueueItem.from_list(choice.contents, ctx.author))
                 return
             #endregion play: PLAIN TEXT
 
             #region play: FROM URL
-            if url_strings:
-                if len(url_strings) > cfg.MAX_CONSECUTIVE_URLS:
-                    log.debug('Cancelling play command: too many consecutive URLs.')
-                    await ctx.send(embed=embedq(f'{EmojiStr.cancel} Too many URLs provided. (Max: {cfg.MAX_CONSECUTIVE_URLS})'))
-                    return
+            assert (not plain_strings) and (url_strings)
 
-                # Does Spotify even use spotify.link URLs anymore? I can barely test this because I can't seem to get one now
-                url_strings = [requests.get(u, timeout=1).url if u.startswith('https://spotify.link') else u for u in url_strings]
+            if len(url_strings) > cfg.MAX_CONSECUTIVE_URLS:
+                log.debug('Cancelling play command: too many consecutive URLs.')
+                await ctx.send(embed=embedq(f'{EmojiStr.cancel} Too many URLs provided. (Max: {cfg.MAX_CONSECUTIVE_URLS})'))
+                return
 
-                if len(url_strings) > 1 and any(re.findall(r"(playlist|album|sets)", link) for link in url_strings):
-                    log.debug('Cancelling play command: album/playlist URL present in a set of URLs.')
-                    await ctx.send(embed=embedq(f'{EmojiStr.cancel} Albums or playlists must be queued on their own.',
-                        'Multi-URL queueing is allowed only for single tracks.'))
-                    return
+            # Does Spotify even use spotify.link URLs anymore? I can barely test this because I can't seem to get one now
+            url_strings = [requests.get(u, timeout=1).url if u.startswith('https://spotify.link') else u for u in url_strings]
 
-                # [ ] Handle playlists, albums
-                if re.findall(r"(playlist|album|sets)", url_strings[0]):
-                    log.debug('URL looks like a playlist or an album.')
-                    # Because of the previous checks we know this has to only be one URL, no need to keep the list
-                    url = url_strings[0]
-                    media_list: Optional[media.PlaylistInfo | media.AlbumInfo] = None
+            if len(url_strings) > 1 and any(re.findall(r"(playlist|album|sets)", link) for link in url_strings):
+                log.debug('Cancelling play command: album/playlist URL present in a set of URLs.')
+                await ctx.send(embed=embedq(f'{EmojiStr.cancel} Albums or playlists must be queued on their own.',
+                    'Multi-URL queueing is allowed only for single tracks.'))
+                return
 
-                    if re.findall(r"https://(?:music\.|www\.|)youtube\.com/playlist\?list=", url):
-                        # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
-                        media_list = media.PlaylistInfo.from_ytdl(url.replace('Voice.', 'www.'))
+            # [ ] Handle playlists, albums
+            if re.findall(r"(playlist|album|sets)", url_strings[0]):
+                log.debug('URL looks like a playlist or an album.')
+                # Because of the previous checks we know this has to only be one URL, no need to keep the list
+                url = url_strings[0]
+                media_list: Optional[media.PlaylistInfo | media.AlbumInfo] = None
 
-                    if url.startswith('https://open.spotify.com/album/'):
-                        media_list = media.AlbumInfo.from_spotify_url(url)
-                    if url.startswith('https://open.spotify.com/playlist/'):
-                        media_list = media.PlaylistInfo.from_spotify_url(url)
+                if re.findall(r"https://(?:music\.|www\.|)youtube\.com/playlist\?list=", url):
+                    # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
+                    media_list = media.PlaylistInfo.from_ytdl(url.replace('music.', 'www.'))
+                if url.startswith('https://open.spotify.com/album/'):
+                    media_list = media.AlbumInfo.from_spotify_url(url)
+                if url.startswith('https://open.spotify.com/playlist/'):
+                    media_list = media.PlaylistInfo.from_spotify_url(url)
+                if re.findall(r"https://soundcloud\.com/\w+/sets/", url):
+                    media_list = media.soundcloud_set(url)
 
-                    if re.findall(r"https://soundcloud\.com/\w+/sets/", url):
-                        media_list = media.soundcloud_set(url)
-
-                    # Final checks
-                    if media_list:
-                        if isinstance(media_list, media.AlbumInfo) and (len(media_list.contents) > cfg.MAX_ALBUM_LENGTH):
-                            await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Album is too long.',
-                                f'Current limit is set to {cfg.MAX_ALBUM_LENGTH}.'))
-                            return
-                        if isinstance(media_list, media.PlaylistInfo) and (len(media_list.contents) > cfg.MAX_PLAYLIST_LENGTH):
-                            await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Playlist is too long.',
-                                f'Current limit is set to {cfg.MAX_PLAYLIST_LENGTH}.'))
-                            return
-
-                        if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
-                            # Find a YTMusic equivalent album if we have a Spotify album
-                            await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
-                            if match_result := media.match_ytmusic_album(media_list, threshold=50):
-                                yt_album = match_result[0]
-                                await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?')\
-                                    .add_field(name=yt_album.album_name, value=yt_album.artist)\
-                                    .set_thumbnail(url=yt_album.thumbnail))
-
-                                confirmation = await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False)
-
-                                if isinstance(confirmation, asyncio.TimeoutError):
-                                    await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Choice prompt timed out, nothing queued.'))
-                                    return
-                                if confirmation == 0:
-                                    await self.queue_msg.edit(embed=embedq('Selection cancelled.', 'Nothing will be queued.'))
-                                    return
-                                if confirmation == 1:
-                                    media_list = yt_album
-                            else:
-                                await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Couldn\'t find any close matches for this album.',
-                                    'Try using a source other than Spotify, if possible.'))
-                                return
-
-                        # If we've reached here, something was successfully found and can be queued without issue
-                        await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
-                    else:
+                # Final checks
+                if media_list:
+                    if isinstance(media_list, media.AlbumInfo) and (len(media_list.contents) > cfg.MAX_ALBUM_LENGTH):
+                        await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Album is too long.',
+                            f'Current limit is set to {cfg.MAX_ALBUM_LENGTH}.'))
                         return
-                else:
-                    # Single track links
-                    to_queue: list[QueueItem] = []
-                    for n, url in enumerate(url_strings):
-                        log.debug('Checking URL %s of %s: %s', n + 1, len(url_strings), url)
-                        await self.queue_msg.edit(embed=embedq(f'Queueing item {n + 1} of {len(url_strings)}...', url))
-                        if re.findall(r"https://(?:music\.|www\.|)youtube\.com/watch\?v=", url):
-                            log.debug('Looks like a YouTube Music or YouTube URL, creating QueueItem...')
-                            to_queue.append(QueueItem(media.TrackInfo.from_pytube(url), ctx.author))
-                        elif url.startswith('https://open.spotify.com/track/'):
-                            log.debug('Looks like a Spotify URL, creating QueueItem...')
-                            to_queue.append(QueueItem(media.TrackInfo.from_spotify_url(url), ctx.author))
-                        elif url.startswith('https://soundcloud.com/'):
-                            log.debug('Looks like a SoundCloud URL, creating QueueItem...')
-                            to_queue.append(QueueItem(media.TrackInfo.from_soundcloud_url(url), ctx.author))
+                    if isinstance(media_list, media.PlaylistInfo) and (len(media_list.contents) > cfg.MAX_PLAYLIST_LENGTH):
+                        await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Playlist is too long.',
+                            f'Current limit is set to {cfg.MAX_PLAYLIST_LENGTH}.'))
+                        return
+
+                    if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
+                        # Find a YTMusic equivalent album if we have a Spotify album
+                        await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                        if match_result := media.match_ytmusic_album(media_list, threshold=50):
+                            yt_album = match_result[0]
+                            await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?') \
+                                .add_field(name=yt_album.album_name, value=yt_album.artist).set_thumbnail(url=yt_album.thumbnail))
+
+                            if await prompt_for_choice(self.bot, ctx, prompt_msg=self.queue_msg, yesno=True, delete_prompt=False) == 1:
+                                media_list = yt_album
+                            else:
+                                return
                         else:
-                            log.debug('Creating QueueItem generically...')
-                            to_queue.append(QueueItem(media.TrackInfo.from_other(url), ctx.author))
-                    await play_or_enqueue(to_queue if len(to_queue) > 1 else to_queue[0])
+                            await self.queue_msg.edit(embed=embedq(f'{EmojiStr.cancel} Couldn\'t find any close matches for this album.',
+                                'Try using a source other than Spotify, if possible.'))
+                            return
+
+                    # If we've reached here, something was successfully found and can be queued without issue
+                    await play_or_enqueue(QueueItem.from_list(media_list.contents, ctx.author))
                     return
+                return
+            else:
+                # Single track links
+                to_queue: list[QueueItem] = []
+                for n, url in enumerate(url_strings):
+                    log.debug('Checking URL %s of %s: %s', n + 1, len(url_strings), url)
+                    await self.queue_msg.edit(embed=embedq(f'Queueing item {n + 1} of {len(url_strings)}...', url))
+                    if re.findall(r"https://(?:music\.|www\.|)youtube\.com/watch\?v=", url):
+                        log.debug('Looks like a YouTube Music or YouTube URL, creating QueueItem...')
+                        to_queue.append(QueueItem(media.TrackInfo.from_pytube(url), ctx.author))
+                    elif url.startswith('https://open.spotify.com/track/'):
+                        log.debug('Looks like a Spotify URL, creating QueueItem...')
+                        to_queue.append(QueueItem(media.TrackInfo.from_spotify_url(url), ctx.author))
+                    elif url.startswith('https://soundcloud.com/'):
+                        log.debug('Looks like a SoundCloud URL, creating QueueItem...')
+                        to_queue.append(QueueItem(media.TrackInfo.from_soundcloud_url(url), ctx.author))
+                    else:
+                        log.debug('Creating QueueItem generically...')
+                        to_queue.append(QueueItem(media.TrackInfo.from_other(url), ctx.author))
+                await play_or_enqueue(to_queue if len(to_queue) > 1 else to_queue[0])
+                return
             #endregion FROM URL
 
     @join.before_invoke
@@ -662,7 +637,7 @@ class Voice(commands.Cog):
     @stop.before_invoke
     @nowplaying.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
-        """Joins the author's voice channel if no voice client is active."""
+        """Cancels the command if a voice connection wasn't found, and the command isn't allowed to auto connect."""
         author = cast(Member, ctx.author)
         auto_connect_commands = ['join', 'play']
         if (not self.voice_client) and author.voice:
@@ -695,26 +670,68 @@ class Voice(commands.Cog):
         @show_elapsed: Show the elapsed time alongside the track length, i.e. "1:02 / 2:56"
         """
         item = cast(QueueItem, self.current_item)
-        submitter_text = self.get_queued_by_text(cast(Member, item.queued_by))
-        loop_icon = self.get_loop_icon()
-        timestamp = f'[{timestamp_from_seconds(self.audio_time_elapsed)} / {item.info.length_hms()}]' if show_elapsed \
-            else f'[{item.info.length_hms()}]' if item.info.length_seconds > 0 \
-            else ''
+        elapsed_hms: str = cast(str, seconds_to_hms(self.audio_time_elapsed))
+        length_hms: Optional[str] = item.info.length_hms(format_zero=False)
+        submitter_text: str = self.get_queued_by_text(cast(Member, item.queued_by))
+        loop_icon: str = self.get_loop_icon()
+
+        timestamp: str = f'[{elapsed_hms} / {length_hms or '?'}]' if show_elapsed else f'[{length_hms}]' if length_hms else ''
+
         embed = Embed(title=f'{loop_icon}{EmojiStr.play} Now playing: {item.info.title} {timestamp}',
             description=f'Link: {item.info.url}{submitter_text}', color=cfg.EMBED_COLOR).set_thumbnail(url=item.info.thumbnail)
         return embed
 
+    async def advance_queue(self, ctx: commands.Context, skipping: bool=False):
+        """Attempts to advance forward in the queue, if the bot is clear to do so.
+        Set to run whenever the audio player finishes its current item."""
+        if not self.voice_client.is_connected():
+            return
+
+        if not self.advance_lock and (skipping or not self.voice_client.is_playing()):
+            log.debug('Locking...')
+            self.advance_lock = True
+            try:
+                if self.player and ((not self.media_queue.is_looping) or (self.media_queue.is_looping and skipping)):
+                    if self.player.filepath not in self.files_to_del:
+                        self.files_to_del.append(self.player.filepath)
+                        log.debug('File marked for deletion: %s', self.player.filepath)
+                    for n, file in enumerate(self.files_to_del):
+                        try:
+                            os.remove(file)
+                            self.files_to_del.pop(n)
+                            log.debug('Removed file: %s', file)
+                        except PermissionError:
+                            log.debug('Permission error prevented removal of file: %s', file)
+                self.player = None
+
+                self.previous_item = self.current_item
+                self.skip_votes_placed.clear()
+                if self.media_queue.is_looping:
+                    log.debug('Looping is enabled, and we %s skipping.', 'ARE' if skipping else 'are NOT')
+                    await self.make_and_start_player(self.media_queue.pop(0) if skipping \
+                        else (self.current_item or self.media_queue.pop(0)), ctx)
+                elif not self.media_queue:
+                    self.voice_client.stop()
+                else:
+                    item_index = 0 if not self.media_queue.roulette_mode else random.randint(0, len(self.media_queue) - 1)
+                    await self.make_and_start_player(self.media_queue.pop(item_index), ctx)
+            finally:
+                # finally statement makes sure we still unlock if an error occurs
+                log.debug('Tasks finished; unlocking...')
+                self.advance_lock = False
+        elif self.advance_lock:
+            log.debug('Attempted call while locked; ignoring...')
+
     async def make_and_start_player(self, item: QueueItem, ctx: commands.Context):
         """Create a new player from the given `QueueItem` and starts playing audio.
-        Handles matching individual Spotify tracks to YTVoice.
+        Handles matching individual Spotify tracks to YTMusic.
 
         Use `advance_queue()` to attempt moving the queue along, do not use this function directly."""
         log.info('Trying to start playing...')
-        print(item != self.current_item)
 
-        if item != self.current_item:
-            if self.current_item:
-                self.play_history.append(self.current_item)
+        if item != self.previous_item:
+            if self.previous_item:
+                self.play_history.append(self.previous_item)
 
             if self.now_playing_msg:
                 self.now_playing_msg = await self.now_playing_msg.delete()
@@ -741,58 +758,30 @@ class Voice(commands.Cog):
                 if isinstance(matches, media.TrackInfo):
                     item.info = matches
 
+            if (item.info.length_seconds == 0) and (cfg.DURATION_LIMIT_SECONDS != 0):
+                prompt_msg = await ctx.send(embed=embedq(f'The duration of "{item.info.title}" couldn\'t be retrieved, so ' +
+                    'it can\'t be checked against the duration limit. Play anyway?'))
+                if await prompt_for_choice(self.bot, ctx, prompt_msg=prompt_msg, yesno=True) == 0:
+                    await self.advance_queue(ctx, skipping=True)
+                    return
+
         try:
             log.debug('Creating YTDLSource...')
-            player = await YTDLSource.from_url(item.info.url, loop=self.bot.loop, stream=False)
+            self.player = await YTDLSource.from_url(item.info.url, loop=self.bot.loop, stream=False)
         except yt_dlp.utils.DownloadError:
             log.info('Download error occurred; skipping this item...')
             await ctx.send(embed=embedq('This video is unavailable.', f'URL: {item.info.url}'))
-            await self.advance_queue(ctx)
+            await self.advance_queue(ctx, skipping=True)
             return
 
         self.voice_client.stop()
         log.info('Starting audio playback...')
+        self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
+        self.current_item = item
 
-        self.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
-
-        if item != self.current_item:
+        if item != self.previous_item:
             # Don't re-send a now playing message if we're just looping this track
-            self.current_item = item
             self.now_playing_msg = await ctx.send(embed=self.embed_now_playing(show_elapsed=False))
 
         if self.queue_msg:
             self.queue_msg = await self.queue_msg.delete()
-
-        for file in [f for f in glob.glob('*.*') if Path(f).suffix in cfg.CLEANUP_EXTENSIONS]:
-            # Delete last played file
-            try:
-                log.debug('Removing file: %s', file)
-                os.remove(file)
-            except PermissionError:
-                log.debug('Permission denied removing file: %s', file)
-
-    async def advance_queue(self, ctx: commands.Context, skipping: bool=False):
-        """Attempts to advance forward in the queue, if the bot is clear to do so.
-        Set to run whenever the audio player finishes its current item."""
-        if not self.voice_client.is_connected():
-            return
-
-        if not self.advance_lock and (skipping or not self.voice_client.is_playing()):
-            log.debug('Locking...')
-            self.advance_lock = True
-            self.skip_votes_placed.clear()
-            try:
-                if self.media_queue.is_looping:
-                    log.debug('Looping is enabled, and we %s skipping.', 'ARE' if skipping else 'are NOT')
-                    await self.make_and_start_player(self.media_queue.pop(0) if skipping else self.current_item or self.media_queue.pop(0), ctx)
-                elif not self.media_queue:
-                    self.voice_client.stop()
-                else:
-                    item_index = 0 if not self.media_queue.roulette_mode else random.randint(0, len(self.media_queue) - 1)
-                    await self.make_and_start_player(self.media_queue.pop(item_index), ctx)
-            finally:
-                # finally statement makes sure we still unlock if an error occurs
-                log.debug('Tasks finished; unlocking...')
-                self.advance_lock = False
-        elif self.advance_lock:
-            log.debug('Attempted call while locked; ignoring...')

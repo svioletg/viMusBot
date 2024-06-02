@@ -22,7 +22,10 @@ class EmojiStr:
     cancel: str = '❌'
     confirm: str = '✅'
     info: str = 'ℹ️'
+    arrow_u: str = '⬆️'
     arrow_r: str = '➡️'
+    arrow_d: str = '⬇️'
+    arrow_l: str = '⬅️'
     # Media
     play: str = '▶️'
     pause: str = '⏸️'
@@ -127,6 +130,7 @@ async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
     except asyncio.TimeoutError:
         log.debug('Choice prompt timeout reached.')
         await handle_messages(embedq(EmojiStr.cancel + ' Prompt timed out.'))
+        return 0
 
     log.debug('Received a valid reaction.')
 

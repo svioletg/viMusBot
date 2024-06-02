@@ -20,7 +20,7 @@ from ytmusicapi import YTMusic
 
 # Local imports
 import utils.configuration as cfg
-from utils.miscutil import timestamp_from_seconds
+from utils.miscutil import seconds_to_hms
 from utils.palette import Palette
 
 log = logging.getLogger('viMusBot')
@@ -44,7 +44,7 @@ YOUTUBE    = MediaSource('youtube')
 SPOTIFY    = MediaSource('spotify')
 SOUNDCLOUD = MediaSource('soundcloud')
 BANDCAMP   = MediaSource('bandcamp')
-OTHER    = MediaSource('other') # Anything yt_dlp labels as generic, or "we don't know"
+OTHER      = MediaSource('other') # Uses yt_dlp's extract_info(), should have basic common attributes
 
 #region EXCEPTIONS
 class MediaError(Exception):
@@ -137,13 +137,20 @@ class MediaInfo:
                 self.info = cast(dict, self.info)
                 # It'll be 'webpage_url' if ytdl.extract_info() was used on a single video, but
                 # 'url' if its a video dictionary from the entries list of a playlist's extracted info
-                self.url       = cast(str, self.info.get('webpage_url') or self.info.get('url')) # type: ignore
-                self.title     = cast(str, self.info['title']) # type: ignore
-                self.artist    = cast(str, self.info['uploader']) # type: ignore
+                self.url       = cast(str, self.info.get('webpage_url') or self.info.get('url'))
+                self.title     = cast(str, self.info['title'])
+                self.artist    = cast(str, self.info.get('uploader', ''))
                 self.thumbnail = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
 
             else:
                 raise ValueError(f'Invalid yt_result_origin received: {yt_info_origin}')
+        elif source == OTHER:
+            self.info           = cast(dict, self.info)
+            self.url            = cast(str, self.info['webpage_url'])
+            self.title          = cast(str, self.info.get('title', ''))
+            self.artist         = cast(str, self.info.get('uploader', ''))
+            self.length_seconds = int(self.info.get('duration', 0))
+            self.thumbnail      = cast(str, benedict(self.info).get('thumbnails[0].url', ''))
         else:
             raise NotImplementedError(f'MediaInfo has no implementation for source: {source}')
 
@@ -185,9 +192,13 @@ class MediaInfo:
             info = ytdl.extract_info(info, download=False) # type: ignore
         return cls(YOUTUBE, info, yt_info_origin='ytdl')
 
-    def length_hms(self) -> str:
-        """Returns the `length_seconds` attribute in HH:MM:SS or MM:SS format, whichever is applicable."""
-        return timestamp_from_seconds(self.length_seconds)
+    def length_hms(self, format_zero: bool = True) -> str | None:
+        """Returns the `length_seconds` attribute in HH:MM:SS or MM:SS format, whichever is applicable.
+        
+        @format_zero: By default, `0:00` is returned if the input is `0`. Setting this to `False` will instead
+            return `None` in that case.
+        """
+        return seconds_to_hms(self.length_seconds, format_zero=format_zero)
 
     def check_missing(self):
         """For debugging. Looks for and logs any attributes that may be "empty", in the sense that bool(attribute) would return False.
@@ -222,12 +233,12 @@ class TrackInfo(MediaInfo):
             if 'album' in self.info:
                 # An 'album' key indicates this was retrieved from Spotipy.track() or .playlist(), otherwise its from .album()
                 # get_group_contents() will take care of these in that case, although it can't get an ISRC
-                self.thumbnail  = cast(str, self.info['album']['images'][0]['url'])
+                self.thumbnail    = cast(str, self.info['album']['images'][0]['url'])
                 self.album_name   = cast(str, self.info['album']['name'])
                 self.release_year = cast(str, self.info['album']['release_date'].split('-')[0])
                 self.isrc         = cast(str, self.info['external_ids'].get('isrc', None))
         elif source == SOUNDCLOUD:
-            self.release_year   = cast(str, self.info.release_date.split('-')[0]) if self.info.release_date else ''
+            self.release_year = cast(str, self.info.release_date.split('-')[0]) if self.info.release_date else ''
         elif source == YOUTUBE:
             if self.yt_info_origin == 'pytube':
                 pass
@@ -236,7 +247,7 @@ class TrackInfo(MediaInfo):
                 self.length_seconds = int(self.info.get('duration_seconds') or self.info.get('lengthSeconds'))
                 self.album_name     = cast(str, benedict(self.info).get('album.name', ''))
             elif self.yt_info_origin == 'ytdl':
-                self.length_seconds = int(self.info['duration'])
+                self.length_seconds = int(self.info.get('duration', None))
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -360,6 +371,10 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
 
 #region CONFIGURE APIs, ETC.
 
+ffmpeg_options = {
+    'options': '-vn',
+}
+
 # Configure youtube dl
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -369,12 +384,13 @@ ytdl_format_options = {
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
-    'quiet': True,
+    'quiet': False,
     'no_warnings': False,
     'default_search': 'auto',
     'extract_flat': True,
-    'source_address': '0.0.0.0',  # bind to ipv4 since ipv6 addresses cause issues sometimes
+    'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
+
 ytdl = YoutubeDL(ytdl_format_options)
 
 # Connect to youtube music API
@@ -650,7 +666,6 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     If no close match could be found — as determined by `compare_media()` — a list of potential matches (`TrackInfo` objects) will be returned.
     Otherwise, just one is returned.
     """
-
     query = f'{src_info.title} {src_info.artist} {src_info.album_name}'
 
     # Start search
