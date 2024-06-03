@@ -46,7 +46,7 @@ class YTDLSource(PCMVolumeTransformer):
 
         self.title = data.get('title')
         self.url = data.get('url')
-        self.ID = data.get('id')
+        self.ID = data.get('id') # pylint: disable=invalid-name
         self.src = data.get('extractor')
 
     @classmethod
@@ -64,7 +64,7 @@ class YTDLSource(PCMVolumeTransformer):
 
         filename = data['url'] if stream else ytdl.prepare_filename(data) # type: ignore
         src = filename.split('-#-')[0] # pylint: disable=unused-variable
-        ID = filename.split('-#-')[1] # pylint: disable=unused-variable
+        ID = filename.split('-#-')[1] # pylint: disable=unused-variable, invalid-name
         return cls(FFmpegPCMAudio(filename, **ffmpeg_options), data=data, filepath=Path(filename)) # type: ignore
 
 @dataclass

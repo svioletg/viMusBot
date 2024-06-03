@@ -196,7 +196,7 @@ class MediaInfo:
 
     def length_hms(self, format_zero: bool = True) -> str | None:
         """Returns the `length_seconds` attribute in HH:MM:SS or MM:SS format, whichever is applicable.
-        
+
         @format_zero: By default, `0:00` is returned if the input is `0`. Setting this to `False` will instead
             return `None` in that case.
         """
@@ -206,13 +206,13 @@ class MediaInfo:
         """For debugging. Looks for and logs any attributes that may be "empty", in the sense that bool(attribute) would return False.
         Some attributes are safe to leave empty, but this can helpful to diagnose some problems.
         """
-        log.debug('Checking for any attributes of %s that may be empty...', self)
+        print(f'Checking for any attributes of {self} that may be empty...')
         counter: int = 0
         for k, v in vars(self).items():
             if not v:
-                log.debug('%s returned as false. Its value is: %s', k, repr(v))
+                print(f'{k} returned as false. Its value is: {repr(v)}')
                 counter += 1
-        log.debug('%s empty attributes found.', counter)
+        print(f'{counter} empty attributes found.')
 
 class TrackInfo(MediaInfo):
     """Specific parsing for single track data."""
@@ -226,6 +226,7 @@ class TrackInfo(MediaInfo):
             - `dict` from `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         MediaInfo.__init__(self, source, info, yt_info_origin)
+        self.is_track = True
         self.isrc: str = '' # ISRC can help for more accurate YouTube searching
 
         if source == SPOTIFY:
@@ -272,11 +273,9 @@ class AlbumInfo(MediaInfo):
             - `dict` from `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         MediaInfo.__init__(self, source, info, yt_info_origin)
-        self.contents: list[TrackInfo] = get_group_contents(self)
         self.upc: str = ''
 
         if source == SPOTIFY:
-            self.length_seconds = track_list_duration(self.contents)
             self.thumbnail    = cast(str, self.info['images'][0]['url'])
             self.album_name     = cast(str, self.info['name'])
             self.release_year   = cast(str, self.info['release_date'].split('-')[0])
@@ -289,13 +288,11 @@ class AlbumInfo(MediaInfo):
                 raise ValueError('pytube origin should not be used to instantiate AlbumInfo.')
             elif self.yt_info_origin == 'ytmusic':
                 self.url = cast(str, 'https://www.youtube.com/playlist?list' + ytmusic.get_album(self.info['browseId'])['audioPlaylistId'])
-                self.length_seconds = track_list_duration(self.contents)
                 self.album_name     = cast(str, self.info['title'])
                 self.release_year   = cast(str, self.info['year'])
-            elif self.yt_info_origin == 'ytdl':
-                self.length_seconds = track_list_duration(self.contents)
-        elif source == OTHER:
-            self.length_seconds = track_list_duration(self.contents)
+
+        self.contents: list[TrackInfo] = get_group_contents(self)
+        self.length_seconds = track_list_duration(self.contents)
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -306,20 +303,17 @@ class PlaylistInfo(MediaInfo):
     """Specific parsing for playlist data."""
     def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         MediaInfo.__init__(self, source, info, yt_info_origin)
-        self.contents: list[TrackInfo] = get_group_contents(self)
 
         if source == SPOTIFY:
             self.thumbnail      = cast(str, self.info['images'][0]['url'])
-            self.length_seconds = track_list_duration(self.contents)
         elif source == SOUNDCLOUD:
             pass
         elif source == YOUTUBE:
             if self.yt_info_origin == 'ytmusic':
                 raise ValueError('ytmusic origin should not be used to instantiate PlaylistInfo.')
-            if self.yt_info_origin == 'ytdl':
-                self.length_seconds = track_list_duration(self.contents)
-        elif source == OTHER:
-            self.length_seconds = track_list_duration(self.contents)
+
+        self.contents: list[TrackInfo] = get_group_contents(self)
+        self.length_seconds = track_list_duration(self.contents)
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -327,6 +321,7 @@ class PlaylistInfo(MediaInfo):
         return cls(SPOTIFY, sp.playlist(url))
 
 def track_list_duration(track_list: list[TrackInfo]) -> int:
+
     """Return the sum of track lengths from a list of `TrackInfo` objects."""
     return int(sum(track.length_seconds for track in track_list))
 
@@ -343,6 +338,11 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             try:
                 if isinstance(group_object, AlbumInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
+                    print(group_object.thumbnail)
+                    print(group_object.album_name)
+                    print(group_object.release_year)
+                    print(object_list[-1])
+                    print('###########################')
                     object_list[-1].thumbnail    = group_object.thumbnail
                     object_list[-1].album_name   = group_object.album_name
                     object_list[-1].release_year = group_object.release_year
