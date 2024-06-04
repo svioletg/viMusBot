@@ -11,15 +11,15 @@
 
 #####
 
-# The color to use on the side of bot messages
-embed-color: "ff00ff"
+# Path to the text file containing the bot's token
+token-file: "token.txt"
 
 # Should be yes/on/true almost always
 # Currently only decides which prefix to use (true = public, false = developer) 
 public: yes
 
-# Path to the text file containing the bot's token
-token-file: "token.txt"
+# The color to use on the side of bot messages
+embed-color: "ff00ff"
 
 # Set your command prefix here
 prefixes:
@@ -30,9 +30,11 @@ prefixes:
 # If enabled, you will enough users to use -skip on the same song before it will actually skip it
 vote-to-skip:
     enabled: yes
-    # A percentage of users connected to voice required to skip a song; does nothing if vote-to-skip is disabled
+    # The following keys do nothing if vote-to-skip is disabled
     threshold-type: "percentage" # Can be "percentage" or "exact"
+    # A percentage of users connected to voice required to skip a song
     threshold-percentage: 50
+    # Exact number of skips-voted required to pass
     threshold-exact: 3
 
 # Toggles whether -nowplaying and -queue will show names of who queued what
@@ -49,9 +51,8 @@ auto-remove:
     - ".webm"
     - ".opus"
 
-# TODO: Turn this into a general playlist option
-# Allows queueing entire Spotify playlists
-allow-spotify-playlists: yes
+# Allows queueing playlists or albums
+allow-playlists-albums: yes
 
 # Limit the amount of tracks playlists can have before queueing
 playlist-track-limit: 50

@@ -129,33 +129,33 @@ if conflicts := check_alias_conflicts():
     log.error('The same alias can not be used for multiple commands; please edit your config file.')
     raise SystemExit
 
-LOG_LEVEL               : str            = check_type('logging-options.console-log-level', str)
-LOG_COLORS              : dict[str, str] = check_type('logging-options.colors', dict)
-DISABLE_LOG_COLORS      : bool           = check_type('logging-options.colors.no-color', bool)
-LOG_TRACEBACKS          : bool           = check_type('logging-options.log-full-tracebacks', bool)
+LOG_LEVEL          : str            = check_type('logging-options.console-log-level', str)
+LOG_COLORS         : dict[str, str] = check_type('logging-options.colors', dict)
+DISABLE_LOG_COLORS : bool           = check_type('logging-options.colors.no-color', bool)
+LOG_TRACEBACKS     : bool           = check_type('logging-options.log-full-tracebacks', bool)
 
-SHOW_USERS_IN_QUEUE     : bool = check_type('show-users-in-queue', bool)
-MAX_HISTORY_LENGTH      : int  = max(check_type('play-history-max', int), 20)
-ALLOW_SPOTIFY_PLAYLISTS : bool = check_type('allow-spotify-playlists', bool)
-MAX_PLAYLIST_LENGTH     : int  = check_type('playlist-track-limit', int)
-MAX_ALBUM_LENGTH        : int  = check_type('album-track-limit', int)
-MAX_CONSECUTIVE_URLS    : int  = check_type('maximum-urls', int)
-FORCE_MATCH_PROMPT      : bool = check_type('force-match-prompt', bool)
+SHOW_USERS_IN_QUEUE  : bool = check_type('show-users-in-queue', bool)
+MAX_HISTORY_LENGTH   : int  = max(check_type('play-history-max', int), 20)
+ALLOW_MEDIALISTS     : bool = check_type('allow-playlists-albums', bool)
+MAX_PLAYLIST_LENGTH  : int  = check_type('playlist-track-limit', int)
+MAX_ALBUM_LENGTH     : int  = check_type('album-track-limit', int)
+MAX_CONSECUTIVE_URLS : int  = check_type('maximum-urls', int)
+FORCE_MATCH_PROMPT   : bool = check_type('force-match-prompt', bool)
 if FORCE_MATCH_PROMPT:
     log.warning('Config key "force-match-prompt" is turned on, which may cause problems if this was unintentional.')
 
-USE_TOP_MATCH           : bool = check_type('use-top-match', bool)
-DURATION_LIMIT_HOURS    : int  = check_type('duration-limit', int)
-DURATION_LIMIT_SECONDS  : int  = DURATION_LIMIT_HOURS * 60 * 60
+USE_TOP_MATCH          : bool = check_type('use-top-match', bool)
+DURATION_LIMIT_HOURS   : int  = check_type('duration-limit', int)
+DURATION_LIMIT_SECONDS : int  = DURATION_LIMIT_HOURS * 60 * 60
 
 VOTE_TO_SKIP          : bool = check_type('vote-to-skip.enabled', bool)
+SKIP_VOTES_TYPE: Literal['percentage', 'exact'] = check_type('vote-to-skip.threshold-type', str)
+if SKIP_VOTES_TYPE not in ['percentage', 'exact']:
+    raise ValueError(f'Config key "vote-to-skip.threshold-type" must be either "percentage" or "exact" (got "{SKIP_VOTES_TYPE}")')
+
 SKIP_VOTES_EXACT      : int  = check_type('vote-to-skip.threshold-exact', int)
 SKIP_VOTES_PERCENTAGE : int  = check_type('vote-to-skip.threshold-percentage', int)
 if SKIP_VOTES_PERCENTAGE > 100:
     log.warning('Config key "vote-to-skip.threshold-percentage" is set higher than 100, which will make skipping impossible.')
 
-SKIP_VOTES_TYPE       : Literal['percentage', 'exact'] = check_type('vote-to-skip.threshold-type', str)
-if SKIP_VOTES_TYPE not in ['percentage', 'exact']:
-    raise ValueError(f'Config key "vote-to-skip.threshold-type" must be either "percentage" or "exact" (got "{SKIP_VOTES_TYPE}")')
-
-log.info('Config looks valid.')
+log.info('No critical issues with configuration.')

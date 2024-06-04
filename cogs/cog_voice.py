@@ -575,8 +575,12 @@ class Voice(commands.Cog):
                     'Multi-URL queueing is allowed only for single tracks.'))
                 return
 
-            # [ ] Handle playlists, albums
+            # Handle playlists, albums
             if re.findall(r"(playlist|album|sets)", url_strings[0]):
+                if not cfg.ALLOW_MEDIALISTS:
+                    await ctx.send(embed=embedq(EmojiStr.cancel + ' Queueing playlists/albums is disabled.',
+                        'This can be edited in the bot\'s configuration.'))
+                    return
                 log.debug('URL looks like a playlist or an album.')
                 # Because of the previous checks we know this has to only be one URL, no need to keep the list
                 url = url_strings[0]
@@ -796,7 +800,7 @@ class Voice(commands.Cog):
 
         self.voice_client.stop()
         log.info('Starting audio playback...')
-        self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx), self.bot.loop))
+        self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.handle_player_stop(ctx), self.bot.loop))
         self.current_item = item
 
         if item != self.previous_item:
@@ -805,3 +809,9 @@ class Voice(commands.Cog):
 
         if self.queue_msg:
             self.queue_msg = await self.queue_msg.delete()
+
+    async def handle_player_stop(self, ctx):
+        """Normally just directs to `advance_queue()`, but handles some small additional logic
+        specifically to be used as the `after` argument for a player source. Should not be used alone."""
+        log.debug('Player has finished.')
+        await self.advance_queue(ctx)
