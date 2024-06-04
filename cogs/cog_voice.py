@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional, Self, cast
 
 # External imports
+from pydub import AudioSegment
 import requests
 import yt_dlp
 from discord import (Embed, FFmpegPCMAudio, Member, Message,
@@ -36,6 +37,18 @@ ytdl = yt_dlp.YoutubeDL(media.ytdl_format_options)
 
 ffmpeg_options = media.ffmpeg_options
 
+class FileAudioSource(PCMVolumeTransformer):
+    """Creates an AudioSource using a file."""
+    def __init__(self, source, *, filepath: Path, volume: float=0.5):
+        super().__init__(source, volume)
+
+        self.filepath = filepath
+        self.file_ext = filepath.suffix.strip('.')
+
+    @classmethod
+    async def from_path(cls, path: Path):
+        return cls(FFmpegPCMAudio(str(path), **ffmpeg_options), filepath=path) # type: ignore
+
 class YTDLSource(PCMVolumeTransformer):
     """Creates an AudioSource using yt_dlp."""
     def __init__(self, source, *, data, filepath: Path, volume: float=0.5):
@@ -43,6 +56,7 @@ class YTDLSource(PCMVolumeTransformer):
 
         self.data = data
         self.filepath = filepath
+        self.file_ext = filepath.suffix.strip('.')
 
         self.title = data.get('title')
         self.url = data.get('url')
@@ -140,7 +154,7 @@ class Voice(commands.Cog):
         self.current_item: Optional[QueueItem] = None
         self.previous_item: Optional[QueueItem] = None
         self.files_to_del: list[Path] = []
-        self.player: Optional[YTDLSource] = None
+        self.player: Optional[YTDLSource | FileAudioSource] = None
 
         self.advance_lock: bool = False
 
@@ -441,6 +455,21 @@ class Voice(commands.Cog):
             await ctx.send(embed=self.embed_now_playing())
         else:
             await ctx.send(embed=embedq('Nothing is playing.'))
+
+    @commands.command(aliases=command_aliases('change'))
+    @commands.check(is_command_enabled)
+    async def change(self, ctx: commands.Context, speed: float):
+        """Apply changes and effects to the currently playing audio."""
+        filepath = self.player.filepath
+        file_ext = self.player.file_ext
+        print(file_ext)
+        sound = AudioSegment.from_file(filepath, format=file_ext)
+        print(sound)
+        new_rate = int(sound.frame_rate * speed)
+        print(new_rate)
+        sound._spawn(sound.raw_data, overrides={'frame_rate': new_rate}).export(str(filepath.stem) + '-MODIFIED.' + file_ext, format=file_ext)
+        if self.voice_client.is_playing():
+            self.voice_client.stop()
 
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
@@ -814,4 +843,9 @@ class Voice(commands.Cog):
         """Normally just directs to `advance_queue()`, but handles some small additional logic
         specifically to be used as the `after` argument for a player source. Should not be used alone."""
         log.debug('Player has finished.')
-        await self.advance_queue(ctx)
+        print(self.player)
+        print(self.player.filepath.stem + '-MODIFIED' + self.player.file_ext)
+        self.player = await FileAudioSource.from_path(Path(self.player.filepath.stem + '-MODIFIED.' + self.player.file_ext))
+        print(self.player)
+        self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.handle_player_stop(ctx), self.bot.loop))
+        # await self.advance_queue(ctx)
