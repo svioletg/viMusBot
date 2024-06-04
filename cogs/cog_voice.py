@@ -460,7 +460,8 @@ class Voice(commands.Cog):
     @commands.check(is_command_enabled)
     async def change(self, ctx: commands.Context, speed: float):
         """Apply changes and effects to the currently playing audio."""
-        filepath = self.player.filepath
+        filepath = re.sub(r".*(-MODIFIED).*", '', str(self.player.filepath))
+        print(filepath)
         file_ext = self.player.file_ext
         print(file_ext)
         sound = AudioSegment.from_file(filepath, format=file_ext)
@@ -843,9 +844,6 @@ class Voice(commands.Cog):
         """Normally just directs to `advance_queue()`, but handles some small additional logic
         specifically to be used as the `after` argument for a player source. Should not be used alone."""
         log.debug('Player has finished.')
-        print(self.player)
-        print(self.player.filepath.stem + '-MODIFIED' + self.player.file_ext)
         self.player = await FileAudioSource.from_path(Path(self.player.filepath.stem + '-MODIFIED.' + self.player.file_ext))
-        print(self.player)
         self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.handle_player_stop(ctx), self.bot.loop))
         # await self.advance_queue(ctx)
