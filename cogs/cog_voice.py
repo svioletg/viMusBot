@@ -461,16 +461,20 @@ class Voice(commands.Cog):
     async def change(self, ctx: commands.Context, speed: float):
         """Apply changes and effects to the currently playing audio."""
         filepath = re.sub(r".*(-MODIFIED).*", '', str(self.player.filepath))
-        print(filepath)
         file_ext = self.player.file_ext
-        print(file_ext)
+
+        msg = await ctx.send(embed=embedq('Applying effects...', 'Getting audio segment...'))
         sound = AudioSegment.from_file(filepath, format=file_ext)
-        print(sound)
         new_rate = int(sound.frame_rate * speed)
-        print(new_rate)
-        sound._spawn(sound.raw_data, overrides={'frame_rate': new_rate}).export(str(filepath.stem) + '-MODIFIED.' + file_ext, format=file_ext)
+
+        msg = await msg.edit(embed=embedq(subtext='Exporting...', base=msg.embeds[0]))
+        sound._spawn(sound.raw_data, overrides={'frame_rate': new_rate})\
+            .export(str(self.player.filepath.stem) + '-MODIFIED.' + file_ext, format=file_ext)
+
+        msg = await msg.edit(embed=embedq(subtext='Preparing player...', base=msg.embeds[0]))
         if self.voice_client.is_playing():
             self.voice_client.stop()
+        await msg.delete()
 
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)

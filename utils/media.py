@@ -601,13 +601,13 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-class YTMusicResults(TypedDict):
+class YTMusicSearchResults(TypedDict):
     """Contains correctly typed results for `search_ytmusic()`"""
     songs:  Optional[list[TrackInfo]]
     videos: Optional[list[TrackInfo]]
     albums: Optional[list[AlbumInfo]]
 
-def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
+def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicSearchResults:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
 
     @query: String to search with.
@@ -616,28 +616,12 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     # TODO: Albums don't seem to return thumbnails here
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
 
-    results: YTMusicResults = {'songs': None, 'videos': None, 'albums': None}
-    if songs:
-        results['songs'] = []
-        for n, s in enumerate(songs):
-            if n < max_results:
-                results['songs'].append(TrackInfo.from_ytmusic(s))
-            else:
-                break
-    if videos:
-        results['videos'] = []
-        for n, v in enumerate(videos):
-            if n < max_results:
-                results['videos'].append(TrackInfo.from_ytmusic(v))
-            else:
-                break
-    if albums:
-        results['albums'] = []
-        for n, a in enumerate(albums):
-            if n < max_results:
-                results['albums'].append(AlbumInfo.from_ytmusic(a))
-            else:
-                break
+    results: YTMusicSearchResults = {'songs': None, 'videos': None, 'albums': None}
+
+    for key, val in {'songs': songs, 'videos': videos, 'albums': albums}.items():
+        if not val: continue
+        results[key] = [i for n, i in enumerate(val) if n <= max_results]
+
     return results
 
 def match_ytmusic_album(src_info: AlbumInfo, threshold: int=75) -> tuple[AlbumInfo, int] | None:

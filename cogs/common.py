@@ -70,9 +70,11 @@ async def edit_or_send(ctx: commands.Context, target: Optional[Message], **kwarg
         message: Message = await ctx.send(**kwargs)
     return message
 
-def embedq(title: str, subtext: Optional[str]=None, color: int=cfg.EMBED_COLOR) -> Embed:
+def embedq(title: str='', subtext: str='', color: int=cfg.EMBED_COLOR, base: Optional[Embed]=None) -> Embed:
     """Shortcut for making embeds for messages."""
-    return Embed(title=title, description=subtext, color=color)
+    if base:
+        return Embed(title=title or base.title, description=subtext or base.description or None, color=color or base.color)
+    return Embed(title=title, description=subtext or None, color=color)
 
 async def prompt_for_choice(bot: commands.Bot, ctx: commands.Context,
     prompt_msg: Message,
