@@ -365,7 +365,7 @@ class Voice(commands.Cog):
     async def skip(self, ctx: commands.Context):
         """Skips the current track. If vote-to-skip is disabled for this bot, it will be skipped immediately."""
         ctx.author = cast(Member, ctx.author)
-        vote_requirement_real = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact'\
+        vote_requirement_real = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' \
             else ceil(len(ctx.author.voice.channel.members) * (cfg.SKIP_VOTES_PERCENTAGE / 100))
         vote_requirement_display = cfg.SKIP_VOTES_EXACT if cfg.SKIP_VOTES_TYPE == 'exact' else f'{cfg.SKIP_VOTES_PERCENTAGE}%'
         skip_msg: Optional[Message] = None

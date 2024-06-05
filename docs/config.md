@@ -65,7 +65,7 @@ aliases:
 album-track-limit: 20
 ```
 
-### `allow-spotify-playlists`
+### `allow-playlists-albums`
 
 > Allow or prevent the queueing of Spotify entire playlists.
 
@@ -217,6 +217,18 @@ logging-options:
         function: "blue" # used for function names
 ```
 
+### `maximum-file-size`
+
+> Maximum file size allowed for `yt_dlp` to download, in megabytes (MB).
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+maximum-file-size: 10 # 10 MB
+```
+
 ### `maximum-urls`
 
 > Maximum number of links that can be queued with one `-play` command.
@@ -227,6 +239,18 @@ logging-options:
 
 ```yaml
 maximum-urls: 3
+```
+
+### `play-history-max`
+
+> Maximum number of tracks to store in the bot's "play history" — which can be accessed with the `-history` command.
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+play-history-max: 5
 ```
 
 ### `playlist-track-limit`

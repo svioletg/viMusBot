@@ -51,6 +51,10 @@ auto-remove:
     - ".webm"
     - ".opus"
 
+# Maximum file size that an be download by yt_dlp, megabytes (MB)
+# Adjust as needed depending on your network speed
+maximum-file-size: 10
+
 # Allows queueing playlists or albums
 allow-playlists-albums: yes
 

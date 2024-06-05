@@ -399,6 +399,7 @@ ytdl_format_options = {
     'no_warnings': False,
     'default_search': 'auto',
     'extract_flat': True,
+    'max_filesize': cfg.MAX_FILE_SIZE * 1024 * 1024,
     'source_address': '0.0.0.0', # bind to ipv4 since ipv6 addresses cause issues sometimes
 }
 
