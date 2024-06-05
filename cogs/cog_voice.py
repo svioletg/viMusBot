@@ -28,7 +28,7 @@ from cogs.common import (EmojiStr, SilentCancel, command_aliases, edit_or_send,
 from cogs.messages import CommonMsg
 from cogs.test_voice import VoiceTest
 from utils import media
-from utils.miscutil import seconds_to_hms
+from utils.miscutil import Stopwatch, seconds_to_hms
 
 log = logging.getLogger('viMusBot')
 
@@ -46,8 +46,9 @@ class FileAudioSource(PCMVolumeTransformer):
         self.file_ext = filepath.suffix.strip('.')
 
     @classmethod
-    async def from_path(cls, path: Path):
-        return cls(FFmpegPCMAudio(str(path), **ffmpeg_options), filepath=path) # type: ignore
+    async def from_path(cls, path: str):
+        """Creates a FileAudioSource from a filepath."""
+        return cls(FFmpegPCMAudio(path, **ffmpeg_options), filepath=Path(path)) # type: ignore
 
 class YTDLSource(PCMVolumeTransformer):
     """Creates an AudioSource using yt_dlp."""
@@ -162,7 +163,7 @@ class Voice(commands.Cog):
 
         self.paused_at: float = 0.0
         self.pause_duration: float = 0.0
-        self.audio_time_elapsed: float = 0.0
+        self.audio_seconds_elapsed: float = 0.0
 
         self.now_playing_msg: Optional[Message] = None
         self.queue_msg: Optional[Message] = None
@@ -170,20 +171,21 @@ class Voice(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: Member, before: VoiceState, after: VoiceState): # pylint: disable=unused-argument
         """Listener for the voice state update event. Currently handles inactivity timeouts and tracks how long audio has been playing."""
+        TICK: float = 0.5
         if not (member.id == self.bot.user.id):
             return
         if before.channel is None:
             # Disconnect after set amount of inactivity
             if cfg.INACTIVITY_TIMEOUT_MINS == 0:
                 return
-            timeout_counter = 0
+            timeout_counter: float = 0.0
             while True:
-                await asyncio.sleep(1)
-                timeout_counter += 1
+                await asyncio.sleep(TICK)
+                timeout_counter += TICK
 
                 if self.voice_client.is_playing() and not self.voice_client.is_paused():
-                    timeout_counter = 0
-                    self.audio_time_elapsed += 1
+                    timeout_counter = 0.0
+                    self.audio_seconds_elapsed += TICK
 
                 if timeout_counter == cfg.INACTIVITY_TIMEOUT_MINS * 60:
                     log.info('Leaving voice due to inactivity...')
@@ -251,7 +253,7 @@ class Voice(commands.Cog):
             return
 
         queue_length_seconds = seconds_to_hms(sum(item.info.length_seconds for item in self.media_queue) +
-            self.current_item.info.length_seconds - self.audio_time_elapsed)
+            self.current_item.info.length_seconds - self.audio_seconds_elapsed)
 
         embed = embedq(title=f'{len(self.media_queue)} items in queue.\n*(Approx. time remaining: {queue_length_seconds})*',)
         start = (10 * page) - 10
@@ -460,21 +462,32 @@ class Voice(commands.Cog):
     @commands.check(is_command_enabled)
     async def change(self, ctx: commands.Context, speed: float):
         """Apply changes and effects to the currently playing audio."""
-        filepath = re.sub(r".*(-MODIFIED).*", '', str(self.player.filepath))
         file_ext = self.player.file_ext
+        filepath = self.original_fname(str(self.player.filepath))
+        print(filepath, file_ext)
 
         msg = await ctx.send(embed=embedq('Applying effects...', 'Getting audio segment...'))
         sound = AudioSegment.from_file(filepath, format=file_ext)
         new_rate = int(sound.frame_rate * speed)
 
         msg = await msg.edit(embed=embedq(subtext='Exporting...', base=msg.embeds[0]))
-        sound._spawn(sound.raw_data, overrides={'frame_rate': new_rate})\
-            .export(str(self.player.filepath.stem) + '-MODIFIED.' + file_ext, format=file_ext)
+
+        modified = sound._spawn(sound.raw_data, overrides={'frame_rate': new_rate}) # pylint: disable=protected-access
+        print(self.modified_fname(filepath, for_source=True))
+        modified.export(self.modified_fname(filepath, for_source=True), format=file_ext)
+
+        # Add a bit of time to compensate for exporting
+        start_ms = ((self.audio_seconds_elapsed + 1) / speed) * 1000
+        print(self.modified_fname(filepath))
+        modified[start_ms:].export(self.modified_fname(filepath), format=file_ext)
 
         msg = await msg.edit(embed=embedq(subtext='Preparing player...', base=msg.embeds[0]))
         if self.voice_client.is_playing():
             self.voice_client.stop()
-        await msg.delete()
+        
+        self.audio_seconds_elapsed = start_ms / 1000
+
+        msg = await msg.edit(embed=embedq(f'Speed changed to {speed}x', 'Playing shortly...'))
 
     @commands.command(aliases=command_aliases('play'))
     @commands.check(is_command_enabled)
@@ -505,7 +518,7 @@ class Voice(commands.Cog):
                     embed=embedq(f'{EmojiStr.inbox} Added {len(item)} items to the queue, from #{item_index[0] + 1} to #{item_index[1] + 1}.'))
 
             if (not self.voice_client.is_playing()) and (queue_was_empty):
-                log.info('Voice client is not playing and the queue is empty, going to try playing...')
+                log.debug('Voice client is not playing and the queue is empty, going to try playing...')
                 starting_msg = await ctx.send(embed=embedq('Starting...'))
                 await self.advance_queue(ctx)
                 starting_msg = await starting_msg.delete()
@@ -711,6 +724,18 @@ class Voice(commands.Cog):
     #region END OF COMMANDS
     #endregion END OF COMMANDS
 
+    def original_fname(self, filename: str) -> str:
+        """Gets the original filename of the currently playing file."""
+        return re.sub(r"^MODIFIED.*@", '', str(filename))
+
+    def modified_fname(self, filename: str, for_source: bool=False) -> str:
+        """Puts the given filename through the template used to designate files with effects applied.
+        Just simple string concatenation, but its kept in a function to make changing this later easier, if needed.
+
+        @for_source: Gives back a filename to be referenced for original length or properties, instead of the truncated file."""
+        filename = self.original_fname(filename)
+        return ('MODIFIED@' + str(filename)) if not for_source else ('MODIFIED@SRC@' + str(filename))
+
     def get_queued_by_text(self, member: Member) -> str:
         """Returns the nickname (if set, username otherwise) of who queued the current item if that is enabled,
         otherwise an empty string."""
@@ -726,7 +751,7 @@ class Voice(commands.Cog):
         @show_elapsed: Show the elapsed time alongside the track length, i.e. "1:02 / 2:56"
         """
         item = cast(QueueItem, self.current_item)
-        elapsed_hms: str = cast(str, seconds_to_hms(self.audio_time_elapsed))
+        elapsed_hms: str = cast(str, seconds_to_hms(self.audio_seconds_elapsed))
         length_hms: Optional[str] = item.info.length_hms(format_zero=False)
         submitter_text: str = self.get_queued_by_text(cast(Member, item.queued_by))
         loop_icon: str = self.get_loop_icon()
@@ -785,7 +810,7 @@ class Voice(commands.Cog):
         Use `advance_queue()` to attempt moving the queue along, do not use this function directly."""
         log.info('Trying to start playing...')
 
-        self.audio_time_elapsed = 0.0
+        self.audio_seconds_elapsed = 0.0
 
         if item != self.previous_item:
             if self.previous_item:
@@ -848,6 +873,12 @@ class Voice(commands.Cog):
         """Normally just directs to `advance_queue()`, but handles some small additional logic
         specifically to be used as the `after` argument for a player source. Should not be used alone."""
         log.debug('Player has finished.')
-        self.player = await FileAudioSource.from_path(Path(self.player.filepath.stem + '-MODIFIED.' + self.player.file_ext))
+        newfile = self.modified_fname(str(self.player.filepath))
+        print(newfile)
+        print(not Path(newfile).is_file())
+        if not Path(newfile).is_file():
+            print('no file at', newfile)
+            raise ValueError('no file at', newfile)
+        self.player = await FileAudioSource.from_path(newfile)
         self.voice_client.play(self.player, after=lambda e: asyncio.run_coroutine_threadsafe(self.handle_player_stop(ctx), self.bot.loop))
         # await self.advance_queue(ctx)

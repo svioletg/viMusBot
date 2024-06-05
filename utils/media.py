@@ -338,11 +338,6 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             try:
                 if isinstance(group_object, AlbumInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
-                    print(group_object.thumbnail)
-                    print(group_object.album_name)
-                    print(group_object.release_year)
-                    print(object_list[-1])
-                    print('###########################')
                     object_list[-1].thumbnail    = group_object.thumbnail
                     object_list[-1].album_name   = group_object.album_name
                     object_list[-1].release_year = group_object.release_year
@@ -618,9 +613,10 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicSearchResults:
 
     results: YTMusicSearchResults = {'songs': None, 'videos': None, 'albums': None}
 
-    for key, val in {'songs': songs, 'videos': videos, 'albums': albums}.items():
-        if not val: continue
-        results[key] = [i for n, i in enumerate(val) if n <= max_results]
+    for key, val in {'songs': (songs, TrackInfo), 'videos': (videos, TrackInfo), 'albums': (albums, AlbumInfo)}.items():
+        if not val[0]: continue
+        category, cls = val
+        results[key] = [cls.from_ytmusic(i) for n, i in enumerate(category) if n <= max_results]
 
     return results
 
