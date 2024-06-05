@@ -601,13 +601,13 @@ def analyze_spotify_track(url: str) -> tuple:
 #endregion
 
 #region YTMUSIC
-class YTMusicResults(TypedDict):
+class YTMusicSearchResults(TypedDict):
     """Contains correctly typed results for `search_ytmusic()`"""
     songs:  Optional[list[TrackInfo]]
     videos: Optional[list[TrackInfo]]
     albums: Optional[list[AlbumInfo]]
 
-def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
+def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicSearchResults:
     """Searches YTMusic with a plain-text query. Returns a dictionary containing the top "song", "video", and album results.
 
     @query: String to search with.
@@ -616,11 +616,12 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     # TODO: Albums don't seem to return thumbnails here
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
 
-    results: YTMusicResults = {'songs': None, 'videos': None, 'albums': None}
+    results: YTMusicSearchResults = {'songs': None, 'videos': None, 'albums': None}
 
-    for key, val in {'songs': songs, 'videos': videos, 'albums': albums}.items():
-        if not val: continue
-        results[key] = [i for n, i in enumerate(val) if n <= max_results]
+    for key, val in {'songs': (songs, TrackInfo), 'videos': (videos, TrackInfo), 'albums': (albums, AlbumInfo)}.items():
+        if not val[0]: continue
+        category, cls = val
+        results[key] = [cls.from_ytmusic(i) for n, i in enumerate(category) if n <= max_results]
 
     return results
 
