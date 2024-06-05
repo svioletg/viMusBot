@@ -67,14 +67,15 @@ album-track-limit: 20
 
 ### `allow-playlists-albums`
 
-> Allow or prevent the queueing of Spotify entire playlists.
+> Allow or prevent the queueing of entire playlists / albums.
+> *NOTE: The bot will generally try its best to distinguish between a user-made playlist and an actual album, but the process isn't guaranteed to work, hence both being controlled by one configuration key.*
 
 **Valid options:** `true` or `false`
 
 **Example:**
 
 ```yaml
-allow-spotify-playlists: true
+allow-playlists-albums: true
 ```
 
 ### `auto-remove`
