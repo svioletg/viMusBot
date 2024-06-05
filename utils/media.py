@@ -617,27 +617,11 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicResults:
     songs, videos, albums = [ytmusic.search(query=query, limit=1, filter=category) for category in ['songs', 'videos', 'albums']]
 
     results: YTMusicResults = {'songs': None, 'videos': None, 'albums': None}
-    if songs:
-        results['songs'] = []
-        for n, s in enumerate(songs):
-            if n < max_results:
-                results['songs'].append(TrackInfo.from_ytmusic(s))
-            else:
-                break
-    if videos:
-        results['videos'] = []
-        for n, v in enumerate(videos):
-            if n < max_results:
-                results['videos'].append(TrackInfo.from_ytmusic(v))
-            else:
-                break
-    if albums:
-        results['albums'] = []
-        for n, a in enumerate(albums):
-            if n < max_results:
-                results['albums'].append(AlbumInfo.from_ytmusic(a))
-            else:
-                break
+
+    for key, val in {'songs': songs, 'videos': videos, 'albums': albums}.items():
+        if not val: continue
+        results[key] = [i for n, i in enumerate(val) if n <= max_results]
+
     return results
 
 def match_ytmusic_album(src_info: AlbumInfo, threshold: int=75) -> tuple[AlbumInfo, int] | None:
