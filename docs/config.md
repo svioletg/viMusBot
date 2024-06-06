@@ -1,10 +1,6 @@
 # viMusBot / Configuration
 
-Your viMusBot folder will come with a `config_default.yml` file, which contains various settings needed for the bot to run. Most of what is provided are simply user preferences — things like the bot's command prefix, the color of its embed sidebar, aliases for commands, and limiting the duration of what can be played.
-
-If you want to change these settings, you must create a `config.yml` file (the bot will create this file while starting up if it does not exist) and override the values for what you want to change. Anything not present in `config.yml` will use the default provided by `config_default.yml`.
-
-**It is important to not directly change the values of `config_default.yml`, as this file will be overwritten with each update.**
+viMusBot has many settings available to customize and configure your bot. To use them, create a `config.yml` file in the bot's directory. Here you'll enter any config "keys" that you wish to change, which will then override the default value for that option.
 
 As an example, if you wanted to change the bot's prefix from the default `-` to `!`, you would write this into `config.yml`...
 
@@ -31,12 +27,22 @@ vote-to-skip:
     threshold-type: "percentage"
 ```
 
-`config_default.yml` has comments for each value, but I've also compiled every setting and its type + valid values on this page, to provide more thorough information.
-As an additional note, in your configuration you can also use `yes` / `no` in place of `true` / `false` if you prefer.
-
-## Glossary — General Options
+## Glossary
 
 Written in alphabetical order. All information below should be accurate as of version **2.0.0**.
+
+### `album-track-limit`
+
+> Prevents queueing an album longer than this limit.
+
+
+**Valid options:** any positive number
+
+**Example:**
+
+```yaml
+album-track-limit: 20
+```
 
 ### `aliases`
 
@@ -51,18 +57,6 @@ aliases:
     move:
         - "m"
         - "mv"
-```
-
-### `album-track-limit`
-
-> Prevents queueing an album longer than this limit.
-
-**Valid options:** any positive number
-
-**Example:**
-
-```yaml
-album-track-limit: 20
 ```
 
 ### `allow-playlists-albums`
