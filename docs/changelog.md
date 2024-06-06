@@ -51,6 +51,7 @@ Developer
         - `search_ytmusic_album()` renamed to `match_ytmusic_album()`
             - Arguments also replaced with `src_info` argument, which takes an `AlbumInfo` object
         - `spotify_track()`, `spotify_album()`, and `spotify_playlist()` all removed, replaced by a `from_spotify_url()` class method for each applicable MediaInfo sub-class
+        - `spyt()` removed, now unnecessary
     - `palette.py` moved to this directory
         - `file` attribute removed from `Palette` as individual modules no longer get their own color (see below at Other -> Config changes)
         - `module` attribute added to `Palette`, represents the color of any module filenames in logs

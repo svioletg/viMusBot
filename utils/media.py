@@ -603,7 +603,7 @@ def analyze_spotify_track(url: str) -> tuple:
 
 #region YTMUSIC
 class YTMusicSearchResults(TypedDict):
-    """Contains correctly typed results for `search_ytmusic()`"""
+    """Contains correctly typed results for `search_ytmusic()`."""
     songs:  Optional[list[TrackInfo]]
     videos: Optional[list[TrackInfo]]
     albums: Optional[list[AlbumInfo]]
@@ -659,8 +659,7 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     if (not cfg.FORCE_MATCH_PROMPT) and src_info.isrc:
         log.info('Searching for ISRC: %s', src_info.isrc)
         # pytube is more accurate when searching with an ISRC
-        pytube_results = pytube.Search(src_info.isrc).results
-        if pytube_results:
+        if pytube_results := pytube.Search(src_info.isrc).results:
             isrc_matches: list[pytube.YouTube] = pytube_results
 
             log.debug('About to search through potential ISRC matches, of which there are %s. Reference title is: %s',
@@ -689,28 +688,18 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
 
     log.info('Searching YTMusic for: %s', query)
     song_results, video_results = [
-        [TrackInfo(YOUTUBE, result, yt_info_origin='ytmusic') for result in ytmusic.search(query=query, limit=1, filter=filt)]\
+        [TrackInfo(YOUTUBE, result, yt_info_origin='ytmusic') for result in ytmusic.search(query=query, limit=1, filter=filt)] \
         for filt in ['songs', 'videos']
     ]
 
     # Remove videos over the specified duration limit
-    for song, video in zip(song_results, video_results):
-        if song.length_seconds > cfg.DURATION_LIMIT_SECONDS:
-            song_results.pop(song_results.index(song))
+    song_results = [song for song in song_results if song.length_seconds < cfg.DURATION_LIMIT_SECONDS]
+    video_results = [video for video in video_results if video.length_seconds < cfg.DURATION_LIMIT_SECONDS]
 
-        if video.length_seconds > cfg.DURATION_LIMIT_SECONDS:
-            video_results.pop(video_results.index(video))
-
-    track_choices: list[TrackInfo] = []
-
-    for result in song_results[:2]:
-        track_choices.append(result)
-
-    for result in video_results[:2]:
-        track_choices.append(result)
+    track_choices: list[TrackInfo] = song_results[:2] + video_results[:2]
 
     if cfg.FORCE_MATCH_PROMPT:
-        log.info('force-match-prompt is enabled, returning choices without checking for matches.')
+        log.warning('force-match-prompt is enabled.')
         return track_choices
 
     # Check for matches
@@ -735,8 +724,3 @@ def match_ytmusic_track(src_info: TrackInfo) -> TrackInfo | list[TrackInfo]:
     log.info('No confident matches were found. Returning the closest ones...')
     return track_choices
 #endregion YTMUSIC
-
-# Other
-def spyt(url: str) -> TrackInfo | list[TrackInfo]:
-    """Matches a Spotify URL with its closest match from YouTube or YTMusic"""
-    return match_ytmusic_track(TrackInfo.from_spotify_url(url))
