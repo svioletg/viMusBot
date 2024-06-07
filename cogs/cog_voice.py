@@ -592,8 +592,12 @@ class Voice(commands.Cog):
                 elif url.startswith('https://open.spotify.com/album/'):
                     if not media.sp:
                         await ctx.send(embed=CommonMsg.spotify_functions_unavailable())
+                        return
                     media_list = media.AlbumInfo.from_spotify_url(url)
                 elif url.startswith('https://open.spotify.com/playlist/'):
+                    if not media.sp:
+                        await ctx.send(embed=CommonMsg.spotify_functions_unavailable())
+                        return
                     media_list = media.PlaylistInfo.from_spotify_url(url)
                 elif re.findall(r"https://soundcloud\.com/\w+/sets/", url):
                     media_list = media.soundcloud_set(url)
@@ -642,6 +646,9 @@ class Voice(commands.Cog):
                         log.debug('Looks like a YouTube Music or YouTube URL, creating QueueItem...')
                         to_queue.append(QueueItem(media.TrackInfo.from_pytube(url), ctx.author))
                     elif url.startswith('https://open.spotify.com/track/'):
+                        if not media.sp:
+                            await ctx.send(embed=CommonMsg.spotify_functions_unavailable())
+                            return
                         log.debug('Looks like a Spotify URL, creating QueueItem...')
                         to_queue.append(QueueItem(media.TrackInfo.from_spotify_url(url), ctx.author))
                     elif url.startswith('https://soundcloud.com/'):

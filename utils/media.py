@@ -405,7 +405,16 @@ ytmusic = YTMusic()
 # Connect to spotify API
 # Turns out you don't actually need to provide a valid ID or secret, just give it a string
 # and everything works fine.
-sp = Spotify(client_credentials_manager=SpotifyClientCredentials(client_id='none', client_secret='none'))
+try:
+    with open('spotify_config.json', 'r', encoding='utf-8') as f:
+        spotify_creds = json.load(f)
+        sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
+            client_id=spotify_creds['client_id'],
+            client_secret=spotify_creds['client_secret']
+        ))
+except FileNotFoundError:
+    log.warning('"spotify_config.json" not found, Spotify functionality will be unavailable.')
+    sp = None
 
 # Connect to soundcloud API
 sc = SoundcloudAPI()

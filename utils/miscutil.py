@@ -13,7 +13,7 @@ from typing import Callable, Optional
 import colorlog
 
 # Local imports
-from utils.configuration import LOG_LEVEL, LOG_COLORS, DISABLE_LOG_COLORS
+import utils.configuration as cfg
 from utils.palette import Palette
 
 plt = Palette()
@@ -44,7 +44,7 @@ def line():
 
 def seconds_to_hms(seconds: int | float, format_zero: bool = True) -> str | None:
     """Returns a formatted string in either MM:SS or HH:MM:SS from the given time in seconds.
-    
+
     @format_zero: By default, `0:00` is returned if the input is `0`. Setting this to `False` will instead
         return `None` in that case.
     """
@@ -78,11 +78,11 @@ def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> loggi
     """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output.
     A file handler is only created if `logfile` has a value."""
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
-    use_color: bool = not DISABLE_LOG_COLORS
+    use_color: bool = not cfg.DISABLE_LOG_COLORS
     new_logger = colorlog.getLogger(logger_name)
     date_format = '%y-%m-%d %H:%M:%S'
-    log_string_pre = '[%(asctime)s] [{c_module_}%(module)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\
-        ' in {c_func_}%(funcName)s%(reset)s: {c_}%(message)s'
+    log_string_pre = '[{c_timer_}%(asctime)s%(reset)s] [{c_module_}%(module)s%(reset)s/{c_}%(levelname)s%(reset)s]'+\
+        ' in {c_function_}%(funcName)s%(reset)s: {c_}%(message)s'
 
     log_string_no_color = re.sub(r"({c_(.*?)})", '', log_string_pre)
     log_string_no_color = re.sub(r"%\(reset\)s", '', log_string_no_color)
@@ -90,20 +90,20 @@ def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> loggi
     log_string_colored = re.sub(r"({c_(.*?)})", r'%(\2log_color)s', log_string_pre)
 
     def get_log_colors(use_color: bool=True):
-        # TODO: Have this use colors set in config.yml
         log_colors = {
-            'DEBUG':    'green' if use_color else '',
-            'INFO':     ''  if use_color else '',
-            'WARNING':  'yellow'  if use_color else '',
-            'ERROR':    'red'  if use_color else '',
-            'CRITICAL': 'red,bg_white' if use_color else ''
+            'DEBUG':    plt.debug if use_color else '',
+            'INFO':     plt.info  if use_color else '',
+            'WARNING':  plt.warn  if use_color else '',
+            'ERROR':    plt.error  if use_color else '',
+            'CRITICAL': plt.critical if use_color else ''
         }
         return log_colors
 
     def get_secondary_log_colors(use_color: bool=True):
         secondary_log_colors = {
-            'module': {l:'cyan' if use_color else '' for l in levels},
-            'func': {l:'cyan' if use_color else '' for l in levels},
+            'timer': {l:plt.timer if use_color else '' for l in levels},
+            'module': {l:plt.module if use_color else '' for l in levels},
+            'function': {l:plt.function if use_color else '' for l in levels}
         }
         return secondary_log_colors
 
@@ -115,7 +115,7 @@ def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> loggi
 
     stdout_handler = colorlog.StreamHandler(stream=stdout)
     stdout_handler.setFormatter(log_format_colored)
-    stdout_handler.setLevel(logging.getLevelName(LOG_LEVEL))
+    stdout_handler.setLevel(logging.getLevelName(cfg.LOG_LEVEL.upper()))
     new_logger.addHandler(stdout_handler)
 
     if logfile:

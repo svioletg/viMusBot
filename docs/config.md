@@ -184,18 +184,29 @@ logging-options:
 
 **Valid options:** a color name that is any of the following...
 
-```
-lime
-green
-yellow
-gold
-red
-darkred
-magenta
-darkmagenta
-blue
-darkblue
-```
+![Image showing each available color in Windows Terminal, on Windows 11.
+The colors shown are...
+brightwhite,
+white,
+grey,
+gray,
+lime,
+green,
+yellow,
+gold,
+darkgold,
+lightred,
+red,
+darkred,
+magenta,
+purple,
+darkpurple,
+cyan,
+cerulean,
+teal,
+blue,
+darkblue,
+navy](https://i.imgur.com/rSUmfXP.png)
 
 ...for any of the keys listed in the example below.
 
@@ -204,12 +215,15 @@ darkblue
 ```yaml
 logging-options:
     colors:
-        no-color: false # set to "true" to completely disable colored output
-        module: "blue" # used for file names
-        warn: "gold" # non-urgent warnings and notices
-        error: "red" # used for tracebacks, and other complete failures
-        timer: "magenta" # used for the time since the last log shown at the end
-        function: "blue" # used for function names
+        no-color: no # Disables all message coloring
+        debug: "green"
+        info: "white"
+        warn: "gold"
+        error: "red"
+        critical: "red on white"
+        timer: "white" # Used for the time/date
+        module: "blue" # For module names (bot.py, media.py, etc.)
+        function: "yellow" # For function names
 ```
 
 ### `maximum-file-size`

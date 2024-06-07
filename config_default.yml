@@ -128,12 +128,14 @@ logging-options:
     log-full-tracebacks: no
     # Choose your preferred log colors (these are only used in console output, log files will have no color codes)
     colors:
-        # Run "palette.py" to see a list of choices
+        # Run "colors.py" to see a list of choices, add "on [color]" for a background
+        # e.g. "red on white" will display red text on a white background
         no-color: no # Disables all message coloring
+        debug: "green"
         info: "white"
         warn: "gold"
         error: "red"
-        critical: "red"
-        timer: "darkmagenta" # The time between logs at the end of each message
-        module: "yellow" # For module names (bot.py, media.py, etc.)
-        function: "blue" # For function names
+        critical: "red on white"
+        timer: "white" # Used for the time/date
+        module: "blue" # For module names (bot.py, media.py, etc.)
+        function: "yellow" # For function names
