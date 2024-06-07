@@ -37,7 +37,7 @@ discordpy_logfile_handler = logging.FileHandler(filename='discord.log', encoding
 discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INFO, root=False)
 
 # Setup bot logging
-log = miscutil.create_logger('viMusBot', Path('vimusbot.log'))
+log = miscutil.create_logger('lydian', Path('lydian.log'))
 
 log.info('Logging for bot.py is now active.')
 

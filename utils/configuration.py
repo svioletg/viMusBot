@@ -12,7 +12,7 @@ from typing import Any, Literal
 import yaml
 from benedict import benedict
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 CONFIG_FILEPATHS: dict[str, str] = {
     'user': 'config.yml',

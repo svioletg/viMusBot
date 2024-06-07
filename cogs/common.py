@@ -13,7 +13,7 @@ from discord.ext import commands
 # Local imports
 import utils.configuration as cfg
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 class EmojiStr:
     """Shortcuts for certain emoji used by the bot."""

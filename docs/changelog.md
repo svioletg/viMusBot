@@ -37,6 +37,7 @@ Developer
         - Now contains variables set and typed from every relevant configuration key, which other modules should use by importing the entire module
     - `spoofy.py` renamed to `media.py`, moved to this directory ([#42](https://github.com/svioletg/viMusBot/issues/42))
     - Changes in `media.py`:
+        - The `client_id` and `client_secret` supplied to the Spotify API are now just the string literals `'none'`, turns out it doesn't actually need to be valid to access what the bot was accessing
         - `FORCE_NO_MATCH` renamed to `FORCE_MATCH_PROMPT`
         - `DURATION_LIMIT` renamed to `DURATION_LIMIT_SECONDS`
         - Removed `get_uri()`, normal URLs work in all `Spotipy` functions being used so there was no need for this
@@ -70,6 +71,7 @@ Fixes
 
 Other
 - `-analyze` command removed
+- `spotify_config.json` no longer needed
 - Config changes:
     - Default value of `use-top-match` set to `no`
     - Default value of `command-blacklist` now set to `test` alone

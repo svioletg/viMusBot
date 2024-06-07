@@ -5,7 +5,7 @@ standardized results from various sources."""
 import json
 import logging
 import re
-from typing import Any, Callable, Literal, Optional, Self, TypedDict, cast
+from typing import Any, Literal, Optional, Self, TypedDict, cast
 
 # External imports
 import pytube
@@ -23,12 +23,9 @@ import utils.configuration as cfg
 from utils.miscutil import seconds_to_hms
 from utils.palette import Palette
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 plt = Palette()
-
-# Function to communicate with the bot and send status messages, useful for long tasks
-bot_status_callback: Callable = lambda message: None
 
 #region DEFINE CLASSES
 
@@ -273,6 +270,7 @@ class AlbumInfo(MediaInfo):
             - `dict` from `yt_dlp.YoutubeDL.YoutubeDL.extract_info()`
         """
         MediaInfo.__init__(self, source, info, yt_info_origin)
+        self.is_album = True
         self.upc: str = ''
 
         if source == SPOTIFY:
@@ -303,6 +301,7 @@ class PlaylistInfo(MediaInfo):
     """Specific parsing for playlist data."""
     def __init__(self, source: MediaSource, info: Any, yt_info_origin: Optional[Literal['pytube', 'ytmusic', 'ytdl']] = None):
         MediaInfo.__init__(self, source, info, yt_info_origin)
+        self.is_playlist = True
 
         if source == SPOTIFY:
             self.thumbnail      = cast(str, self.info['images'][0]['url'])
@@ -338,11 +337,6 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
             try:
                 if isinstance(group_object, AlbumInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
-                    print(group_object.thumbnail)
-                    print(group_object.album_name)
-                    print(group_object.release_year)
-                    print(object_list[-1])
-                    print('###########################')
                     object_list[-1].thumbnail    = group_object.thumbnail
                     object_list[-1].album_name   = group_object.album_name
                     object_list[-1].release_year = group_object.release_year
@@ -409,14 +403,9 @@ ytdl = YoutubeDL(ytdl_format_options)
 ytmusic = YTMusic()
 
 # Connect to spotify API
-with open('spotify_config.json', 'r', encoding='utf-8') as f:
-    scred = json.loads(f.read())['spotify']
-
-client_credentials_manager = SpotifyClientCredentials(
-    client_id = scred['client_id'],
-    client_secret = scred['client_secret']
-)
-sp = Spotify(client_credentials_manager = client_credentials_manager)
+# Turns out you don't actually need to provide a valid ID or secret, just give it a string
+# and everything works fine.
+sp = Spotify(client_credentials_manager=SpotifyClientCredentials(client_id='none', client_secret='none'))
 
 # Connect to soundcloud API
 sc = SoundcloudAPI()

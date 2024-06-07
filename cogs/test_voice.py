@@ -12,7 +12,7 @@ from discord.ext import commands
 
 from cogs.common import command_from_alias, embedq, prompt_for_choice
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 class VoiceTest:
     """Tests for the `Voice` cog."""

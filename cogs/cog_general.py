@@ -10,7 +10,7 @@ from discord.ext import commands
 from cogs.common import command_aliases, embedq, is_command_enabled
 from version import VERSION
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 class General(commands.Cog):
     """General, miscellaneous functions."""

@@ -10,9 +10,7 @@ with open('docs/config.md', 'r', encoding='utf-8') as f:
     md = BeautifulSoup(marko.convert(f.read()), 'html.parser')
 
 md_keys: list[str] = ['.'.join(re.findall(r"<code>(.*?)</code>", str(h))) for h in md.find_all('h3')]
-
 yaml_keys = cfg.CONFIG_DEFAULT_DICT.keypaths()
-
 difference: set[str] = set(yaml_keys) - set(md_keys)
 
 if not difference:

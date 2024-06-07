@@ -29,7 +29,7 @@ from cogs.test_voice import VoiceTest
 from utils import media
 from utils.miscutil import seconds_to_hms
 
-log = logging.getLogger('viMusBot')
+log = logging.getLogger('lydian')
 
 # Configure youtube dl
 ytdl = yt_dlp.YoutubeDL(media.ytdl_format_options)
@@ -50,7 +50,7 @@ class YTDLSource(PCMVolumeTransformer):
         self.src = data.get('extractor')
 
     @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
+    async def from_url(cls, url, *, loop=None, stream=False) -> Self:
         """Creates a YTDLSource from a URL."""
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
@@ -590,6 +590,8 @@ class Voice(commands.Cog):
                     # Convert to a normal YouTube playlist URL because dealing with YTMusic playlists/albums are a hassle
                     media_list = media.PlaylistInfo.from_ytdl(url.replace('music.', 'www.'))
                 elif url.startswith('https://open.spotify.com/album/'):
+                    if not media.sp:
+                        await ctx.send(embed=CommonMsg.spotify_functions_unavailable())
                     media_list = media.AlbumInfo.from_spotify_url(url)
                 elif url.startswith('https://open.spotify.com/playlist/'):
                     media_list = media.PlaylistInfo.from_spotify_url(url)

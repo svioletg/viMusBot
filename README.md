@@ -22,8 +22,6 @@ Start by downloading the `Source code (zip)` file under **Assets** from the bott
 
 [Setting Up: Discord](#setting-up-discord)
 
-[Setting Up: Spotify API](#setting-up-spotify-api)
-
 [Running & Updating](#running--updating)
 
 [Documentation & Guides](#documentation--guides)
@@ -78,34 +76,6 @@ The last thing you'll need to do on the Discord side of things is give the bot i
 Tick the boxes next to these permissions, and then save your changes.
 
 **To create an invite link** for the bot, click "OAuth2" on the left sidebar, then "URL Generator". Under "Scopes", tick only the "bot" checkbox. Under "Bot Permission", select the same permissions shown above. Your link will be at the bottom of this page.
-
-## Setting up: Spotify API
-
-You'll need to supply an API "client ID" and "client secret" in order for Spotify-related functions to work. You will need a Spotify account, but you will **not** need a Spotify Premium subscription.
-
-1. Start by going to your [Spotify for Developers Dashboard](https://developer.spotify.com/dashboard). Once you're logged in and at this page, you should see a blue "**Create app**" button, which you should click.
-2. Fill in the Name and Description fields with whatever you want; the "Website" field can be left blank. The Redirect URI field is required, although it will not actually be used by the bot, so you can just enter `localhost`.
-3. Under "Which API/SDKs are you planning to use?", select "Web API", then hit "Save".
-![Spotify app setup page](https://i.imgur.com/hoPjBKE.png)
-4. You should now be sent to your app's dashboard with some graphs displayed. On the right side of the screen, click "Settings".
-5. Click "View client secret" to reveal the string.
-![Client ID and client secret fields](https://i.imgur.com/4AoWjWj.png)
-
-The `spotifysetup.bat` script has been included with viMusBot to set up your config automatically — if you're on Windows, you can run it, and then paste in the requested information.
-
-Alternatively, you can manually create the required `spotify_config.json` file, and then paste in the following...
-
-```json
-{
-    "spotify":
-    {
-        "client_id": "YOUR_ID",
-        "client_secret": "YOUR_SECRET"
-    }
-}
-```
-
-...where `YOUR_ID` and `YOUR_SECRET` are your app's client ID and client secret respectively — make sure to keep them surrounded by quotation marks.
 
 ## Running & Updating
 
