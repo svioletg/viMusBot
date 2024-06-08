@@ -41,16 +41,8 @@ log = miscutil.create_logger('lydian', Path('lydian.log'))
 
 log.info('Logging for bot.py is now active.')
 
-log.debug('')
-log.info('')
-log.warning('')
-log.error('')
-log.critical('')
-
-exit()
-
 log.info('Python version: %s', python_version())
-log.info('viMusBot version: %s', VERSION)
+log.info('Lydian version: %s', VERSION)
 
 # TODO: Make sure updater is up to snuff
 # Check for updates

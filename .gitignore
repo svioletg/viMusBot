@@ -48,3 +48,4 @@ new-release.bat
 .markdownlint.json
 ffmpeg.exe
 ffprobe.exe
+dev.py

@@ -129,8 +129,10 @@ if conflicts := check_alias_conflicts():
     log.error('The same alias can not be used for multiple commands; please edit your config file.')
     raise SystemExit
 
-LOG_LEVEL          : str            = check_type('logging-options.console-log-level', str)
-LOG_COLORS         : dict[str, str] = check_type('logging-options.colors', dict)
+LOG_LEVEL: str            = check_type('logging-options.console-log-level', str)
+
+check_type('logging-options.colors', dict)
+LOG_COLORS_PATH    : str            = 'logging-options.colors'
 DISABLE_LOG_COLORS : bool           = check_type('logging-options.colors.no-color', bool)
 LOG_TRACEBACKS     : bool           = check_type('logging-options.log-full-tracebacks', bool)
 

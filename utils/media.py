@@ -407,7 +407,7 @@ ytmusic = YTMusic()
 # and everything works fine.
 try:
     with open('spotify_config.json', 'r', encoding='utf-8') as f:
-        spotify_creds = json.load(f)
+        spotify_creds = json.load(f)['spotify']
         sp = Spotify(client_credentials_manager=SpotifyClientCredentials(
             client_id=spotify_creds['client_id'],
             client_secret=spotify_creds['client_secret']

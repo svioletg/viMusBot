@@ -63,7 +63,7 @@ class Palette:
 
     def parse_color_config(self, key: str) -> str:
         """Parse what's entered in the config for this key into an escape code."""
-        key = cfg.LOG_COLORS[key]
+        key = cfg.get(f'{cfg.LOG_COLORS_PATH}.{key}')
         colors = key.split(' on ')
         fg = ''
         bg = ''
