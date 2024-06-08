@@ -10,6 +10,7 @@ Developer
 - `customlog.py` has been removed entirely, logging is now handled using the [`colorlog`](https://pypi.org/project/colorlog/) library ([#73](https://github.com/svioletg/viMusBot/issues/73))
     - Therefore, logs are no longer marked as `verbose` with a keyword argument, and instead use standard logging levels. Most logs that used `verbose` have been moved to `DEBUG`-level logs, but some have been deemed `INFO`-level instead
 - Changes in `bot.py`:
+    - `on_error` client event added to handle non-command-related errors, finally
     - No longer have to use `try/except` blocks for 404 errors resulting from editing/deleting messages, the issue was that the reference variables weren't getting properly set to `None` when `some_message.delete()` was called, so the reference pointed to nothing
     - `duration_from_url()` and `title_from_url()` removed, any functions related to URL caching removed, now irrelevant
     - `-test` debug command added
