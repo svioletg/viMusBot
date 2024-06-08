@@ -9,6 +9,7 @@ import asyncio
 import glob
 import logging
 import os
+import sys
 import traceback
 from pathlib import Path
 from platform import python_version
@@ -25,7 +26,8 @@ from pretty_help import PrettyHelp
 import utils.configuration as cfg
 from cogs import cog_general, cog_voice
 from cogs.common import EmojiStr, SilentCancel, embedq
-from utils import miscutil, updater
+from utils import updater
+from utils.miscutil import create_logger
 from utils.palette import Palette
 from version import VERSION
 
@@ -37,10 +39,8 @@ discordpy_logfile_handler = logging.FileHandler(filename='discord.log', encoding
 discord.utils.setup_logging(handler=discordpy_logfile_handler, level=logging.INFO, root=False)
 
 # Setup bot logging
-log = miscutil.create_logger('lydian', Path('lydian.log'))
-
+log = create_logger('lydian', Path('lydian.log'))
 log.info('Logging for bot.py is now active.')
-
 log.info('Python version: %s', python_version())
 log.info('Lydian version: %s', VERSION)
 
@@ -134,7 +134,16 @@ async def on_command_error(ctx: commands.Context, error: BaseException):
         str(error)))
 
 @bot.event
+async def on_error(event_name, *args, **kwargs): # pylint: disable=unused-argument
+    """Handles any non-command errors."""
+    error = sys.exc_info()[1]
+    log.error(error)
+    if cfg.LOG_TRACEBACKS:
+        log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(error)))
+
+@bot.event
 async def on_ready():
+    "Runs when the bot is ready to start."
     log.info('Logged in as %s (ID: %s)', bot.user, bot.user.id)
     log.info('=' * 20)
     log.info('Ready!')
@@ -144,6 +153,7 @@ async def on_ready():
 asyncio_tasks: dict[str, asyncio.Task] = {}
 
 async def console_thread():
+    """Handles console commands."""
     log.info('Console is active.')
     while True:
         try:
@@ -180,6 +190,7 @@ async def console_thread():
                 log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(e)))
 
 async def bot_thread():
+    """Async thread for the Discord bot."""
     log.info('Starting bot thread...')
     log.debug('Assigning bot logger to cogs...')
     cog_general.log = log
@@ -193,6 +204,7 @@ async def bot_thread():
         await bot.start(token)
 
 async def main():
+    """Creates main tasks and runs everything."""
     asyncio_tasks['bot'] = asyncio.create_task(bot_thread())
     asyncio_tasks['console'] = asyncio.create_task(console_thread())
     try:

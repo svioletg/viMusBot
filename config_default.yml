@@ -134,7 +134,7 @@ logging-options:
         debug: "green"
         info: "white"
         warn: "gold"
-        error: "red"
+        error: "lightred"
         critical: "red on white"
         timer: "white" # Used for the time/date
         module: "blue" # For module names (bot.py, media.py, etc.)

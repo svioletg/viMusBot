@@ -121,13 +121,24 @@ class PlaylistLimitError(Exception):
     """Raised when a playlist exceeds its maximum length, set by user configuration."""
 
 async def author_in_vc(ctx: commands.Context) -> bool:
-    """Checks whether the command author is connected to a voice channel before allowing it to run."""
+    """Checks whether the command author is connected to a voice channel before allowing it to run.
+    
+    If the author *is* connected, they must be connected to the same voice channel the bot is in for this to pass."""
     command_author = cast(Member, ctx.author)
     if not command_author.voice:
         log.info('Command author not connected to voice, cancelling.')
         await ctx.send(embed=embedq(EmojiStr.cancel + ' You must be connected to a voice channel to do this.'))
         return False
-    return True
+
+    if ctx.voice_client:
+        if ctx.voice_client.channel == command_author.voice.channel:
+            return True
+        else:
+            await ctx.send(embed=embedq(EmojiStr.cancel + ' You must be in the same voice channel as the bot to do this.',
+                f'The bot is currently connected to "{ctx.voice_client.channel}"'))
+            return False
+    else:
+        return True
 
 class Voice(commands.Cog):
     """Handles voice and music-related tasks."""
@@ -205,7 +216,8 @@ class Voice(commands.Cog):
     @commands.check(author_in_vc)
     async def join(self, ctx: commands.Context):
         """Joins the same voice channel the command user is connected to."""
-        await ctx.send(embed=embedq(f'Joining voice channel: {cast(Member, ctx.author).voice.channel.name}'))
+        author = cast(Member, ctx.author)
+        await ctx.send(embed=embedq(f'Joining voice channel: {author.voice.channel.name}'))
 
     @commands.command(aliases=command_aliases('leave'))
     @commands.check(is_command_enabled)
