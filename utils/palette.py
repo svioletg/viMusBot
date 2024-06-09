@@ -8,22 +8,18 @@ from typing import cast
 import colorama
 from colorama import Fore, Style
 
-# Local imports
-import utils.configuration as cfg
-
 colorama.init(autoreset=True)
-
-NO_COLOR: bool = cfg.DISABLE_LOG_COLORS
 
 class Palette:
     """Contains color attributes and public methods."""
-    def __init__(self):
+    def __init__(self, load_config: bool=True):
+        self.load_config = load_config
         # General color names
         self.reset       = Style.RESET_ALL
 
         self.brightwhite = Style.BRIGHT + Fore.WHITE
         self.white       = Style.NORMAL + Fore.WHITE
-        self.grey        = Style.DIM + Fore.WHITE
+        self.grey        = Style.DIM    + Fore.WHITE
         self.gray = self.grey
 
         self.lime        = Style.BRIGHT + Fore.GREEN
@@ -63,6 +59,10 @@ class Palette:
 
     def parse_color_config(self, key: str) -> str:
         """Parse what's entered in the config for this key into an escape code."""
+        if not self.load_config:
+            return self.white
+
+        import utils.configuration as cfg # pylint: disable=import-outside-toplevel
         key = cfg.get(f'{cfg.LOG_COLORS_PATH}.{key}')
         colors = key.split(' on ')
         fg = ''

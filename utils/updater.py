@@ -1,9 +1,12 @@
-"""Automatic updater for the bot. Checks the locally stored version number against the latest release up on GitHub
+"""Automatic updater for the bot. Checks the locally stored version number against the latest release up on GitHub,
 and replaces local files if a new version exists."""
 
 # Standard imports
 import os
+import re
 import shutil
+from string import ascii_lowercase
+from typing import Self
 import urllib.request
 from pathlib import Path
 from zipfile import ZipFile
@@ -13,25 +16,57 @@ import colorama
 import requests
 
 # Local imports
-from version import VERSION
 from utils.palette import Palette
+from version import VERSION
 
 colorama.init(autoreset=True)
-plt = Palette()
+plt = Palette(load_config=False)
 
-def get_latest_tag() -> dict:
+class Release:
+    """Organizes useful information from a GitHub API reponse of a release."""
+    def __init__(self, response_json: dict):
+        """
+        @response_json: Dictionary retrieved from using `.json()` on a `Response`.
+        """
+        self.name: str = response_json['name']
+        self.tag: str = response_json['tag_name']
+        self.version: tuple[int, ...] = self.get_version_tuple(self.tag)
+
+        self.url: str = response_json['html_url']
+        self.zip: str = response_json['zipball_url']
+        self.tarball: str = response_json['tarball_url']
+
+        self.is_prerelease: bool = response_json['prerelease']
+        self.is_draft: bool = response_json['draft']
+
+        self.text: str = response_json['body']
+        self.date: str = re.match(r"(\d{4}-\d{2}-\d{2})", response_json['published_at'])[0] # type: ignore
+
+    @classmethod
+    def from_url(cls, github_url: str) -> Self:
+        """Creates a `Release` from a GitHub API release URL."""
+        response = requests.get(github_url, timeout=5)
+        return cls(response.json())
+
+    @staticmethod
+    def get_version_tuple(tag_string: str) -> tuple[int, ...]:
+        """Turns a tag string (e.g. `"1.8.3c") into a tuple of integers. (e.g. `(1, 8, 3, 3)`)
+        Version extension letters will be turned into integers based off their alphabetical position."""
+        version: list = tag_string.split('.')
+        if version_ext := re.findall(r"([a-z])", version[-1]):
+            version[-1] = re.sub(r"([a-z])", '', version[-1])
+            version.append(ascii_lowercase.index(version_ext[0]) + 1)
+        return tuple(map(int, version))
+
+def get_latest_tag() -> Release:
     """Retrieves the latest release on the viMusBot repository and stores it along with the detected local version."""
-    response: requests.Response = requests.get('https://api.github.com/repos/svioletg/viMusBot/releases/latest', timeout=5)
-    latest: dict = response.json()
-    latest_tag: str = latest['tag_name'].strip()
-
-    return {'tag': latest_tag, 'response_json': latest}
+    return Release.from_url('https://api.github.com/repos/svioletg/viMusBot/releases/latest')
 
 def main():
     print('Checking...')
 
-    latest: dict = get_latest_tag()
-    up_to_date: bool = VERSION == latest['tag']
+    latest = get_latest_tag()
+    local = Release.get_version_tuple(VERSION)
 
     if up_to_date:
         print(f'Current: {plt.gold}{VERSION}{plt.reset} | Latest: {plt.lime}{latest['tag']}')

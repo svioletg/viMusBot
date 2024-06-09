@@ -32,6 +32,8 @@ Developer
             - `MediaQueue` no longer keeps track of multiple queues per Discord server and instead represents just a single queue (part of [#52](https://github.com/svioletg/viMusBot/issues/52))
                 - It also now contains things like `now_playing`, `last_played`, `is_looping` (formerly `loop_this`), etc.
 - `utils/` directory added to contain helper modules
+    - `updater.py` moved to this directory
+        - `Release` class created to organize response information and easily check versions
     - `miscutil.py` created in this directory to house general-purpose utility methods that should be shared between modules
     - `configuration.py` created in this directory to reduce the amount of duplicated code regarding configuration across this project
         - This module has a `get()` function that automatically retrieves the default value if none is set in the custom configuration, this removes the need for every single file to have the key typed out twice, e.g. `config.get('allow-spotify-playlists', config_default['allow-spotify-playlists'])`, and can now just be `config.get('allow-spotify-playlists')`
