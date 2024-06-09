@@ -1,3 +1,5 @@
+@echo off
+
 echo Creating virtual enviornment...
 
 py -3 -m venv .lydienv

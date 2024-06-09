@@ -68,8 +68,6 @@ def get_latest_tag() -> Release:
 def main():
     print('Checking...')
 
-    VERSION = '1.9.0'
-
     latest = get_latest_tag()
     local = Release.get_version_tuple(VERSION)
 
