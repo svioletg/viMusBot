@@ -67,4 +67,5 @@ def main() -> None:
         print('Done!')
         print(f'You are now on {plt.lime}v{new_version}{plt.reset}')
 
+if __name__ == '__main__':
     main()
