@@ -26,7 +26,7 @@ from pretty_help import PrettyHelp
 import utils.configuration as cfg
 from cogs import cog_general, cog_voice
 from cogs.common import EmojiStr, SilentCancel, embedq
-from utils import updater
+from utils import updating
 from utils.miscutil import create_logger
 from utils.palette import Palette
 from version import VERSION

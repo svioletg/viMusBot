@@ -23,9 +23,6 @@ quickstart.sh
 test.py
 *.prof
 *.lprof
-# backups of files in case i need to roll back after a big change
-bot_*.py
-spoofy_*.py
 # log files & downloaded media files from bot testing
 *.log
 *.part
@@ -49,3 +46,4 @@ new-release.bat
 ffmpeg.exe
 ffprobe.exe
 dev.py
+*.zip

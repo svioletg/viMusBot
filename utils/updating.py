@@ -5,10 +5,11 @@ and replaces local files if a new version exists."""
 import os
 import re
 import shutil
-from string import ascii_lowercase
-from typing import Self
+import sys
 import urllib.request
 from pathlib import Path
+from string import ascii_lowercase
+from typing import Self
 from zipfile import ZipFile
 
 # External imports
@@ -53,6 +54,8 @@ class Release:
         """Turns a tag string (e.g. `"1.8.3c") into a tuple of integers. (e.g. `(1, 8, 3, 3)`)
         Version extension letters will be turned into integers based off their alphabetical position."""
         version: list = tag_string.split('.')
+        if version[0] == 'dev':
+            return (-1, int(version[1]))
         if version_ext := re.findall(r"([a-z])", version[-1]):
             version[-1] = re.sub(r"([a-z])", '', version[-1])
             version.append(ascii_lowercase.index(version_ext[0]) + 1)
@@ -65,43 +68,53 @@ def get_latest_tag() -> Release:
 def main():
     print('Checking...')
 
+    VERSION = '1.9.0'
+
     latest = get_latest_tag()
     local = Release.get_version_tuple(VERSION)
 
-    if up_to_date:
-        print(f'Current: {plt.gold}{VERSION}{plt.reset} | Latest: {plt.lime}{latest['tag']}')
-        print('You are up to date.')
-        return
-
-    print(f'Current: {plt.gold}{VERSION}{plt.reset} | Latest: {plt.lime}{latest['tag']}')
-
-    if input('A new version is available. Update now? (y/n) ').strip().lower() != 'y':
+    if local[0] == -1:
+        print('Development version detected; can\'t compare to latest.')
         print('Exiting.')
         return
 
-    latest_zip = f'./viMusBot-{latest['tag']}.zip'
+    if local == latest.version:
+        print('You are up to date.')
+        print(f'Current: {plt.lime}{VERSION}{plt.reset} = Latest: {plt.lime}{latest.tag}')
+        print('Exiting.')
+        return
 
-    print('Retrieving: '+latest['zipball_url'])
-    urllib.request.urlretrieve(latest['zipball_url'], latest_zip)
+    if latest.version > local:
+        print('A new update is available.')
+        print(f'Current: {plt.gold}{VERSION}{plt.reset} < Latest: {plt.lime}{latest.tag}')
+
+    if input('\nUpdate now? (y/n) ').strip().lower() != 'y':
+        print('Exiting.')
+        return
+
+    latest_archive = Path(f'viMusBot-{latest.tag}.zip')
+
+    print('Retrieving: ' + latest.zip)
+    urllib.request.urlretrieve(latest.zip, latest_archive)
 
     print('Extracting...')
-    with ZipFile(latest_zip, 'r') as zipf:
-        source_dir = zipf.namelist()[0]
-        zipf.extractall('.')
+    with ZipFile(latest_archive, 'r') as zipf:
+        extract_destination = Path(zipf.namelist()[0])
+        zipf.extractall('newupdate')
+        return
 
     print('Copying...')
-    source_dir = Path(source_dir)
     cwd = str(Path.cwd())
-    shutil.copytree(source_dir, cwd, dirs_exist_ok=True)
+    shutil.copytree(extract_destination, cwd, dirs_exist_ok=True)
 
     print('Cleaning up...')
-    os.remove(latest_zip)
-    shutil.rmtree(source_dir)
+    os.remove(latest_archive)
+    shutil.rmtree(extract_destination)
 
     with open('version.txt', 'r', encoding='utf-8') as f:
         new_version = f.read()
         print('Done!')
-        print(f'You are now using: {plt.lime}v{new_version}{plt.reset}')
+        print(f'You are now on: {plt.lime}v{new_version}{plt.reset}')
 
 if __name__ == '__main__':
     main()
