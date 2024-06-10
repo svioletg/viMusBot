@@ -119,8 +119,8 @@ command-blacklist:
 logging-options:
     # What level of logs to output to the console; valid options are "DEBUG" (lowest), "INFO", "WARNING", "ERROR", and "CRITICAL" (highest)
     # Only logs greater than or equal to this level will be displayed,
-    # others will not show up in the console but are still logged to vimusbot.log 
-    # For more about this and what each level represents, see: https://github.com/svioletg/viMusBot/blob/dev/README.md#reading-logs
+    # others will not show up in the console but are still logged to lydian.log 
+    # For more about this and what each level represents, see: https://github.com/svioletg/lydian-discord-bot/blob/dev/README.md#reading-logs
     console-log-level: "INFO"
     # Whether to print out full error tracebacks to the console
     # Tracebacks are always saved to the log file for debugging usage,

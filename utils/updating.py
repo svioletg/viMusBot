@@ -5,7 +5,6 @@ and replaces local files if a new version exists."""
 import os
 import re
 import shutil
-import sys
 import urllib.request
 from pathlib import Path
 from string import ascii_lowercase
@@ -61,14 +60,14 @@ class Release:
             version.append(ascii_lowercase.index(version_ext[0]) + 1)
         return tuple(map(int, version))
 
-def get_latest_tag() -> Release:
+def get_latest_release() -> Release:
     """Retrieves the latest release on the viMusBot repository and stores it along with the detected local version."""
     return Release.from_url('https://api.github.com/repos/svioletg/viMusBot/releases/latest')
 
 def main():
     print('Checking...')
 
-    latest = get_latest_tag()
+    latest = get_latest_release()
     local = Release.get_version_tuple(VERSION)
 
     if local[0] == -1:
@@ -99,7 +98,6 @@ def main():
     with ZipFile(latest_archive, 'r') as zipf:
         extract_destination = Path(zipf.namelist()[0])
         zipf.extractall('newupdate')
-        return
 
     print('Copying...')
     cwd = str(Path.cwd())

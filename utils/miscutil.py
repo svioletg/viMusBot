@@ -76,7 +76,8 @@ def time_func(func: Callable, printout: bool=True) -> float:
 
 def create_logger(logger_name: str, logfile: Optional[str | Path]=None) -> logging.Logger:
     """Sets up a new logger, using `colorlog` for colored console output and `logging` for file output.
-    A file handler is only created if `logfile` has a value."""
+    A file handler is only created if `logfile` has a value.
+    """
     levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     use_color: bool = not cfg.DISABLE_LOG_COLORS
     new_logger = colorlog.getLogger(logger_name)

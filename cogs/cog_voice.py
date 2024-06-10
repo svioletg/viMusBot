@@ -528,7 +528,7 @@ class Voice(commands.Cog):
             if plain_strings:
                 text_search: str = ' '.join(plain_strings)
                 log.debug('Using plain-text search: %s', text_search)
-                top_songs, top_videos, top_albums = map(media.search_ytmusic_text(text_search).get, ('songs', 'videos', 'albums'))
+                top_songs, top_videos, top_albums = map(lambda k: media.search_ytmusic_text(text_search).get(k), ('songs', 'videos', 'albums'))
 
                 if cfg.USE_TOP_MATCH:
                     log.debug('USE_TOP_MATCH on.')
@@ -796,7 +796,7 @@ class Voice(commands.Cog):
                         choice = await prompt_for_choice(self.bot, ctx,
                             prompt_msg=prompt_msg, choice_nums=len(matches), result_msg=self.queue_msg)
                         if isinstance(choice, int) and choice != 0:
-                            item.info = matches[choice]
+                            item.info = matches[choice - 1]
                         else:
                             await self.advance_queue(ctx)
                             return
@@ -829,7 +829,7 @@ class Voice(commands.Cog):
             self.now_playing_msg = await ctx.send(embed=self.embed_now_playing(show_elapsed=False))
 
         if self.queue_msg:
-            self.queue_msg = await self.queue_msg.delete()
+            self.queue_msg = await self.queue_msg.delete(delay=1.0)
 
     async def handle_player_stop(self, ctx):
         """Normally just directs to `advance_queue()`, but handles some small additional logic

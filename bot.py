@@ -1,4 +1,4 @@
-"""The main bot script. Running this will start viMusBot."""
+"""The main bot script. Running this will start Lydian."""
 
 # pylint: disable=wrong-import-position
 
@@ -44,27 +44,25 @@ log.info('Logging for bot.py is now active.')
 log.info('Python version: %s', python_version())
 log.info('Lydian version: %s', VERSION)
 
-# TODO: Make sure updater is up to snuff
 # Check for updates
-# if __name__ == '__main__':
-#     log.info('Running on version %s; checking for updates...', VERSION)
+if __name__ == '__main__':
+    log.info('Running on version %s; checking for updates...', VERSION)
 
-#     update_check_result = update.get_latest_tag()
+    if VERSION.startswith('dev.'):
+        log.warning('You are running a development version.')
 
-#     # Check for an outdated version
-#     if update_check_result['current'] != update_check_result['latest']:
-#         log.warning('### There is a new release available.')
-#         current_tag = update_check_result['current']
-#         latest_tag = update_check_result['latest']
-#         log.warning('### Current: %s | Latest: %s', current_tag, latest_tag)
-#         log.warning('### Use "update.py" or "update.bat" to update.')
-#     else:
-#         if VERSION.startswith('dev.'):
-#             log.warning('You are running a development version.')
-#         else:
-#             log.info('You are up to date.')
+    latest_release = updating.get_latest_release()
+    current = updating.Release.get_version_tuple(VERSION)
 
-#     log.info('Changelog: https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md')
+    # Check for an outdated version
+    if current < latest_release.version:
+        log.warning('### There is a new release available.')
+        print('\n' + latest_release.text[:1000] + '...\n')
+        log.warning('### Use "update.py" or "update.bat" to update.')
+    else:
+        log.info('You are up to date.')
+
+    log.info('Changelog: https://github.com/svioletg/lydian-discord-bot/blob/master/docs/changelog.md')
 
 # Clear out downloaded files
 log.info('Removing previously downloaded media files...')
@@ -181,6 +179,7 @@ async def console_thread():
                         await asyncio_tasks['console']
                     except asyncio.exceptions.CancelledError:
                         pass
+                    log.info('All tasks stopped. Exiting...')
                 case _:
                     log.info('Unrecognized command "%s"', user_input)
         except Exception as e:
