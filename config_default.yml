@@ -92,24 +92,16 @@ inactivity-timeout: 10
 aliases:
     analyze:
         - "analyse"
-    join:
-        - "j"
-    loop:
-        - "l"
-    move:
-        - "m"
     nowplaying:
         - "np"
     play:
         - "p"
     queue:
         - "q"
-    repository:
-        - "repo"
-        - "github"
-        - "gh"
     skip:
         - "s"
+    repository:
+        - "github"
 
 # Any commands listed here will be disabled from use - do not include a prefix before the name
 command-blacklist:

@@ -79,6 +79,7 @@ Other
 - Config changes:
     - Default value of `use-top-match` set to `no`
     - Default value of `command-blacklist` now set to `test` alone
+    - Default aliases for `join`, `loop`, and `move` removed
     - `force-no-match` renamed to `force-match-prompt` for clarity
     - `spotify-playlist-limit` removed, `playlist-track-limit` and `album-track-limit` added in its place (limit applies to any source now)
     - `use-url-cache` removed

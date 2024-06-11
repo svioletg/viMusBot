@@ -109,12 +109,16 @@ class VoiceTest:
     async def test_playall(self, ctx: commands.Context):
         """Run `test_play()` over every option and combination."""
         # TODO: Finish later
-        passed = []
-        failed = []
         prompt_msg = await ctx.send(embed=embedq('This can take a long time. Continue?'))
         yn = await prompt_for_choice(self.inst.bot, ctx, prompt_msg, yesno=True)
         if yn != 1:
             return
+
+        passed = []
+        failed = []
+
+        for src in self.test_sources + ['any', 'mixed']:
+            await self.test_play(ctx, src)
 
     async def test_play(self, ctx: commands.Context, source: str, flags: Optional[list[str]]=None) -> Optional[dict]:
         """NOT a completely comprehensive test, but covers most common bases
@@ -126,6 +130,9 @@ class VoiceTest:
         - `album` = Use an album URL
 
         "playlist" and "album" can't be used together
+
+        @source: Any valid test source in `self.test_sources`, as well as `"any"` or `"mixed"`.\
+            `any` chooses a single test source at random, `mixed` chooses a number of random test sources.
         """
         # if (not bypass_ctx) and (debugctx is None):
         #     log.error('Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')

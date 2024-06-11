@@ -183,7 +183,7 @@ async def console_thread():
                 case _:
                     log.info('Unrecognized command "%s"', user_input)
         except Exception as e:
-            log.info('Error encountered in console thread!')
+            log.info('Error encountered in console thread.')
             log.error(e)
             if cfg.LOG_TRACEBACKS:
                 log.error('Full traceback to follow...\n\n%s', ''.join(traceback.format_exception(e)))
