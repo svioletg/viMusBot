@@ -178,6 +178,9 @@ class Voice(commands.Cog):
                 await asyncio.sleep(1)
                 timeout_counter += 1
 
+                if self.voice_client is None:
+                    break
+
                 if self.voice_client.is_playing() and not self.voice_client.is_paused():
                     timeout_counter = 0
                     self.audio_time_elapsed += 1
@@ -201,6 +204,10 @@ class Voice(commands.Cog):
 
 
     #region COMMANDS
+    @commands.command()
+    async def dl(self, ctx: commands.Context, url):
+        ytdl.extract_info(url, download=True)
+
     @commands.command(aliases=command_aliases('test'))
     @commands.check(is_command_enabled)
     async def test(self, ctx: commands.Context, to_test: str, *args):
@@ -526,9 +533,10 @@ class Voice(commands.Cog):
 
             #region play: PLAIN TEXT
             if plain_strings:
-                text_search: str = ' '.join(plain_strings)
-                log.debug('Using plain-text search: %s', text_search)
-                top_songs, top_videos, top_albums = map(lambda k: media.search_ytmusic_text(text_search).get(k), ('songs', 'videos', 'albums'))
+                search_query: str = ' '.join(plain_strings)
+                log.debug('Using plain-text search: %s', search_query)
+                text_search_result = media.search_ytmusic_text(search_query)
+                top_songs, top_videos, top_albums = map(lambda k: text_search_result.get(k), ('songs', 'videos', 'albums'))
 
                 if cfg.USE_TOP_MATCH:
                     log.debug('USE_TOP_MATCH on.')
@@ -630,7 +638,9 @@ class Voice(commands.Cog):
 
                 if isinstance(media_list, media.AlbumInfo) and media_list.source == media.SPOTIFY:
                     # Find a YTMusic equivalent album if we have a Spotify album
-                    await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...'))
+                    log.debug('Trying to match Spotify album to YouTube Music...')
+                    await self.queue_msg.edit(embed=embedq('Trying to match this Spotify album with a YouTube Music equivalent...',
+                        'This can take a few seconds...'))
                     if match_result := media.match_ytmusic_album(media_list, threshold=50):
                         yt_album = match_result[0]
                         await self.queue_msg.edit(embed=embedq('A possible match was found. Queue this album?') \

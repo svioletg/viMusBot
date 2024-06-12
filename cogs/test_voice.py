@@ -1,6 +1,7 @@
 """Handles testing various parts of the `Voice` cog. Must be used in a running bot."""
 
 # Standard imports
+import itertools
 import logging
 import random
 import time
@@ -95,7 +96,8 @@ class VoiceTest:
     async def perform_test(self, ctx: commands.Context, name: str, *args):
         """Runs a matching test name.
 
-        @name: Will be automatically prefixed with `test_` and called."""
+        @name: Will be automatically prefixed with `test_` and called.
+        """
         name = command_from_alias(name) or name
         name = 'test_' + name
         log.info('Performing test "%s"...', name)
@@ -106,25 +108,10 @@ class VoiceTest:
         log.info('\n\n%s%s', test.__doc__, '' if test.__doc__.endswith('\n') else '\n')
         await test(ctx, *args)
 
-    async def test_playall(self, ctx: commands.Context):
-        """Run `test_play()` over every option and combination."""
-        # TODO: Finish later
-        prompt_msg = await ctx.send(embed=embedq('This can take a long time. Continue?'))
-        yn = await prompt_for_choice(self.inst.bot, ctx, prompt_msg, yesno=True)
-        if yn != 1:
-            return
-
-        passed = []
-        failed = []
-
-        for src in self.test_sources + ['any', 'mixed']:
-            await self.test_play(ctx, src)
-
-    async def test_play(self, ctx: commands.Context, source: str, flags: Optional[list[str]]=None) -> Optional[dict]:
+    async def test_play(self, ctx: commands.Context, source: str, flags: Optional[list[str]]=None, force_invalid: bool=False) -> Optional[dict]:
         """NOT a completely comprehensive test, but covers most common bases
 
         Valid flags:
-        - `invalid` = Use an intentionally invalid URL
         - `multiple` = Use multiple URLs
         - `playlist` = Use a playlist URL
         - `album` = Use an album URL
@@ -133,6 +120,7 @@ class VoiceTest:
 
         @source: Any valid test source in `self.test_sources`, as well as `"any"` or `"mixed"`.\
             `any` chooses a single test source at random, `mixed` chooses a number of random test sources.
+        @force_invalid: Use an intentionally invalid URL.
         """
         # if (not bypass_ctx) and (debugctx is None):
         #     log.error('Debug context is not set; aborting test. Use the "dctx" bot command while in a voice channel to grab one.')
@@ -144,7 +132,7 @@ class VoiceTest:
 
         flags = flags or []
 
-        valid: str = 'invalid' if 'invalid' in flags else 'valid'
+        valid: str = 'invalid' if force_invalid else 'valid'
         playlist_or_album: str | bool = 'playlist' if 'playlist' in flags else 'album' if 'album' in flags else False
         multiple_urls: bool = 'multiple' in flags
 
@@ -161,7 +149,7 @@ class VoiceTest:
         src = random.choice(self.test_sources) if source in ['any', 'mixed'] else source
         url_type = playlist_or_album if playlist_or_album else 'single'
 
-        self.inst.voice_client = await cast(Member, ctx.author).voice.channel.connect()
+        self.inst.voice_client = self.inst.voice_client or await cast(Member, ctx.author).voice.channel.connect()
         if not multiple_urls:
             await self.inst.play(ctx, random.choice(self.test_urls[url_type][valid][src]))
             if self.inst.voice_client.is_playing():

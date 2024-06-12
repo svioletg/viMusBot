@@ -320,20 +320,17 @@ class PlaylistInfo(MediaInfo):
         return cls(SPOTIFY, sp.playlist(url))
 
 def track_list_duration(track_list: list[TrackInfo]) -> int:
-
     """Return the sum of track lengths from a list of `TrackInfo` objects."""
     return int(sum(track.length_seconds for track in track_list))
 
 # Pylint warns about some return paths here returning None, but I can't find a situation where that would happen
 def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo]: # type: ignore
     """Retrieves a list of `TrackInfo` objects based on the URLs found witin an AlbumInfo or PlaylistInfo object."""
-    # TODO: This can take a while, maybe find a way to report status back to bot.py?
     object_list: list[TrackInfo] = []
     log.debug('Looking for MediaInfo group contents...')
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
         for n, track in enumerate(track_list):
-            log.debug('Getting track %s out of %s...', n + 1, len(track_list))
             try:
                 if isinstance(group_object, AlbumInfo):
                     object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
@@ -620,6 +617,7 @@ def search_ytmusic_text(query: str, max_results: int=1) -> YTMusicSearchResults:
     for key, val in {'songs': (songs, TrackInfo), 'videos': (videos, TrackInfo), 'albums': (albums, AlbumInfo)}.items():
         if not val[0]: continue
         category, cls = val
+        print(key, len(category), cls)
         results[key] = [cls.from_ytmusic(i) for n, i in enumerate(category) if n <= max_results]
 
     return results
@@ -633,10 +631,12 @@ def match_ytmusic_album(src_info: AlbumInfo, threshold: int=75) -> tuple[AlbumIn
     """
     title, artist, release_year = src_info.title, src_info.artist, src_info.release_year
     query = f'{title} {artist} {release_year}'
+    query_no_year = f'{title} {artist}'
 
     log.info('Finding a YTMusic album match...')
 
-    album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')[:5]]
+    album_results = [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query, limit=1, filter='albums')[:5]] \
+                    + [AlbumInfo(YOUTUBE, result, 'ytmusic') for result in ytmusic.search(query=query_no_year, limit=1, filter='albums')[:5]]
 
     for result in album_results:
         if (confidence := compare_media(src_info, result)[0]) >= threshold:
