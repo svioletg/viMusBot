@@ -247,7 +247,7 @@ class TrackInfo(MediaInfo):
                 self.length_seconds = int(self.info.get('duration_seconds') or self.info.get('lengthSeconds'))
                 self.album_name     = cast(str, benedict(self.info).get('album.name', ''))
             elif self.yt_info_origin == 'ytdl':
-                self.length_seconds = int(self.info.get('duration', None))
+                self.length_seconds = int(self.info.get('duration', 0))
 
     @classmethod
     def from_spotify_url(cls, url: str) -> Self:
@@ -330,10 +330,10 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
     log.debug('Looking for MediaInfo group contents...')
     if group_object.source == SPOTIFY:
         track_list = cast(list[dict], group_object.info['tracks']['items'])
-        for n, track in enumerate(track_list):
+        for track in track_list:
             try:
                 if isinstance(group_object, AlbumInfo):
-                    object_list.append(TrackInfo(SPOTIFY, cast(dict, track)))
+                    object_list.append(TrackInfo(SPOTIFY, track))
                     object_list[-1].thumbnail    = group_object.thumbnail
                     object_list[-1].album_name   = group_object.album_name
                     object_list[-1].release_year = group_object.release_year
@@ -349,6 +349,9 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
         track_list = group_object.info.tracks
         for track in track_list:
             object_list.append(TrackInfo(SOUNDCLOUD, track))
+            object_list[-1].thumbnail    = group_object.thumbnail
+            object_list[-1].album_name   = group_object.album_name
+            object_list[-1].release_year = group_object.release_year
         return object_list
 
     if group_object.source == YOUTUBE:
@@ -361,6 +364,9 @@ def get_group_contents(group_object: AlbumInfo | PlaylistInfo) -> list[TrackInfo
 
         for track in track_list:
             object_list.append(TrackInfo(YOUTUBE, track))
+            object_list[-1].thumbnail    = object_list[-1].thumbnail or group_object.thumbnail
+            object_list[-1].album_name   = object_list[-1].album_name or group_object.album_name
+            object_list[-1].release_year = object_list[-1].release_year or group_object.release_year
         return object_list
 
     if group_object.source == OTHER:
