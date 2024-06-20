@@ -11,7 +11,7 @@ from collections import deque
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
-from typing import Optional, Self, cast
+from typing import Callable, Optional, Self, cast
 
 # External imports
 import requests
@@ -122,7 +122,7 @@ class PlaylistLimitError(Exception):
 
 async def author_in_vc(ctx: commands.Context) -> bool:
     """Checks whether the command author is connected to a voice channel before allowing it to run.
-    
+
     If the author *is* connected, they must be connected to the same voice channel the bot is in for this to pass."""
     command_author = cast(Member, ctx.author)
     if not command_author.voice:
@@ -154,6 +154,7 @@ class Voice(commands.Cog):
         self.player: Optional[YTDLSource] = None
 
         self.advance_lock: bool = False
+        self.after_advance_queue: Optional[Callable] = None
 
         self.skip_votes_placed: list[Member] = []
 
@@ -204,10 +205,6 @@ class Voice(commands.Cog):
 
 
     #region COMMANDS
-    @commands.command()
-    async def dl(self, ctx: commands.Context, url):
-        ytdl.extract_info(url, download=True)
-
     @commands.command(aliases=command_aliases('test'))
     @commands.check(is_command_enabled)
     async def test(self, ctx: commands.Context, to_test: str, *args):
@@ -535,18 +532,17 @@ class Voice(commands.Cog):
             if plain_strings:
                 search_query: str = ' '.join(plain_strings)
                 log.debug('Using plain-text search: %s', search_query)
-                text_search_result = media.search_ytmusic_text(search_query)
-                top_songs, top_videos, top_albums = map(lambda k: text_search_result.get(k), ('songs', 'videos', 'albums'))
+                top = media.search_ytmusic_text(search_query)
 
                 if cfg.USE_TOP_MATCH:
                     log.debug('USE_TOP_MATCH on.')
-                    if top_songs:
+                    if top['songs']:
                         log.debug('Queueing top song...')
-                        await play_or_enqueue(QueueItem(top_songs[0], ctx.author))
+                        await play_or_enqueue(QueueItem(top['songs'][0], ctx.author)) # pylint: disable=unsubscriptable-object
                         return
-                    elif top_videos:
+                    elif top['videos']:
                         log.debug('Queueing top video...')
-                        await play_or_enqueue(QueueItem(top_videos[0], ctx.author))
+                        await play_or_enqueue(QueueItem(top['videos'][0], ctx.author)) # pylint: disable=unsubscriptable-object
                         return
                     else:
                         await ctx.send(embed=embedq(f'{EmojiStr.cancel} No close matches could be found.'))
@@ -565,7 +561,7 @@ class Voice(commands.Cog):
                             options[position] = item[0]
                     return options, target_embed
 
-                choice_options, choice_embed = assemble_choices(choice_embed, [top_songs, top_videos, top_albums], ['song', 'video', 'album'])
+                choice_options, choice_embed = assemble_choices(choice_embed, [top['songs'], top['videos'], top['albums']], ['song', 'video', 'album'])
 
                 choice_prompt = await ctx.send(embed=choice_embed)
                 choice = await prompt_for_choice(self.bot, ctx, choice_prompt, choice_nums=len(choice_options), result_msg=self.queue_msg)
@@ -740,7 +736,7 @@ class Voice(commands.Cog):
         if not self.voice_client.is_connected():
             return
 
-        if not self.advance_lock and (skipping or not self.voice_client.is_playing()):
+        if (not self.advance_lock) and (skipping or not self.voice_client.is_playing()):
             log.debug('Locking...')
             self.advance_lock = True
             try:
@@ -755,6 +751,8 @@ class Voice(commands.Cog):
                             log.debug('Removed file: %s', file)
                         except PermissionError:
                             log.debug('Permission error prevented removal of file: %s', file)
+                        except FileNotFoundError:
+                            log.debug('File not found: %s', file)
                 self.player = None
 
                 self.previous_item = self.current_item
@@ -772,6 +770,9 @@ class Voice(commands.Cog):
                 # finally statement makes sure we still unlock if an error occurs
                 log.debug('Tasks finished; unlocking...')
                 self.advance_lock = False
+            if self.after_advance_queue:
+                self.after_advance_queue()
+            self.after_advance_queue = None
         elif self.advance_lock:
             log.debug('Attempted call while locked; ignoring...')
 
@@ -781,6 +782,9 @@ class Voice(commands.Cog):
 
         Use `advance_queue()` to attempt moving the queue along, do not use this function directly."""
         log.info('Trying to start playing...')
+
+        def skip_after_return() -> None:
+            self.after_advance_queue = lambda: asyncio.run_coroutine_threadsafe(self.advance_queue(ctx, skipping=True), self.bot.loop)
 
         self.audio_time_elapsed = 0.0
 
@@ -817,7 +821,7 @@ class Voice(commands.Cog):
                 prompt_msg = await ctx.send(embed=embedq(f'The duration of "{item.info.title}" couldn\'t be retrieved, so ' +
                     'it can\'t be checked against the duration limit. Play anyway?'))
                 if await prompt_for_choice(self.bot, ctx, prompt_msg=prompt_msg, yesno=True) == 0:
-                    await self.advance_queue(ctx, skipping=True)
+                    skip_after_return()
                     return
 
         try:
@@ -826,7 +830,14 @@ class Voice(commands.Cog):
         except yt_dlp.utils.DownloadError:
             log.info('Download error occurred; skipping this item...')
             await ctx.send(embed=embedq('This video is unavailable.', f'URL: {item.info.url}'))
-            await self.advance_queue(ctx, skipping=True)
+            skip_after_return()
+            return
+
+        if not self.player.filepath.is_file():
+            log.info('Player filepath was not found, skipping...')
+            await ctx.send(embed=embedq('File is missing, skipping this item.',
+                'The video file likely went over the filesize limit. Check the logs for details.'))
+            skip_after_return()
             return
 
         self.voice_client.stop()

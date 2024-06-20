@@ -53,7 +53,7 @@ auto-remove:
 
 # Maximum file size that an be download by yt_dlp, megabytes (MB)
 # Adjust as needed depending on your network speed
-maximum-file-size: 10
+maximum-file-size: 50
 
 # Allows queueing playlists or albums
 allow-playlists-albums: yes
