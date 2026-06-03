@@ -1,14 +1,14 @@
 # viMusBot
 
+---
+
+## viMusBot has been archived, with its successor at the [lydian](https://github.com/svioletg/lydian) repository.
+
+---
+
 Full changelog: [changelog.md](https://github.com/svioletg/viMusBot/blob/master/docs/changelog.md)
 
 See progress on bug fixes and new features here: [viMusBot Taskboard](https://github.com/users/svioletg/projects/1/views/1)
-
----
-
-### Following a large rewrite, *viMusBot* is now *Lydian*, and development has moved to the [lydian-discord-bot](https://github.com/svioletg/lydian-discord-bot) repository. This repository will be kept for archival / historical purposes.
-
----
 
 viMusBot is a Discord music bot with support for Spotify links, written in Python.
 
